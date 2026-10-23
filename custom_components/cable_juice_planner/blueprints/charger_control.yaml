@@ -1,8 +1,20 @@
 blueprint:
   name: Cable Juice Planner - styr laderen
   description: >
-    Udfører Cable Juice Planners handlinger på din lader: tænd/sluk, start/stop og
-    ladestrøm pr. fase.
+    Udfører Cable Juice Planners handlinger på laderen og/eller bilen: tænd/sluk, start/stop,
+    ladestrøm pr. fase og bilens ladegrænse. Lav én automation pr. bil – vælg bilens
+    "Lader handling".
+
+
+    **Alle handlinger er valgfrie.** For hver opgave udfylder du handlingen dér, hvor dit setup
+    kan gøre det – i laderen, i bilen eller begge steder. F.eks. start/stop og ladestrøm i
+    laderen og ladegrænsen i bilen, eller start/stop og ladegrænse i bilen og ladestrøm i
+    laderen. Kan hverken laderen eller bilen sætte ladestrømmen, starter og stopper
+    blueprinten bare ladningen.
+
+
+    **Rækkefølge ved start:** tænd laderen → ladestrøm i laderen → ladestrøm i bilen →
+    start laderen → start bilen. Ved stop stoppes laderen og bilen.
 
 
     **Fail-safe:** er `charger_action` utilgængelig, eller er der ikke regnet en ny plan i
@@ -12,9 +24,21 @@ blueprint:
     deactivated`, når scriptet er slået fra. Begge dele udføres som normale handlinger.
 
 
+    **Ladestatus (valgfri):** en status-sensor, en "lader"-kontakt/binær sensor eller en
+    effektsensor fortæller blueprinten, om der lades. Så gentages start ikke, mens der lades
+    eller når laderen/bilen melder færdig (f.eks. `completed`/`finished` – bilen er fuld eller
+    har nået sin ladegrænse), og integrationerne kan genstartes, hvis der ikke lades.
+
+
+    **Genstart (valgfri):** står handlingen på `charge` i det valgte antal minutter, uden at
+    der lades, køres dine genstart-handlinger (f.eks. genindlæs laderens eller bilens
+    integration) – højst det valgte antal gange.
+
+
     I handlingerne kan du bruge variablerne `phase_1`, `phase_2`, `phase_3` (ampere),
-    `max_phase` (højeste fase), `phases` (antal faser i brug), `charger_enabled`,
-    `fail_safe` (true i fail-safe) og `message` (i notifikationen).
+    `max_phase` (højeste fase), `phases` (antal faser i brug), `charging_limit` (bilens
+    ladegrænse i %), `charger_enabled`, `fail_safe` (true i fail-safe) og `message` (i
+    notifikationen).
   domain: automation
   source_url: https://github.com/dezito/Cable-Juice-Planner-HACS/blob/main/custom_components/cable_juice_planner/blueprints/charger_control.yaml
   input:
@@ -24,91 +48,203 @@ blueprint:
       input:
         action_sensor:
           name: Lader handling
-          description: sensor.cjp_<prefix>_charger_action
+          description: >
+            Bilens sensor.cjp_<prefix>_charger_action. Ladestrømmen pr. fase og ladegrænsen
+            læses fra dens attributter (phase_1_amps, phase_2_amps, phase_3_amps,
+            charging_limit).
           selector:
             entity:
               filter:
                 - integration: cable_juice_planner
                   domain: sensor
-        phase_1_sensor:
-          name: Fase 1 ampere
-          description: sensor.cjp_<prefix>_charger_phase_1_amps
-          selector:
-            entity:
-              filter:
-                - integration: cable_juice_planner
-                  domain: sensor
-        phase_2_sensor:
-          name: Fase 2 ampere
-          description: sensor.cjp_<prefix>_charger_phase_2_amps
-          selector:
-            entity:
-              filter:
-                - integration: cable_juice_planner
-                  domain: sensor
-        phase_3_sensor:
-          name: Fase 3 ampere
-          description: sensor.cjp_<prefix>_charger_phase_3_amps
-          selector:
-            entity:
-              filter:
-                - integration: cable_juice_planner
-                  domain: sensor
+                  device_class: enum
     charger:
       name: Lader
       icon: mdi:ev-plug-type2
+      collapsed: true
       input:
         start_actions:
           name: Start ladning
-          description: F.eks. easee.action_command resume eller switch.turn_on
+          description: >
+            Det der får laderen til at lade: laderens egen service (f.eks. start/resume i
+            Easee, Zaptec eller Wallbox), en start/stop-kontakt (f.eks. Monta, OCPP, go-e) eller
+            en knap.
           default: []
           selector:
             action: {}
         stop_actions:
           name: Stop ladning
-          description: F.eks. easee.action_command pause eller switch.turn_off
+          description: >
+            Det modsatte af start: stop/pause-servicen eller kontakten slået fra. Kan laderen
+            pause ved 0 A, er det nok at sætte ladestrømmen (den sættes til 0 ved stop).
           default: []
           selector:
             action: {}
         amps_actions:
           name: Sæt ladestrøm
           description: >
-            F.eks. easee.set_charger_dynamic_limit med current: "{{ max_phase }}" eller
-            current_p1/p2/p3. Køres når strømmen ændres og før start.
+            Laderens grænse for ladestrømmen: en dynamisk grænse-service (f.eks. Easee, Zaptec)
+            eller en number-entitet (f.eks. OCPP, go-e, Wallbox) sat til "{{ max_phase }}".
+            Tager laderen strøm pr. fase, så brug "{{ phase_1 }}", "{{ phase_2 }}" og
+            "{{ phase_3 }}" (0 = fasen bruges ikke). Køres når strømmen ændres og før start.
           default: []
           selector:
             action: {}
         enable_actions:
           name: Tænd laderen
-          description: Når attributten charger_enabled bliver true (genstart af laderen).
+          description: >
+            Når attributten charger_enabled bliver true (integrationen genstarter laderen, hvis
+            den ikke begynder at lade), f.eks. switch.turn_on på laderens "aktiveret"-kontakt.
+            Vælg entiteten, ikke hele enheden – ellers slås alle laderens kontakter til.
           default: []
           selector:
             action: {}
         disable_actions:
           name: Sluk laderen
-          description: Når attributten charger_enabled bliver false (genstart af laderen).
+          description: Når attributten charger_enabled bliver false (første halvdel af genstarten).
           default: []
           selector:
             action: {}
+    car:
+      name: Bil
+      icon: mdi:car-electric
+      collapsed: true
+      input:
+        car_start_actions:
+          name: Start ladning i bilen
+          description: >
+            Bilens lade-kontakt eller start-service fra bilens integration (f.eks. Tesla/Tessie,
+            VW/Cupra/Skoda/Audi, Kia/Hyundai, Mercedes, Ford, Stellantis-bilerne). Bruges ofte
+            når laderen ikke kan styres.
+          default: []
+          selector:
+            action: {}
+        car_stop_actions:
+          name: Stop ladning i bilen
+          description: Det modsatte af start – kontakten slået fra eller stop-servicen.
+          default: []
+          selector:
+            action: {}
+        car_amps_actions:
+          name: Sæt ladestrøm i bilen
+          description: >
+            Kun hvis bilen kan sætte ladestrømmen (f.eks. en "charge current"-number) –
+            number.set_value med value: "{{ max_phase }}". Kan hverken laderen eller bilen
+            styre strømmen, lader bilen med det den kan, og soloverskud/lastfordeling kan ikke
+            regulere den. Køres når strømmen ændres og før start (aldrig med 0 A).
+          default: []
+          selector:
+            action: {}
+        car_limit_actions:
+          name: Sæt ladegrænse i bilen
+          description: >
+            Bilens ladegrænse (f.eks. "charge limit" eller "target state of charge") –
+            number.set_value med value: "{{ charging_limit }}". Køres når integrationen ændrer
+            ladegrænsen og før start. Kræver at bilens integration er sat op i Cable Juice
+            Planner (uden den er ladegrænsen ikke kendt).
+          default: []
+          selector:
+            action: {}
+    state:
+      name: Ladestatus
+      icon: mdi:battery-charging
+      collapsed: true
+      input:
         charger_status:
-          name: Laderens status (valgfri)
-          description: Bruges i fail-safe, så start-kommandoen ikke gentages mens laderen allerede lader.
+          name: Status eller "lader"-entitet (valgfri)
+          description: >
+            Laderens eller bilens status-sensor (f.eks. charging/completed) eller en kontakt /
+            binær sensor der er on, når der lades. Tilpas de to lister nedenfor til de
+            tilstande din entitet har (se dens historik).
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: [sensor, binary_sensor, switch]
+        charging_states:
+          name: Tilstande der betyder lader
+          description: F.eks. charging, Charging eller on.
+          default: [charging, "on"]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [charging, "on"]
+        completed_states:
+          name: Tilstande der betyder færdig
+          description: >
+            Bilen er fuld eller har nået sin ladegrænse (som CHARGER_COMPLETED_STATUS), f.eks.
+            completed, finished, Finishing eller charge_complete.
+          default: [completed, finished]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [completed, finished]
+        power_sensor:
+          name: Ladeeffekt (valgfri)
+          description: >
+            Hvis der ikke er en status: en effektsensor for laderen eller bilen. Over tærsklen
+            nedenfor regnes det for at lade. Bruges sammen med status, hvis begge er sat.
           default: ""
           selector:
             entity:
               filter:
                 - domain: sensor
-        charging_states:
-          name: Status der betyder lader
-          default: [charging]
+                  device_class: power
+        power_threshold:
+          name: Lader over
+          description: >
+            Kun når Ladeeffekt er valgt: effekten skal være over denne værdi, før det regnes
+            for at lade. Hold den over laderens/bilens standby-forbrug og under den laveste
+            ladeeffekt (6 A på 1 fase ≈ 1400 W). Bruges til ikke at gentage start, mens der
+            lades, og til at se om der skal genstartes.
+          default: 500
           selector:
-            select:
-              multiple: true
-              custom_value: true
-              options: [charging]
+            number:
+              min: 50
+              max: 5000
+              step: 50
+              unit_of_measurement: W
+              mode: box
+    restart:
+      name: Genstart når der ikke lades
+      icon: mdi:restart-alert
+      collapsed: true
+      input:
+        restart_actions:
+          name: Genstart-handlinger
+          description: >
+            Køres når handlingen har stået på charge i det valgte antal minutter uden at der
+            lades (kræver Ladestatus). F.eks. homeassistant.reload_config_entry med en af
+            laderens eller bilens entiteter som mål – det genindlæser hele den integration.
+          default: []
+          selector:
+            action: {}
+        restart_minutes:
+          name: Genstart efter
+          default: 10
+          selector:
+            number:
+              min: 5
+              max: 120
+              step: 5
+              unit_of_measurement: min
+              mode: box
+        restart_max:
+          name: Højst antal genstarter
+          description: Pr. gang handlingen skifter til charge.
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 10
+              step: 1
+              mode: box
     fail_safe:
       name: Fail-safe
       icon: mdi:shield-car
+      collapsed: true
       input:
         fail_safe_minutes:
           name: Fail-safe efter
@@ -145,8 +281,8 @@ blueprint:
         notify_actions:
           name: Notifikation
           description: >
-            Ved fail-safe og når integrationen melder mode error. Variablen message har
-            teksten, f.eks. notify.mobile_app_telefon med message: "{{ message }}".
+            Ved fail-safe, genstart og når integrationen melder mode error. Variablen message har
+            teksten, f.eks. en notify-service med message: "{{ message }}".
           default: []
           selector:
             action: {}
@@ -168,12 +304,21 @@ triggers:
     attribute: mode
     id: mode
   - trigger: state
-    entity_id:
-      - !input phase_1_sensor
-      - !input phase_2_sensor
-      - !input phase_3_sensor
-    to: ~
+    entity_id: !input action_sensor
+    attribute: phase_1_amps
     id: amps
+  - trigger: state
+    entity_id: !input action_sensor
+    attribute: phase_2_amps
+    id: amps
+  - trigger: state
+    entity_id: !input action_sensor
+    attribute: phase_3_amps
+    id: amps
+  - trigger: state
+    entity_id: !input action_sensor
+    attribute: charging_limit
+    id: limit
   - trigger: state
     entity_id: !input action_sensor
     to: [unavailable, unknown]
@@ -189,17 +334,20 @@ triggers:
 
 variables:
   action_sensor: !input action_sensor
-  phase_1_sensor: !input phase_1_sensor
-  phase_2_sensor: !input phase_2_sensor
-  phase_3_sensor: !input phase_3_sensor
   charger_status: !input charger_status
   charging_states: !input charging_states
+  completed_states: !input completed_states
+  power_sensor: !input power_sensor
+  power_threshold: !input power_threshold
+  restart_minutes: !input restart_minutes
+  restart_max: !input restart_max
   fail_safe_minutes: !input fail_safe_minutes
   fail_safe_amps: !input fail_safe_amps
   fail_safe_phases: !input fail_safe_phases
   action: "{{ states(action_sensor) }}"
   charger_mode: "{{ state_attr(action_sensor, 'mode') or 'normal' }}"
   charger_enabled: "{{ state_attr(action_sensor, 'charger_enabled') | default(true, true) | bool }}"
+  charging_limit: "{{ state_attr(action_sensor, 'charging_limit') | int(0) }}"
   fail_safe: >
     {% set s = states[action_sensor] %}
     {% if s is none %}
@@ -210,10 +358,19 @@ variables:
       {% set updated = as_timestamp(s.attributes.get('updated'), 0) %}
       {{ updated > 0 and (as_timestamp(now()) - updated) > fail_safe_minutes * 60 }}
     {% endif %}
-  already_charging: "{{ charger_status != '' and states(charger_status) in charging_states }}"
-  phase_1: "{{ (fail_safe_amps if fail_safe else states(phase_1_sensor)) | int(0) }}"
-  phase_2: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 2 else 0 if fail_safe else states(phase_2_sensor)) | int(0) }}"
-  phase_3: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 3 else 0 if fail_safe else states(phase_3_sensor)) | int(0) }}"
+  already_charging: >
+    {{ (charger_status != '' and states(charger_status) in charging_states)
+       or (power_sensor != '' and states(power_sensor) | float(0) * (1000 if state_attr(power_sensor, 'unit_of_measurement') == 'kW' else 1) > power_threshold) }}
+  has_charging_state: "{{ charger_status != '' or power_sensor != '' }}"
+  # minutes the action has been charge (last_changed only moves when the state changes)
+  charge_minutes: >
+    {% set s = states[action_sensor] %}
+    {{ ((now() - s.last_changed).total_seconds() / 60) | int if s is not none and s.state == 'charge' else 0 }}
+  restart_attempt: "{{ ((charge_minutes - restart_minutes) // restart_minutes) + 1 if charge_minutes >= restart_minutes else 0 }}"
+  charger_done: "{{ charger_status != '' and states(charger_status) in completed_states }}"
+  phase_1: "{{ (fail_safe_amps if fail_safe else state_attr(action_sensor, 'phase_1_amps')) | int(0) }}"
+  phase_2: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 2 else 0 if fail_safe else state_attr(action_sensor, 'phase_2_amps')) | int(0) }}"
+  phase_3: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 3 else 0 if fail_safe else state_attr(action_sensor, 'phase_3_amps')) | int(0) }}"
   max_phase: "{{ [phase_1, phase_2, phase_3] | max }}"
   phases: "{{ [phase_1, phase_2, phase_3] | select('gt', 0) | list | count }}"
 
@@ -222,7 +379,8 @@ actions:
       # ---- fail-safe: the planner is gone or does not calculate any more ----
       - conditions: "{{ fail_safe }}"
         sequence:
-          - if: "{{ not already_charging }}"
+          # not while it charges, and not when the charger says the car is done
+          - if: "{{ not already_charging and not charger_done }}"
             then:
               - variables:
                   message: >
@@ -231,11 +389,36 @@ actions:
                     {{ fail_safe_amps }} A på {{ fail_safe_phases }} fase(r).
               - sequence: !input enable_actions
               - sequence: !input amps_actions
+              - sequence: !input car_amps_actions
               - sequence: !input start_actions
+              - sequence: !input car_start_actions
               # notify when the fail-safe starts and at most once an hour while it lasts
               - if: "{{ trigger.id != 'watchdog' or now().minute < 5 }}"
                 then:
                   - sequence: !input notify_actions
+      # ---- charging was asked for but does not happen: restart the integrations ----
+      - conditions: >
+          {{ trigger.id == 'watchdog' and has_charging_state and action == 'charge' and charger_enabled
+             and not already_charging and not charger_done
+             and 1 <= restart_attempt <= restart_max
+             and (charge_minutes - restart_minutes) % restart_minutes < 5 }}
+        sequence:
+          - variables:
+              message: >
+                Der lades ikke, selvom Cable Juice Planner har bedt om det i
+                {{ charge_minutes }} min. Genstarter (forsøg {{ restart_attempt }} af
+                {{ restart_max }}).
+          - sequence: !input restart_actions
+          - sequence: !input notify_actions
+          # after the restart: send the current decision again
+          - delay: 60
+          - sequence: !input enable_actions
+          - sequence: !input amps_actions
+          - if: "{{ max_phase > 0 }}"
+            then:
+              - sequence: !input car_amps_actions
+          - sequence: !input start_actions
+          - sequence: !input car_start_actions
       # ---- the integration reports an error (it already asks for max amps) ----
       - conditions: "{{ trigger.id == 'mode' and charger_mode == 'error' }}"
         sequence:
@@ -245,7 +428,13 @@ actions:
                 Se notifikationerne i Home Assistant.
           - sequence: !input notify_actions
           - sequence: !input amps_actions
-          - sequence: !input start_actions
+          - if: "{{ max_phase > 0 }}"
+            then:
+              - sequence: !input car_amps_actions
+          - if: "{{ not charger_done }}"
+            then:
+              - sequence: !input start_actions
+              - sequence: !input car_start_actions
       # ---- normal operation ----
       - conditions: "{{ trigger.id == 'enabled' }}"
         sequence:
@@ -254,9 +443,15 @@ actions:
               - sequence: !input enable_actions
             else:
               - sequence: !input disable_actions
+      - conditions: "{{ trigger.id == 'limit' and charging_limit > 0 }}"
+        sequence:
+          - sequence: !input car_limit_actions
       - conditions: "{{ trigger.id == 'amps' and action in ['charge', 'stop'] }}"
         sequence:
           - sequence: !input amps_actions
+          - if: "{{ max_phase > 0 }}"
+            then:
+              - sequence: !input car_amps_actions
       - conditions: "{{ trigger.id in ['action', 'start', 'fail_safe'] and action in ['charge', 'stop'] }}"
         sequence:
           - if: "{{ charger_enabled }}"
@@ -264,8 +459,19 @@ actions:
               - sequence: !input enable_actions
           - if: "{{ action == 'charge' }}"
             then:
+              - if: "{{ charging_limit > 0 }}"
+                then:
+                  - sequence: !input car_limit_actions
               - sequence: !input amps_actions
-              - sequence: !input start_actions
+              - if: "{{ max_phase > 0 }}"
+                then:
+                  - sequence: !input car_amps_actions
+              # a new charge decision always starts; after a restart only when not charging/done
+              - if: "{{ trigger.id == 'action' or not (already_charging or charger_done) }}"
+                then:
+                  - sequence: !input start_actions
+                  - sequence: !input car_start_actions
             else:
               - sequence: !input stop_actions
+              - sequence: !input car_stop_actions
               - sequence: !input amps_actions
