@@ -116,6 +116,9 @@ class ControlMixin:
         self.set_state("charger_phase_2_amps", phase_2)
         self.set_state("charger_phase_3_amps", phase_3)
         self.set_state("charging_watts", watt)
+        # also on the action sensor: an automation only needs that one entity
+        for i, value in enumerate((phase_1, phase_2, phase_3), start=1):
+            self.set_attr("charger_action", f"phase_{i}_amps", int(value))
 
     def set_charger_phase_limits(self, circuit_amps=None, charger_amps=None) -> None:
         circuit_amps = self._max_amps() if circuit_amps is None else circuit_amps
@@ -204,6 +207,8 @@ class ControlMixin:
         if self.sensor_states.get(key) != value:
             _LOGGER.info("Car %s: %s", key, value)
         self.set_state(key, value)
+        # also on the action sensor, so the charger automation only needs that entity
+        self.set_attr("charger_action", key, value)
 
     def wake_up_ev(self) -> None:
         if not self.is_ev_configured():
