@@ -1,0 +1,72 @@
+debug_info:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: cable_juice_planner
+
+enforce_planning:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: cable_juice_planner
+
+manual_add_public_charging_session:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: cable_juice_planner
+    charging_session_start:
+      required: true
+      selector:
+        datetime:
+    battery_level_begin:
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: box
+    battery_level_end:
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: box
+    battery_level_added:
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: box
+    battery_kwh_added:
+      selector:
+        number:
+          min: 0
+          max: 250
+          step: 0.01
+          unit_of_measurement: kWh
+          mode: box
+    total_charging_cost:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 0.01
+          mode: box
+    include_charging_loss:
+      default: true
+      selector:
+        boolean:
+    add_to_history:
+      default: false
+      selector:
+        boolean:

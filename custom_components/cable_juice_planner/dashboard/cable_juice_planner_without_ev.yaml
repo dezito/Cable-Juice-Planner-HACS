@@ -1,0 +1,2220 @@
+views:
+- theme: Backend-selected
+  title: Hjem
+  type: sections
+  badges:
+  - type: entity
+    show_name: false
+    show_state: true
+    show_icon: true
+    entity: button.cjp_enforce_planning
+    state_content: name
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.cjp_enforce_planning
+  - type: custom:mushroom-template-badge
+    content: Debug info
+    icon: mdi:mushroom
+    color: yellow
+    tap_action:
+      action: perform-action
+      perform_action: cable_juice_planner.debug_info
+      data:
+        config_entry_id: __ENTRY_ID__
+    label: ''
+  cards:
+  - type: markdown
+    content: '{{ states.sensor.cjp_charging_history.attributes.history }}'
+    view_layout:
+      position: sidebar
+  - type: vertical-stack
+    cards:
+    - type: horizontal-stack
+      cards:
+      - type: gauge
+        entity: sensor.elbil_lade_score_energyscore
+        min: 0
+        max: 100
+        needle: true
+        severity:
+          red: 0
+          yellow: 35
+          green: 65
+      - type: gauge
+        entity: sensor.cjp_solar_charged_percentage
+        needle: true
+        severity:
+          green: 50
+          yellow: 25
+          red: 0
+    - graph: line
+      type: sensor
+      entity: sensor.cjp_co2_emitted
+      detail: 1
+      hours_to_show: 550
+    view_layout:
+      position: sidebar
+  - type: history-graph
+    entities:
+    - entity: sensor.cjp_solar_over_production_current_hour
+    - entity: sensor.cjp_kwh_cost_price
+    hours_to_show: 48
+    view_layout:
+      position: sidebar
+  - type: markdown
+    content: '  {{ states.sensor.cjp_overview.attributes.overview }}'
+    view_layout:
+      position: sidebar
+  - square: false
+    columns: 1
+    type: grid
+    cards:
+    - square: false
+      columns: 1
+      type: grid
+      cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.cjp_charge_very_cheap_battery_level
+        double_tap_action:
+          action: none
+        hold_action:
+          action: none
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-entity-card
+        entity: sensor.cjp_charge_ultra_cheap_battery_level
+        double_tap_action:
+          action: none
+        hold_action:
+          action: none
+        tap_action:
+          action: more-info
+      - type: custom:mushroom-chips-card
+        chips:
+        - type: entity
+          entity: button.cjp_enforce_planning
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.cjp_enforce_planning
+          hold_action:
+            action: none
+          content_info: name
+          use_entity_picture: false
+        alignment: end
+    view_layout:
+      position: sidebar
+  - square: false
+    columns: 1
+    type: grid
+    cards:
+    - type: custom:mushroom-title-card
+      title: Tur ladning
+    - square: false
+      columns: 1
+      type: grid
+      cards:
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: number.cjp_trip_range_needed
+          state: '0.0'
+        card:
+          type: custom:mushroom-number-card
+          entity: number.cjp_trip_charge_procent
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: number.cjp_trip_charge_procent
+          state: '0.0'
+        card:
+          type: custom:mushroom-number-card
+          entity: number.cjp_trip_range_needed
+      - type: custom:mushroom-entity-card
+        entity: datetime.cjp_trip_date_time
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+      - type: custom:mushroom-entity-card
+        entity: datetime.cjp_trip_homecoming_date_time
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+      - type: custom:mushroom-chips-card
+        chips:
+        - type: entity
+          entity: button.cjp_trip_reset
+          content_info: name
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.cjp_trip_reset
+          hold_action:
+            action: none
+          use_entity_picture: false
+        alignment: end
+    view_layout:
+      position: sidebar
+  - square: false
+    columns: 1
+    type: grid
+    cards:
+    - type: custom:mushroom-title-card
+      title: Manuel ladning
+      title_tap_action:
+        action: none
+      subtitle_tap_action:
+        action: none
+    - square: false
+      columns: 1
+      type: grid
+      cards:
+      - type: custom:mushroom-entity-card
+        entity: switch.cjp_allow_manual_charging_now
+        tap_action:
+          action: toggle
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+      - type: custom:mushroom-entity-card
+        entity: switch.cjp_allow_manual_charging_solar
+        tap_action:
+          action: toggle
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+    view_layout:
+      position: sidebar
+  - type: markdown
+    content: '{{ states.sensor.cjp_emoji_description.attributes.description }}'
+    view_layout:
+      position: sidebar
+  sections:
+  - type: grid
+    cards:
+    - vehicle_image_type: default
+      status_image_type: none
+      layout_type: full_half
+      formatted_entities: true
+      show_location: true
+      show_mileage: true
+      show_car_state: true
+      show_info_icons: true
+      help_highlight: true
+      sections_order:
+      - title
+      - image
+      - info
+      - icon_row_zwo8t17
+      - break_mfi9kulrn3k53jy8zs
+      - bar_0
+      bars:
+      - left_entity: sensor.bil_lader_2_status
+        right_entity: sensor.bil_lader_2_power
+        left_title_size: 14
+        left_text_size: 14
+        right_title_size: 14
+        right_text_size: 14
+        bar_size: regular
+        bar_style: inset
+        show_left: true
+        show_right: true
+        show_percentage: true
+        show_left_title: true
+        show_left_value: true
+        show_right_title: true
+        show_right_value: true
+        percentage_type: entity
+        percentage_amount_entity: ''
+        percentage_total_entity: ''
+        percentage_template: ''
+        alignment: space-between
+        width: '100'
+        use_gradient: true
+        gradient_display_mode: value_based
+        gradient_stops:
+        - id: '1'
+          position: 0
+          color: '#ff0000'
+        - id: stop-4
+          position: 25
+          color: '#ff8000'
+        - id: stop-7
+          position: 50
+          color: '#ffc000'
+        - id: stop-5
+          position: 75
+          color: '#80ff00'
+        - id: '2'
+          position: 100
+          color: '#00ff00'
+        animation_state: charging
+        action_animation_entity: sensor.bil_lader_2_status
+        action_animation_state: error
+        action_animation: blinking
+        entity: number.cjp_battery_level
+        percentage_attribute: ''
+        left_condition:
+          type: none
+          entity: ''
+          state: ''
+        right_condition:
+          type: none
+          entity: ''
+          state: ''
+        animation_type: charging-lines
+        bar_name: Batteri
+        right_template_mode: false
+        right_title: Lade effekt
+        left_title: Lader
+        left_text_bold: false
+        left_title_bold: false
+        animation_entity: sensor.bil_lader_2_status
+        bar_radius: round
+        right_title_bold: false
+        right_text_bold: false
+      icon_rows:
+      - id: zwo8t17
+        width: '100'
+        alignment: center
+        vertical_alignment: center
+        spacing: none
+        columns: 0
+        icons:
+        - entity: sensor.bil_lader_2_status
+          icon_inactive: mdi:ev-plug-type1
+          icon_active: mdi:ev-plug-type1
+          color_inactive: var(--secondary-text-color)
+          color_active: var(--primary-color)
+          name_color_inactive: var(--primary-text-color)
+          name_color_active: var(--primary-text-color)
+          state_color_inactive: var(--secondary-text-color)
+          state_color_active: var(--primary-text-color)
+          inactive_state: 'off'
+          active_state: 'on'
+          inactive_template_mode: false
+          active_template_mode: true
+          inactive_template: ''
+          active_template: '{{ not is_state(''sensor.bil_lader_2_status'', ''disconnected'') }}'
+          active_state_text: ''
+          inactive_state_text: ''
+          show_state: true
+          show_name: false
+          show_name_active: false
+          show_name_inactive: false
+          show_state_active: false
+          show_state_inactive: false
+          show_units: true
+          show_icon_active: true
+          show_icon_inactive: true
+          use_entity_color_for_icon: false
+          use_entity_color_for_icon_active: false
+          use_entity_color_for_icon_inactive: false
+          use_entity_color_for_icon_background: false
+          use_entity_color_for_container_background: false
+          name: ''
+          single_click_action: more-info
+          on_click_action: more-info
+          text_position: bottom
+          vertical_alignment: center
+          text_alignment: center
+          icon_size: 24
+          text_size: 14
+          icon_background: none
+          icon_background_color: var(--secondary-background-color)
+          container_background: none
+          container_background_color: var(--secondary-background-color)
+          draggable: true
+          dynamic_icon_template_mode: false
+          dynamic_icon_template: ''
+          dynamic_color_template_mode: false
+          dynamic_color_template: ''
+          action: ''
+          service_data: {}
+        confirmation_mode: false
+        row_name: ''
+      type: custom:ultra-vehicle-card
+      title_alignment: center
+      title_size: 24
+      title_bold: false
+      show_units: true
+      vehicle_image_width: 100
+      action_image_width: 100
+      images:
+      - id: x7jq2qo
+        name: Vehicle Image
+        image_type: upload
+        image_width: 100
+        priority: 0
+        image: /api/image/serve/dbe7b105217146ad79c06bb2480334d5
+      title_italic: false
+      title_uppercase: false
+      image_priority_mode: order
+      info_rows: []
+      grid_options:
+        columns: full
+      column_width: 50-50
+      sections_columns:
+        title: half_full_row2_full
+        break_mfi9kulrn3k53jy8zs: full_half_row2_right
+      top_view_side_margin: 20
+      top_view_middle_spacing: 20
+      top_view_vertical_spacing: 20
+      section_styles:
+        break_mfi9kulrn3k53jy8zs:
+          marginTop: 16
+          marginBottom: 16
+      section_breaks:
+      - id: break_mfi9kulrn3k53jy8zs
+        break_style: blank
+        break_thickness: 4
+        break_width_percent: 100
+        break_color: var(--divider-color)
+    - type: vertical-stack
+      cards:
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: sensor.stromligning_current_price_vat
+          state: unavailable
+        card:
+          type: horizontal-stack
+          cards:
+          - type: markdown
+            content: '# Strømligning er nede <font color=red>!!!</font>'
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: sensor.stromligning_current_price_vat
+            tap_action:
+              action: call-service
+              service: homeassistant.reload_config_entry
+              target:
+                entity_id: sensor.stromligning_current_price_vat
+            hold_action:
+              action: none
+            icon: mdi:reload
+            name: Genstart Strømligning
+            show_state: true
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: sensor.stromligning_current_price_vat
+          state_not: unavailable
+        card:
+          type: custom:config-template-card
+          variables:
+            today_prices: |
+              states['sensor.stromligning_current_price_vat']
+                ?.attributes?.prices || []
+            tomorrow_prices: |
+              (() => {
+                const entity =
+                  states['binary_sensor.stromligning_tomorrow_available_vat'];
+
+                return entity?.attributes?.prices || [];
+              })()
+            forecast_prices: |
+              states['sensor.stromligning_forecasts_vat']
+                ?.attributes?.prices || []
+            all_prices: |
+              (() => {
+                const today =
+                  states['sensor.stromligning_current_price_vat']
+                    ?.attributes?.prices || [];
+
+                const tomorrowEntity =
+                  states['binary_sensor.stromligning_tomorrow_available_vat'];
+
+                const tomorrow =
+                  tomorrowEntity?.attributes?.prices || [];
+
+                const tomorrowIsForecast =
+                  tomorrowEntity?.attributes?.forecast_data === true;
+
+                const officialTomorrow =
+                  tomorrowIsForecast ? [] : tomorrow;
+
+                const official = [
+                  ...today,
+                  ...officialTomorrow
+                ];
+
+                let officialEnd = 0;
+
+                official.forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (!isNaN(end) && end > officialEnd)
+                    officialEnd = end;
+                });
+
+                const forecast =
+                  states['sensor.stromligning_forecasts_vat']
+                    ?.attributes?.prices || [];
+
+                const prices = [
+                  ...today,
+                  ...tomorrow
+                ]
+                  .map(p => Number(p.price))
+                  .filter(Number.isFinite);
+
+                let forecastEnd = 0;
+
+                tomorrow.forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (!isNaN(end) && end > forecastEnd)
+                    forecastEnd = end;
+                });
+
+                const existingEnd =
+                  Math.max(officialEnd, forecastEnd);
+
+                forecast.forEach(p => {
+                  const start = new Date(p.start).getTime();
+                  const price = Number(p.price);
+
+                  if (
+                    start >= existingEnd &&
+                    Number.isFinite(price)
+                  ) {
+                    prices.push(price);
+                  }
+                });
+
+                return prices;
+              })()
+            total_hours: |
+              vars.all_prices.length
+            lowest_price: |
+              (() => {
+                if (!vars.all_prices.length)
+                  return 0;
+
+                return Math.min(...vars.all_prices) * 1.05;
+              })()
+            highest_price: |
+              (() => {
+                if (!vars.all_prices.length)
+                  return 0;
+
+                return Math.max(...vars.all_prices) * 0.95;
+              })()
+            mean_price: |
+              (() => {
+                if (!vars.all_prices.length)
+                  return 0;
+
+                return vars.all_prices.reduce(
+                  (sum, price) => sum + price,
+                  0
+                ) / vars.all_prices.length;
+              })()
+            step_under_mean: |
+              (vars.mean_price - vars.lowest_price) / 5
+            step_over_mean: |
+              (vars.highest_price - vars.mean_price) / 5
+            price1: vars.lowest_price
+            price2: vars.mean_price - vars.step_under_mean * 4
+            price3: vars.mean_price - vars.step_under_mean * 3
+            price4: vars.mean_price - vars.step_under_mean * 2
+            price5: vars.mean_price - vars.step_under_mean
+            price6: vars.mean_price
+            price7: vars.mean_price + vars.step_over_mean
+            price8: vars.mean_price + vars.step_over_mean * 2
+            price9: vars.mean_price + vars.step_over_mean * 3
+            price10: vars.mean_price + vars.step_over_mean * 4
+            price11: vars.highest_price
+            total_span: 24 * 7 - 1
+          entities:
+          - sensor.stromligning_current_price_vat
+          - binary_sensor.stromligning_tomorrow_available_vat
+          - sensor.stromligning_forecasts_vat
+          - sensor.stromligning_15min_spotprice_ex_vat
+          - binary_sensor.stromligning_15min_tomorrow_available_ex_vat
+          - sensor.stromligning_15min_forecasts_ex_vat
+          - sensor.stromligning_nettariff_vat
+          - sensor.stromligning_systemtariff_vat
+          - sensor.solcast_pv_forecast_forecast_today
+          - sensor.solcast_pv_forecast_forecast_tomorrow
+          - sensor.solcast_pv_forecast_forecast_day_3
+          - sensor.solcast_pv_forecast_forecast_day_4
+          - sensor.solcast_pv_forecast_forecast_day_5
+          - sensor.solcast_pv_forecast_forecast_day_6
+          - sensor.solcast_pv_forecast_forecast_day_7
+          card:
+            type: custom:apexcharts-card
+            apex_config:
+              chart:
+                height: 300px
+              xaxis:
+                tooltip:
+                  enabled: false
+              tooltip:
+                shared: true
+                intersect: false
+                fixed:
+                  enabled: false
+                  position: topLeft
+                x:
+                  show: true
+                enabledOnSeries:
+                - 0
+                - 1
+                - 2
+              stroke:
+                curve: straight
+              markers:
+                size: 0
+            all_series_config:
+              unit: kWh
+              extend_to: false
+              fill_raw: zero
+              show:
+                legend_value: false
+                offset_in_name: false
+            experimental:
+              color_threshold: true
+              brush: true
+            brush:
+              selection_span: ${total_span + "h"}
+            header:
+              title: ${"Elpriser pr. time (kr/kWh) 🔵" + vars.lowest_price.toFixed(2) + " 🟢" + vars.mean_price.toFixed(2) + " 🟣" + vars.highest_price.toFixed(2)}
+              show: true
+              standard_format: false
+              show_states: false
+              colorize_states: true
+            now:
+              show: true
+              label: Nu
+            graph_span: ${total_span + "h"}
+            span:
+              start: day
+            yaxis:
+            - id: price
+            - id: solar
+              opposite: true
+              decimals: 1
+              max: ~6.0
+              min: 0
+            show:
+              loading: true
+              last_updated: true
+            series:
+            - entity: sensor.stromligning_current_price_vat
+              yaxis_id: price
+              type: column
+              name: Inkl. afgifter
+              unit: kr.
+              color: green
+              data_generator: |
+                const data = [];
+
+                // ------------------------------------------
+                // I DAG
+                // ------------------------------------------
+
+                const today =
+                  hass.states[
+                    'sensor.stromligning_current_price_vat'
+                  ]?.attributes?.prices || [];
+
+                today.forEach(p => {
+                  const price = Number(p.price);
+
+                  if (Number.isFinite(price)) {
+                    data.push([
+                      new Date(p.start),
+                      price
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // I MORGEN
+                // ------------------------------------------
+
+                const tomorrowEntity =
+                  hass.states[
+                    'binary_sensor.stromligning_tomorrow_available_vat'
+                  ];
+
+                const tomorrowPrices =
+                  tomorrowEntity?.attributes?.prices || [];
+
+                const tomorrowIsForecast =
+                  tomorrowEntity?.attributes?.forecast_data === true;
+
+                const officialTomorrow =
+                  tomorrowIsForecast
+                    ? []
+                    : tomorrowPrices;
+
+                officialTomorrow.forEach(p => {
+                  const price = Number(p.price);
+
+                  if (Number.isFinite(price)) {
+                    data.push([
+                      new Date(p.start),
+                      price
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // SIDSTE OFFICIELLE PRIS
+                // ------------------------------------------
+
+                let officialEnd = 0;
+
+                [...today, ...officialTomorrow].forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (
+                    !isNaN(end) &&
+                    end > officialEnd
+                  ) {
+                    officialEnd = end;
+                  }
+                });
+
+
+                // ------------------------------------------
+                // FORECAST FOR I MORGEN
+                // ------------------------------------------
+
+                if (tomorrowIsForecast) {
+                  tomorrowPrices.forEach(p => {
+                    const price = Number(p.price);
+
+                    if (Number.isFinite(price)) {
+                      data.push([
+                        new Date(p.start),
+                        price
+                      ]);
+                    }
+                  });
+                }
+
+
+                // ------------------------------------------
+                // SIDSTE TOMORROW-TIDSPUNKT
+                // ------------------------------------------
+
+                let tomorrowEnd = officialEnd;
+
+                tomorrowPrices.forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (
+                    !isNaN(end) &&
+                    end > tomorrowEnd
+                  ) {
+                    tomorrowEnd = end;
+                  }
+                });
+
+
+                // ------------------------------------------
+                // FORECAST
+                // ------------------------------------------
+
+                const forecast =
+                  hass.states[
+                    'sensor.stromligning_forecasts_vat'
+                  ]?.attributes?.prices || [];
+
+                forecast.forEach(p => {
+                  const start =
+                    new Date(p.start).getTime();
+
+                  const price =
+                    Number(p.price);
+
+                  if (
+                    start >= tomorrowEnd &&
+                    Number.isFinite(price)
+                  ) {
+                    data.push([
+                      new Date(p.start),
+                      price
+                    ]);
+                  }
+                });
+
+
+                return data.sort(
+                  (a, b) => a[0] - b[0]
+                );
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              color_threshold:
+              - value: ${vars.price1}
+                color: '#0064FF'
+              - value: ${vars.price2}
+                color: '#0096FF'
+              - value: ${vars.price3}
+                color: '#00B496'
+              - value: ${vars.price4}
+                color: '#00FA50'
+              - value: ${vars.price5}
+                color: '#00FF32'
+              - value: ${vars.price6}
+                color: '#00FF00'
+              - value: ${vars.price7}
+                color: '#FFFF00'
+              - value: ${vars.price8}
+                color: '#FFA500'
+              - value: ${vars.price9}
+                color: '#FF5000'
+              - value: ${vars.price10}
+                color: '#C81919'
+              - value: ${vars.price11}
+                color: '#C800C8'
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.stromligning_15min_spotprice_ex_vat
+              yaxis_id: price
+              type: area
+              name: Salgspris
+              unit: kr.
+              color: white
+              stroke_width: 0
+              data_generator: |
+                const data = [];
+
+                const sellFee = 0.025;
+
+                const nettariff = Number(
+                  hass.states[
+                    'sensor.stromligning_nettariff_vat'
+                  ]?.state
+                ) || 0;
+
+                const systemtariff = Number(
+                  hass.states[
+                    'sensor.stromligning_systemtariff_vat'
+                  ]?.state
+                ) || 0;
+
+                const sellCosts =
+                  nettariff +
+                  systemtariff +
+                  sellFee;
+
+
+                // ------------------------------------------
+                // I DAG
+                // ------------------------------------------
+
+                const today =
+                  hass.states[
+                    'sensor.stromligning_15min_spotprice_ex_vat'
+                  ]?.attributes?.prices || [];
+
+                today.forEach(p => {
+                  const spotprice = Number(p.price);
+
+                  if (Number.isFinite(spotprice)) {
+                    data.push([
+                      new Date(p.start),
+                      spotprice - sellCosts
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // I MORGEN
+                // ------------------------------------------
+
+                const tomorrowEntity =
+                  hass.states[
+                    'binary_sensor.stromligning_15min_tomorrow_available_ex_vat'
+                  ];
+
+                const tomorrowPrices =
+                  tomorrowEntity?.attributes?.prices || [];
+
+                tomorrowPrices.forEach(p => {
+                  const spotprice = Number(p.price);
+
+                  if (Number.isFinite(spotprice)) {
+                    data.push([
+                      new Date(p.start),
+                      spotprice - sellCosts
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // SIDSTE PRIS FRA TOMORROW ENTITY
+                // ------------------------------------------
+
+                let availableEnd = 0;
+
+                [...today, ...tomorrowPrices].forEach(p => {
+                  const end =
+                    new Date(p.end).getTime();
+
+                  if (
+                    !isNaN(end) &&
+                    end > availableEnd
+                  ) {
+                    availableEnd = end;
+                  }
+                });
+
+
+                // ------------------------------------------
+                // FORECAST
+                // ------------------------------------------
+
+                const forecast =
+                  hass.states[
+                    'sensor.stromligning_15min_forecasts_ex_vat'
+                  ]?.attributes?.prices || [];
+
+                forecast.forEach(p => {
+                  const start =
+                    new Date(p.start).getTime();
+
+                  const spotprice =
+                    Number(p.price);
+
+                  if (
+                    start >= availableEnd &&
+                    Number.isFinite(spotprice)
+                  ) {
+                    data.push([
+                      new Date(p.start),
+                      spotprice - sellCosts
+                    ]);
+                  }
+                });
+
+
+                return data.sort(
+                  (a, b) => a[0] - b[0]
+                );
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.solcast_pv_forecast_forecast_today
+              yaxis_id: solar
+              type: area
+              name: Solcelle prognose
+              data_generator: |
+                const toUTC00 = (d) => {
+                  const x = new Date(d);
+
+                  return new Date(Date.UTC(
+                    x.getUTCFullYear(),
+                    x.getUTCMonth(),
+                    x.getUTCDate(),
+                    x.getUTCHours(),
+                    0,
+                    0,
+                    0
+                  ));
+                };
+
+                const map = new Map();
+
+
+                // ------------------------------------------
+                // OPRET ALLE PRISTIMESTAMPS SOM 0
+                // ------------------------------------------
+
+                const addTimes = (rows) => {
+                  (rows || []).forEach(row => {
+                    if (!row.start)
+                      return;
+
+                    const key =
+                      toUTC00(row.start).getTime();
+
+                    if (!map.has(key))
+                      map.set(key, 0);
+                  });
+                };
+
+
+                // I dag
+                addTimes(
+                  hass.states[
+                    'sensor.stromligning_current_price_vat'
+                  ]?.attributes?.prices || []
+                );
+
+
+                // I morgen - både forecast og officielle
+                const tomorrowEntity =
+                  hass.states[
+                    'binary_sensor.stromligning_tomorrow_available_vat'
+                  ];
+
+                addTimes(
+                  tomorrowEntity?.attributes?.prices || []
+                );
+
+
+                // Forecast
+                addTimes(
+                  hass.states[
+                    'sensor.stromligning_forecasts_vat'
+                  ]?.attributes?.prices || []
+                );
+
+
+                // ------------------------------------------
+                // SOLCAST DATA
+                // ------------------------------------------
+
+                const overlay = (series) => {
+                  (series || []).forEach(row => {
+                    if (!row.period_start)
+                      return;
+
+                    const key =
+                      toUTC00(
+                        row.period_start
+                      ).getTime();
+
+                    map.set(
+                      key,
+                      Number(row.pv_estimate) || 0
+                    );
+                  });
+                };
+
+
+                overlay(
+                  entity.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_tomorrow'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_3'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_4'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_5'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_6'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_7'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+
+                return Array.from(
+                  map.entries()
+                )
+                  .sort((a, b) => a[0] - b[0])
+                  .map(([time, value]) => [
+                    new Date(Number(time)),
+                    value
+                  ]);
+              color: orange
+              stroke_width: 0
+              opacity: 0.5
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: true
+            - entity: sensor.stromligning_forecasts_vat
+              yaxis_id: price
+              type: area
+              name: Prognose
+              unit: ''
+              stroke_width: 0
+              opacity: 0.25
+              color: purple
+              data_generator: |
+                try {
+
+                  // ------------------------------------------
+                  // I DAG
+                  // ------------------------------------------
+
+                  const today =
+                    hass.states[
+                      'sensor.stromligning_current_price_vat'
+                    ]?.attributes?.prices || [];
+
+
+                  // ------------------------------------------
+                  // I MORGEN
+                  // ------------------------------------------
+
+                  const tomorrowEntity =
+                    hass.states[
+                      'binary_sensor.stromligning_tomorrow_available_vat'
+                    ];
+
+                  const tomorrowPrices =
+                    tomorrowEntity?.attributes?.prices || [];
+
+                  const tomorrowIsForecast =
+                    tomorrowEntity?.attributes?.forecast_data === true;
+
+                  const officialTomorrow =
+                    tomorrowIsForecast
+                      ? []
+                      : tomorrowPrices;
+
+                  const tomorrowForecast =
+                    tomorrowIsForecast
+                      ? tomorrowPrices
+                      : [];
+
+
+                  // ------------------------------------------
+                  // OFFICIELLE PRISER
+                  // ------------------------------------------
+
+                  const official = [
+                    ...today,
+                    ...officialTomorrow
+                  ];
+
+
+                  // ------------------------------------------
+                  // FIND STARTEN PÅ FORECAST
+                  // ------------------------------------------
+
+                  let forecastStart = 0;
+
+                  if (tomorrowForecast.length) {
+                    forecastStart =
+                      Math.min(
+                        ...tomorrowForecast
+                          .map(p =>
+                            new Date(p.start).getTime()
+                          )
+                          .filter(t =>
+                            !isNaN(t)
+                          )
+                      );
+                  }
+
+
+                  const normalForecast =
+                    entity.attributes?.prices || [];
+
+
+                  if (
+                    !forecastStart &&
+                    normalForecast.length
+                  ) {
+                    const times =
+                      normalForecast
+                        .map(p =>
+                          new Date(p.start).getTime()
+                        )
+                        .filter(t =>
+                          !isNaN(t)
+                        );
+
+                    if (times.length)
+                      forecastStart = Math.min(...times);
+                  }
+
+
+                  if (!forecastStart)
+                    return [];
+
+
+                  // ------------------------------------------
+                  // ALLE RÆKKER
+                  // ------------------------------------------
+
+                  const rows = [
+                    ...official,
+                    ...tomorrowForecast,
+                    ...normalForecast
+                  ];
+
+
+                  // ------------------------------------------
+                  // FIND MAX PRIS
+                  // ------------------------------------------
+
+                  let maxP = 0;
+
+                  rows.forEach(row => {
+                    const price =
+                      Number(row.price);
+
+                    if (
+                      Number.isFinite(price) &&
+                      price > maxP
+                    ) {
+                      maxP = price;
+                    }
+                  });
+
+
+                  if (maxP <= 0)
+                    maxP = 10;
+
+
+                  // ------------------------------------------
+                  // ALLE TIMESTAMPS
+                  // ------------------------------------------
+
+                  const times = [
+                    ...new Set(
+                      rows
+                        .map(row =>
+                          new Date(
+                            row.start
+                          ).getTime()
+                        )
+                        .filter(time =>
+                          !isNaN(time)
+                        )
+                    )
+                  ].sort(
+                    (a, b) => a - b
+                  );
+
+
+                  if (!times.length) {
+                    return [
+                      [
+                        new Date(forecastStart),
+                        maxP
+                      ],
+                      [
+                        new Date(
+                          forecastStart +
+                          3600000
+                        ),
+                        maxP
+                      ]
+                    ];
+                  }
+
+
+                  // ------------------------------------------
+                  // 0 FØR FORECAST
+                  // MAX EFTER FORECAST
+                  // ------------------------------------------
+
+                  return times.map(time => [
+                    new Date(time),
+                    time >= forecastStart
+                      ? maxP
+                      : 0
+                  ]);
+
+
+                } catch (e) {
+
+                  console.log(
+                    'stromligning forecast_zone error',
+                    e
+                  );
+
+                  return [];
+                }
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: false
+                legend_value: false
+      grid_options:
+        columns: full
+        rows: auto
+    column_span: 2
+  - type: grid
+    cards:
+    - type: custom:mushroom-number-card
+      entity: number.cjp_battery_level
+      fill_container: false
+      tap_action:
+        action: more-info
+      hold_action:
+        action: none
+      double_tap_action:
+        action: none
+      grid_options:
+        columns: full
+      view_layout:
+        position: sidebar
+    - type: custom:mushroom-entity-card
+      entity: sensor.cjp_current_charging_rule
+      primary_info: state
+      secondary_info: none
+      icon_type: none
+      card_mod:
+        style:
+          mushroom-state-info$: |
+            .container {
+             --card-primary-font-size: 20px;
+             align-items: center;
+            padding-bottom: 10px !important;
+            padding-top: 10px !important;
+            }
+            .primary {
+              text-align: center !important;
+              white-space: pre-wrap !important;
+            }
+      grid_options:
+        columns: full
+    - type: conditional
+      conditions:
+      - condition: numeric_state
+        entity: number.cjp_battery_level
+        below: number.cjp_min_daily_battery_level
+      - condition: state
+        entity: number.cjp_battery_level
+        state_not: '0.0'
+      card:
+        type: vertical-stack
+        cards:
+        - type: markdown
+          content: |-
+            # 📎 {{ states.switch.cjp_forced_charging_daily_battery_level.name }}
+            **Tvangsladning kan aktiveres manuelt, hvis batteriniveauet falder under det daglige minimumsniveau.**
+            <details> <summary><b>Læs mere</b></summary>
+
+              - **Opladning**: Lader op til det daglige minimumsniveau {{ states.number.cjp_min_daily_battery_level.state | int}}%
+              - **Omkostningskontrol**: Opladningen sker ikke i de 4 dyreste timer for at minimere omkostningerne.
+                {% for date, price in states.switch.cjp_forced_charging_daily_battery_level.attributes.expensive_hours.items() -%}
+                 - **{{ date }}** &emsp;&emsp;&emsp; {{price}}
+                {% endfor %}
+            </details>
+        - type: custom:mushroom-entity-card
+          entity: switch.cjp_forced_charging_daily_battery_level
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod:
+        style: |
+          ha-card {
+            --markdown-table-border-color: transparent
+          }
+      content: '{{ states.sensor.cjp_charging_history.attributes.history }}'
+      grid_options:
+        columns: full
+    - type: vertical-stack
+      cards:
+      - type: markdown
+        card_mod:
+          style: |
+            ha-card {
+              --markdown-table-border-color: transparent
+            }
+        content: '{{ states.sensor.cjp_overview.attributes.overview }}'
+        view_layout:
+          position: sidebar
+      - type: vertical-stack
+        cards:
+        - type: custom:stack-in-card
+          mode: vertical
+          cards:
+          - type: markdown
+            content: |-
+              ## 📎 Opladningsgrænser ved billige strøm priser
+
+              <details>
+              <summary><b>Læs mere</b></summary>
+
+              - **{{ states.sensor.cjp_charge_very_cheap_battery_level.name }}** oplades til **{{ states.sensor.cjp_charge_very_cheap_battery_level.state }}%**
+                - Når prisen er under de sidste 14 dages billigste pris
+              - **{{ states.sensor.cjp_charge_ultra_cheap_battery_level.name }}** oplades til **{{ states.sensor.cjp_charge_ultra_cheap_battery_level.state }}%**
+                - Når prisen er 25% under de sidste 14 dages billigste pris
+
+              <center>☀️Opladningsgrænsen reguleres, afhængig af solcelle over produktions estimering, en uge frem</center>
+              </details>
+          - type: custom:mushroom-entity-card
+            entity: sensor.cjp_charge_very_cheap_battery_level
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-entity-card
+            entity: sensor.cjp_charge_ultra_cheap_battery_level
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: more-info
+        - type: custom:mushroom-chips-card
+          chips:
+          - type: entity
+            entity: button.cjp_enforce_planning
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.cjp_enforce_planning
+            hold_action:
+              action: more-info
+            content_info: name
+            use_entity_picture: false
+          alignment: end
+      view_layout:
+        position: sidebar
+  - type: grid
+    cards:
+    - type: custom:stack-in-card
+      mode: vertical
+      cards:
+      - type: markdown
+        content: |-
+          ## 📎 Tur planlægning
+
+          Tur opladningen planlægges automatisk, når betingelserne er opfyldt.
+
+          <details>
+          <summary><b>Læs mere</b></summary>
+
+          - **Automatisk aktivering**: Tur opladning starter automatisk, når følgende betingelser er opfyldt:
+            - En af følgende betingelser er opfyldt:
+              - **{{ states.number.cjp_trip_charge_procent.name }}** er indstillet til en procent over 0%.
+              - **{{ states.number.cjp_trip_range_needed.name }}** er indstillet til et antal kilometer over 0 km.
+            - **{{ states.datetime.cjp_trip_date_time.name }}** er sat til en fremtidig dato.
+            - **{{ states.datetime.cjp_trip_homecoming_date_time.name }}** er sat til en fremtidig dato.
+          - **Opladning**:
+            - Lader op til det nødvendige behov for at gennemføre turen, baseret på enten det ønskede batteriniveau eller den indstillede distance.
+            - Opladning mellem **{{ states.number.cjp_max_recommended_charge_limit_battery_level.state | int }}-100%** vil blive udført lige inden afgang for at beskytte batteriet.
+
+
+          </details>
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: number.cjp_trip_range_needed
+          state: '0.0'
+        card:
+          type: custom:mushroom-number-card
+          entity: number.cjp_trip_charge_procent
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: number.cjp_trip_charge_procent
+          state: '0.0'
+        card:
+          type: custom:mushroom-number-card
+          entity: number.cjp_trip_range_needed
+      - type: custom:mushroom-entity-card
+        entity: switch.cjp_trip_preheat
+        icon_color: red
+        fill_container: false
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+      - type: custom:mushroom-entity-card
+        entity: datetime.cjp_trip_date_time
+        hold_action:
+          action: more-info
+        double_tap_action:
+          action: none
+      - type: custom:mushroom-entity-card
+        entity: datetime.cjp_trip_homecoming_date_time
+        hold_action:
+          action: more-info
+        double_tap_action:
+          action: none
+      - type: custom:mushroom-chips-card
+        chips:
+        - type: entity
+          entity: button.cjp_trip_reset
+          content_info: name
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.cjp_trip_reset
+          hold_action:
+            action: more-info
+          use_entity_picture: false
+        alignment: end
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: custom:mushroom-title-card
+          title: Manuel ladning
+          title_tap_action:
+            action: none
+          subtitle_tap_action:
+            action: none
+        - type: custom:mushroom-entity-card
+          entity: switch.cjp_allow_manual_charging_now
+          tap_action:
+            action: toggle
+          hold_action:
+            action: more-info
+          double_tap_action:
+            action: none
+        - type: custom:mushroom-entity-card
+          entity: switch.cjp_allow_manual_charging_solar
+          tap_action:
+            action: toggle
+          hold_action:
+            action: more-info
+          double_tap_action:
+            action: none
+      view_layout:
+        position: sidebar
+  - type: grid
+    cards:
+    - type: entities
+      entities:
+      - entity: sensor.cjp_solar_over_production_current_hour
+      - entity: sensor.cjp_kwh_cost_price
+    - type: history-graph
+      entities:
+      - entity: sensor.cjp_solar_over_production_current_hour
+      - entity: sensor.cjp_kwh_cost_price
+      hours_to_show: 48
+      logarithmic_scale: false
+      layout_options:
+        grid_columns: 4
+        grid_rows: auto
+      view_layout:
+        position: sidebar
+    - type: markdown
+      content: '{{ states.sensor.cjp_emoji_description.attributes.description }}'
+      view_layout:
+        position: sidebar
+  max_columns: 5
+  dense_section_placement: true
+- type: sections
+  path: ''
+  max_columns: 5
+  sections:
+  - type: grid
+    cards:
+    - type: custom:mushroom-title-card
+      title: Opladningsstrategier for Elbil
+      layout_options:
+        grid_columns: full
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: custom:mushroom-entity-card
+          entity: switch.cjp_solar_charging
+          double_tap_action:
+            action: none
+          hold_action:
+            action: more-info
+          tap_action:
+            action: toggle
+          secondary_info: none
+        - type: markdown
+          content: "# \U0001F4CE️ {{ states.switch.cjp_solar_charging.name }}\n\n**Aktiveres når der er overproduktion fra solceller**\n\n<details>\n<summary><b>Læs mere</b></summary>\n\n- **\U0001F4CA Opladning**: Udnytter overskydende solenergi til opladning.\n- **\U0001F50B Opladningsbehov**:\n  - Tilpasses efter solcelleoverproduktion i forhold til husets forbrug.\n  - Maksimal opladning: {{ states.number.cjp_max_recommended_charge_limit_battery_level.state | int }}%\n- **\U0001F4C5 Opladningsplan**:\n  - Estimerer tilgængelig solcelleoverproduktion i løbet af ugen under planlægningen af \"Optimal Ugeopladning\" og \"Arbejdsplan Opladning\"\n  - Planlægger opladning ud fra solcelleoverproduktionen, så bilen oplades mest muligt med vedvarende energi.\n  \n</details>\n"
+      grid_options:
+        columns: 12
+        rows: auto
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_fill_up
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+            secondary_info: none
+          - type: custom:mushroom-entity-card
+            border: true
+            entity: number.cjp_typical_daily_distance
+            step: 5
+            min: 0
+            max: 500
+        - type: markdown
+          content: |-
+            # 📎 {{ states.switch.cjp_fill_up.name }}
+
+            **Kan aktiveres ved ferie** (Ignorerer arbejdsplanen) 🏖️
+
+            <details>
+            <summary><b>Læs mere</b></summary>
+
+            - **📊 Opladning**: Fordeles over en uge.
+            - **🔋 Opladningsbehov**:
+              - {{ states.number.cjp_max_recommended_charge_limit_battery_level.state | int - states.number.cjp_battery_level.state | int }}% opdeles i 3 dele.
+              - Opladningsbehovet er baseret på forskellen mellem det nuværende batteriniveau og det maksimalt anbefalede.
+            - **📅 Opladningsplan**: Finder de billigste tidspunkter for opladning.
+
+            </details>
+      grid_options:
+        columns: 15
+        rows: auto
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_deactivate_script
+            icon_color: red
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+            secondary_info: none
+        - type: markdown
+          content: |-
+            # 📎 {{ states.switch.cjp_deactivate_script.name }}
+
+            <details>
+            <summary><b>Læs mere</b></summary>
+            Laderen og elbilen, bliver ikke styret af scriptet, og fungere normalt
+
+            </details>
+      grid_options:
+        columns: 9
+        rows: auto
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: custom:mushroom-entity-card
+          entity: switch.cjp_workplan_charging
+          double_tap_action:
+            action: none
+          hold_action:
+            action: more-info
+          tap_action:
+            action: toggle
+          secondary_info: none
+        - type: markdown
+          content: "# \U0001F4CE {{ states.switch.cjp_workplan_charging.name }}\n\n**Aktiveres ved arbejde indenfor den næste uge**\n\n<details>\n<summary><b>Læs mere</b></summary>\n\n- **\U0001F4CA Opladning**: Planlægger daglig opladning over en uge.\n- **\U0001F50B Opladningsbehov**:\n  - Tilpasses baseret på arbejdsdage og fridage.\n  - Tager højde for afgangs- og hjemkomsttidspunkt samt afstand i alt.\n  - Minimum batteriniveau ved hjemkomst: {{ states.number.cjp_min_daily_battery_level.state | int }}%.\n  - Maksimal opladning: {{ states.number.cjp_max_recommended_charge_limit_battery_level.state | int }}%.\n- **\U0001F4C5 Opladningsplan**: \n  - Planlægger opladningen udfra arbejdsplanen, så bilen altid er klar til brug.\n  - Vælger de mest økonomiske tidspunkter fra nu og frem til den givende arbejdsdags afgang.\n\n</details>"
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_monday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_monday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_monday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_monday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_monday
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+              icon_color: red
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_monday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_monday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_monday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_monday
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_tuesday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_tuesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_tuesday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_tuesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_tuesday
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+              icon_color: red
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_tuesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_tuesday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_tuesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_tuesday
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_wednesday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_wednesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_wednesday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_wednesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_wednesday
+              icon_color: red
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_wednesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_wednesday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_wednesday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_wednesday
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_thursday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_thursday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_thursday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_thursday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_thursday
+              icon_color: red
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_thursday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_thursday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_thursday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_thursday
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_friday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_friday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_friday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_friday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_friday
+              icon_color: red
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_friday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_friday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_friday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_friday
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_saturday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_saturday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_saturday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_saturday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_saturday
+              icon_color: red
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_saturday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_saturday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_saturday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_saturday
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: horizontal-stack
+          cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_workday_sunday
+            double_tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            tap_action:
+              action: toggle
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_sunday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: number.cjp_workday_distance_needed_sunday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_sunday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: switch.cjp_preheat_sunday
+              icon_color: red
+              tap_action:
+                action: toggle
+              hold_action:
+                action: more-info
+        - type: horizontal-stack
+          cards:
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_sunday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_departure_sunday
+          - type: conditional
+            conditions:
+            - entity: switch.cjp_workday_sunday
+              state: 'on'
+            card:
+              type: custom:mushroom-entity-card
+              entity: time.cjp_workday_homecoming_sunday
+      layout_options:
+        grid_columns: full
+    column_span: 3
+  - type: grid
+    cards:
+    - type: custom:mushroom-title-card
+      title: Indstillinger
+      layout_options:
+        grid_columns: 4
+        grid_rows: auto
+      view_layout:
+        position: sidebar
+    - type: custom:stack-in-card
+      mode: vertical
+      cards:
+      - type: markdown
+        content: |
+          ## 📎 Virtuel elbil indstillinger
+
+          <details>
+          <summary><b>Læs mere</b></summary>
+
+          - **{{ states.number.cjp_battery_level.name }}** Indstil bilens nuværende batteri niveau
+          - **{{ states.number.cjp_estimated_total_range.name }}** Indstil bilens realistiske maks rækkevidde
+          </details>
+      - type: custom:mushroom-number-card
+        entity: number.cjp_battery_level
+      - type: custom:mushroom-number-card
+        entity: number.cjp_completed_battery_level
+      - type: custom:mushroom-number-card
+        entity: number.cjp_estimated_total_range
+      view_layout:
+        position: sidebar
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: markdown
+          content: |
+            ## 📎 Anbefalet fuld ladning
+
+            <details>
+            <summary><b>Læs mere</b></summary>
+
+            Hvis din bil har et LFP-batteri anbefales det mindst en gang hver 14. dag eller som foreskrevet af bilproducenten.
+
+            </details>
+        - type: custom:numberbox-card
+          border: true
+          entity: number.cjp_full_charge_recommended
+        - type: custom:mushroom-entity-card
+          entity: datetime.cjp_last_full_charge
+          fill_container: false
+          secondary_info: state
+      view_layout:
+        position: sidebar
+      layout_options:
+        grid_columns: 4
+        grid_rows: auto
+    - type: vertical-stack
+      cards:
+      - type: vertical-stack
+        cards:
+        - type: custom:stack-in-card
+          mode: vertical
+          cards:
+          - type: markdown
+            content: "## \U0001F4CE Kalkulering af ladetab ##\n\nFor at opnå det bedste resultat anbefales det at lade bilen op fra en lav procent (f.eks. 10%) til 100%.\n\n1. **<font color={% if states.number.cjp_battery_level.state | int > 20 %}red{% else %}lightgreen{% endif %}>Aflad bilen</font>** : \n   - Sørg for at bilen er afladet så meget som muligt.\n   - \"**{{ states.number.cjp_battery_level.name }}**\" er på {{ states.number.cjp_battery_level.state }}% (Maksimum 20%).\n\n2. **<font color={% if states.number.cjp_max_recommended_charge_limit_battery_level.state | int < 90 %}red{% else %}lightgreen{% endif %}>Indstil max ladeprocent</font>**: \n   - Sæt den ønskede ladeprocent i bilen og Home Assistant.\n   - \"**{{ states.number.cjp_max_recommended_charge_limit_battery_level.name }}\"** er sat til {{ states.number.cjp_max_recommended_charge_limit_battery_level.state }}% (Minimum 90%).\n\n3. **Aktiver \"Kalkulere ladetab\"**: Start processen for kalkulering af ladetab. Lad bilen\
+              \ selv indikere, når den er fuldt opladet.\n4. **Gem resultatet**: Når opladningen er fuldført, gemmes resultatet automatisk i konfigurationsfilen.\n5. **Modtag notifikation**: Du vil modtage en notifikation på din mobil med resultatet.\n"
+          - type: custom:mushroom-entity-card
+            entity: switch.cjp_calculate_charging_loss
+            fill_container: true
+        view_layout:
+          position: sidebar
+      - type: custom:mushroom-chips-card
+        chips:
+        - type: entity
+          entity: button.cjp_restart_script
+          tap_action:
+            action: more-info
+          hold_action:
+            action: more-info
+          double_tap_action:
+            action: more-info
+          content_info: name
+          icon_color: red
+          use_entity_picture: false
+        alignment: end
+        view_layout:
+          position: sidebar
+      view_layout:
+        position: sidebar
+  - type: grid
+    cards:
+    - type: custom:mushroom-title-card
+      title: ' '
+      layout_options:
+        grid_columns: 4
+        grid_rows: auto
+      view_layout:
+        position: sidebar
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: markdown
+          content: |-
+            ## 📎 Ladningsprocent ved billig strøm
+            <details> <summary><b>Læs mere</b></summary>
+
+            - **Normal billig strøm**: Hvis strømprisen er under den laveste gennemsnitspris per døgn i den seneste periode, lades batteriet op til "**{{ states.number.cjp_very_cheap_grid_charging_max_battery_level.name }}**".
+            - **Ekstra billig strøm**: Hvis strømprisen er yderligere 25% billigere, lades batteriet op til "**{{ states.number.cjp_ultra_cheap_grid_charging_max_battery_level.name }}**".
+            - "**{{ states.switch.cjp_fill_up.name }}**" skal være aktiveret
+            </details>
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_very_cheap_grid_charging_max_battery_level
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_ultra_cheap_grid_charging_max_battery_level
+      view_layout:
+        position: sidebar
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: markdown
+          content: |-
+            ## 📎 Batteriniveau- og Forvarmningsindstillinger for Elbil
+
+            <details>
+            <summary><b>Læs mere</b></summary>
+
+            - **{{ states.number.cjp_min_daily_battery_level.name }}**
+              - Minimum batteriniveau ved hjemkomst fra arbejde.
+            - **{{ states.number.cjp_min_trip_battery_level.name }}**
+              - Minimum batteriniveau ved hjemkomst fra en tur.
+            - **{{ states.number.cjp_min_charge_limit_battery_level.name }}**
+              - Bilens minimum mulige opladningsindstilling.
+            - **{{ states.number.cjp_max_recommended_charge_limit_battery_level.name }}**
+              - Bilproducentens maksimale anbefaling eller maksimal opladningsprocent ved brug af "Cable Juice Planner".
+            - **{{ states.number.cjp_preheat_minutes_before.name }}**
+              - Forvarm bilen før afgang til arbejde og ture.
+
+            </details>
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_min_daily_battery_level
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_min_trip_battery_level
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_min_charge_limit_battery_level
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_max_recommended_charge_limit_battery_level
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_preheat_minutes_before
+      view_layout:
+        position: sidebar
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: markdown
+          content: |-
+            ## 📎 Solcelleoverproduktion Salgspris
+
+            <details>
+            <summary><b>Læs mere</b></summary>
+
+            Sæt prisen til **-1.0** for at bruge den aktuelle salgspris.
+
+            </details>
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_solar_sell_fixed_price
+      view_layout:
+        position: sidebar
+    - type: vertical-stack
+      cards:
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+        - type: markdown
+          content: |-
+            ## 📎 Powerwall-indstillinger
+            <details> <summary><b>Læs mere</b></summary>
+            <ha-alert alert-type="info">
+              Lav en automation, der <b>deaktiverer Powerwall-afladning</b>, når elbilen lader.
+            </ha-alert>
+
+            **Opladning af elbil med solcelle-overskudsproduktion** starter kun, når Powerwall-batteriniveauet er over:   <br> **"{{ states.number.cjp_ev_charge_after_powerwall_battery_level.name }}"**
+            <br><br> **🔋 Brug Powerwall-strøm til elbilen – betingelser:**
+            - **⚙️ Krav**:
+              - **{{ states.switch.cjp_solar_charging.name }}** skal være aktiv.
+              - **{{ states.switch.cjp_powerwall_discharge_above_needed.name }}** skal være tændt.
+
+              - Lav en automation, der tillader afladning kun når:
+                - `switch.cjp_powerwall_discharge_above_needed` er aktiv **og**
+                - Powerwall-batteriniveauet er over værdien i `number.cjp_ev_charge_after_powerwall_battery_level`.
+
+            - **🛠 Brugerdefineret tærskel**:
+              - Kun strøm **over den valgte grænse** (justerbar nedenfor) bruges til opladning af elbilen.
+              - Nuværende grænse: **{{ states.number.cjp_ev_charge_after_powerwall_battery_level.state | int }}%**
+
+            </details>
+        - type: custom:mushroom-entity-card
+          entity: switch.cjp_powerwall_discharge_above_needed
+          name: Tillad afladning fra Powerwall
+          icon: mdi:battery-arrow-down
+          tap_action:
+            action: toggle
+          hold_action:
+            action: more-info
+          double_tap_action:
+            action: none
+        - type: custom:numberbox-card
+          border: false
+          entity: number.cjp_ev_charge_after_powerwall_battery_level
+          name: Minimum Powerwall-niveau (%)
+      view_layout:
+        position: sidebar
+    column_span: 1
+  cards: []
+  title: Indstillinger
+  dense_section_placement: true

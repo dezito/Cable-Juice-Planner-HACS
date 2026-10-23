@@ -1,0 +1,86 @@
+# Trimmed copy of a PyScript Cable-Juice-Planner config (used by the legacy import test)
+charger:
+  charging_loss: -0.05
+  charging_max_amp: 16.0
+  charging_phases: 3.0
+  entity_ids:
+    cable_connected_entity_id: ""
+    co2_entity_id: sensor.energi_data_service_co2
+    enabled_entity_id: switch.ev_charger_is_enabled
+    kwh_meter_entity_id: sensor.ev_charger_maler_kwh
+    lifetime_kwh_meter_entity_id: sensor.ev_charger_lifetime_energy
+    other_ev_using_this_charger_entity_ids: []
+    power_consumtion_entity_id: sensor.ev_charger_power
+    status_entity_id: sensor.ev_charger_status
+  power_voltage: 240.0
+cron_interval: 5
+database:
+  charging_history_db_data_to_save: 12
+  drive_efficiency_db_data_to_save: 15
+  km_kwh_efficiency_db_data_to_save: 15
+  kwh_avg_prices_db_data_to_save: 15
+  power_values_db_data_to_save: 15
+  solar_available_db_data_to_save: 10
+enable_diagnostic_file_log: false
+ev_car:
+  battery_size: 69.0
+  entity_ids:
+    charge_cable_entity_id: binary_sensor.my_car_charge_cable
+    charge_port_door_entity_id: cover.my_car_charge_port_door
+    charging_limit_entity_id: number.my_car_charge_limit
+    climate_entity_id: climate.my_car_climate
+    estimated_battery_range_entity_id: sensor.my_car_battery_range
+    last_update_entity_id: ""
+    location_entity_id: device_tracker.my_car_location
+    odometer_entity_id: sensor.my_car_odometer
+    usable_battery_level_entity_id: sensor.my_car_battery_level
+  last_charging_hour_before_departure_buffer: 1
+  max_recommended_charge_limit_battery_level: 90.0
+  min_charge_limit_battery_level: 50.0
+  min_daily_battery_level: 35.0
+  min_trip_battery_level: 20.0
+  typical_daily_distance_non_working_day: 85.0
+  ultra_cheap_grid_charging_max_battery_level: 90.0
+  very_cheap_grid_charging_max_battery_level: 80.0
+  workday_distance_needed_monday: 85.0
+forecast:
+  entity_ids:
+    daily_service_entity_id: weather.forecast_home
+    hourly_service_entity_id: weather.forecast_home
+    outdoor_temp_entity_id: sensor.outdoor_temperature
+home:
+  entity_ids:
+    ignore_consumption_from_entity_ids:
+    - sensor.heat_pump_power
+    power_consumption_entity_id: sensor.home_power_consumption
+    powerwall_battery_level_entity_id: ""
+    powerwall_watt_flow_entity_id: ""
+  invert_powerwall_watt_flow_entity_id: false
+  power_consumption_entity_id_include_powerwall_charging: false
+  power_consumption_entity_id_include_powerwall_discharging: false
+language: da-DK
+notification:
+  efficiency_on_cable_plug_in: true
+  preheating: true
+notify_list:
+- notify.mobile_app_phone
+prices:
+  entity_ids:
+    energidataservice_buy_entity_id: sensor.energi_data_service
+    energidataservice_sell_entity_id: sensor.energi_data_service_salg
+  refund: 0.0
+  sell_fee: 0.03
+solar:
+  allow_grid_charging_above_solar_available: 0
+  charging_single_phase_max_amp: 16.0
+  charging_single_phase_min_amp: 6.0
+  charging_three_phase_min_amp: 5.0
+  enable_selling_during_expensive_hours: false
+  entity_ids:
+    forecast_entity_id: ""
+    production_entity_id: sensor.inverter_input_power
+  inverter_discharging_power_limit: 6000.0
+  max_to_current_hour: false
+  production_price: -1.0
+  solarpower_use_before_minutes: 15
+testing_mode: false

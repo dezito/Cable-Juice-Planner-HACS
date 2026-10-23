@@ -1,0 +1,334 @@
+{
+  "entity": {
+    "switch": {
+      "deactivate_script": {
+        "default": "mdi:cancel"
+      },
+      "forced_charging_daily_battery_level": {
+        "default": "mdi:battery-charging-low"
+      },
+      "allow_manual_charging_now": {
+        "default": "mdi:ev-plug-type2"
+      },
+      "allow_manual_charging_solar": {
+        "default": "mdi:solar-power"
+      },
+      "solar_charging": {
+        "default": "mdi:brain"
+      },
+      "fill_up": {
+        "default": "mdi:brain"
+      },
+      "workplan_charging": {
+        "default": "mdi:brain"
+      },
+      "trip_preheat": {
+        "default": "mdi:heat-wave"
+      },
+      "workday_monday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "workday_tuesday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "workday_wednesday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "workday_thursday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "workday_friday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "workday_saturday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "workday_sunday": {
+        "default": "mdi:briefcase-outline"
+      },
+      "preheat_monday": {
+        "default": "mdi:heat-wave"
+      },
+      "preheat_tuesday": {
+        "default": "mdi:heat-wave"
+      },
+      "preheat_wednesday": {
+        "default": "mdi:heat-wave"
+      },
+      "preheat_thursday": {
+        "default": "mdi:heat-wave"
+      },
+      "preheat_friday": {
+        "default": "mdi:heat-wave"
+      },
+      "preheat_saturday": {
+        "default": "mdi:heat-wave"
+      },
+      "preheat_sunday": {
+        "default": "mdi:heat-wave"
+      },
+      "calculate_charging_loss": {
+        "default": "mdi:battery-sync"
+      },
+      "powerwall_discharge_above_needed": {
+        "default": "mdi:power-plug-battery"
+      }
+    },
+    "number": {
+      "solar_sell_fixed_price": {
+        "default": "mdi:cash-multiple"
+      },
+      "preheat_minutes_before": {
+        "default": "mdi:timer-cog-outline"
+      },
+      "typical_daily_distance": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_monday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_tuesday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_wednesday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_thursday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_friday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_saturday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "workday_distance_needed_sunday": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "min_daily_battery_level": {
+        "default": "mdi:percent-outline"
+      },
+      "min_trip_battery_level": {
+        "default": "mdi:percent-outline"
+      },
+      "min_charge_limit_battery_level": {
+        "default": "mdi:percent-outline"
+      },
+      "max_recommended_charge_limit_battery_level": {
+        "default": "mdi:percent-outline"
+      },
+      "very_cheap_grid_charging_max_battery_level": {
+        "default": "mdi:sale"
+      },
+      "ultra_cheap_grid_charging_max_battery_level": {
+        "default": "mdi:sale-outline"
+      },
+      "battery_level": {
+        "default": "mdi:battery-high"
+      },
+      "completed_battery_level": {
+        "default": "mdi:battery-high"
+      },
+      "estimated_total_range": {
+        "default": "mdi:map-marker-distance"
+      },
+      "trip_charge_procent": {
+        "default": "mdi:percent-outline"
+      },
+      "trip_range_needed": {
+        "default": "mdi:map-marker-distance"
+      },
+      "full_charge_recommended": {
+        "default": "mdi:battery-heart"
+      },
+      "ev_charge_after_powerwall_battery_level": {
+        "default": "mdi:percent-outline"
+      },
+      "public_charging_session_cost": {
+        "default": "mdi:cash-edit"
+      }
+    },
+    "select": {
+      "forecast_type": {
+        "default": "mdi:form-select"
+      }
+    },
+    "time": {
+      "workday_departure_monday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_departure_tuesday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_departure_wednesday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_departure_thursday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_departure_friday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_departure_saturday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_departure_sunday": {
+        "default": "mdi:clock-start"
+      },
+      "workday_homecoming_monday": {
+        "default": "mdi:clock-end"
+      },
+      "workday_homecoming_tuesday": {
+        "default": "mdi:clock-end"
+      },
+      "workday_homecoming_wednesday": {
+        "default": "mdi:clock-end"
+      },
+      "workday_homecoming_thursday": {
+        "default": "mdi:clock-end"
+      },
+      "workday_homecoming_friday": {
+        "default": "mdi:clock-end"
+      },
+      "workday_homecoming_saturday": {
+        "default": "mdi:clock-end"
+      },
+      "workday_homecoming_sunday": {
+        "default": "mdi:clock-end"
+      }
+    },
+    "datetime": {
+      "trip_date_time": {
+        "default": "mdi:calendar-start"
+      },
+      "trip_homecoming_date_time": {
+        "default": "mdi:calendar-end"
+      },
+      "last_full_charge": {
+        "default": "mdi:battery-check"
+      }
+    },
+    "button": {
+      "enforce_planning": {
+        "default": "mdi:calendar-refresh"
+      },
+      "trip_reset": {
+        "default": "mdi:restore"
+      },
+      "restart_script": {
+        "default": "mdi:restart"
+      }
+    },
+    "sensor": {
+      "current_charging_rule": {
+        "default": "mdi:battery-sync"
+      },
+      "charger_action": {
+        "default": "mdi:ev-station",
+        "state": {
+          "charge": "mdi:ev-station",
+          "stop": "mdi:ev-plug-type2"
+        }
+      },
+      "charging_limit": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "charger_phase_1_amps": {
+        "default": "mdi:numeric-1-box"
+      },
+      "charger_phase_2_amps": {
+        "default": "mdi:numeric-2-box"
+      },
+      "charger_phase_3_amps": {
+        "default": "mdi:numeric-3-box"
+      },
+      "charging_watts": {
+        "default": "mdi:ev-station"
+      },
+      "overview": {
+        "default": "mdi:text-box-outline"
+      },
+      "charging_history": {
+        "default": "mdi:history"
+      },
+      "emoji_description": {
+        "default": "mdi:emoticon-outline"
+      },
+      "kwh_cost_price": {
+        "default": "mdi:cash"
+      },
+      "charge_very_cheap_battery_level": {
+        "default": "mdi:battery-arrow-up-outline"
+      },
+      "charge_ultra_cheap_battery_level": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "solar_over_production_current_hour": {
+        "default": "mdi:solar-power-variant"
+      },
+      "solar_charged_percentage": {
+        "default": "mdi:solar-power"
+      },
+      "drive_efficiency": {
+        "default": "mdi:speedometer"
+      },
+      "km_per_kwh": {
+        "default": "mdi:map-marker-distance"
+      },
+      "estimated_range": {
+        "default": "mdi:map-marker-path"
+      },
+      "drive_efficiency_last_battery_level": {
+        "default": "mdi:battery-clock"
+      },
+      "drive_efficiency_last_odometer": {
+        "default": "mdi:counter"
+      },
+      "co2_emitted": {
+        "default": "mdi:molecule-co2"
+      },
+      "kwh_charged_by_solar": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "site_available_l1": {
+        "default": "mdi:current-ac"
+      },
+      "site_house_l1": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "site_available_l2": {
+        "default": "mdi:current-ac"
+      },
+      "site_house_l2": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "site_available_l3": {
+        "default": "mdi:current-ac"
+      },
+      "site_house_l3": {
+        "default": "mdi:home-lightning-bolt-outline"
+      }
+    },
+    "binary_sensor": {
+      "public_charging_session_done": {
+        "default": "mdi:ev-station"
+      }
+    },
+    "event": {
+      "ev_request": {
+        "default": "mdi:car-connected"
+      }
+    }
+  },
+  "services": {
+    "debug_info": {
+      "service": "mdi:bug"
+    },
+    "enforce_planning": {
+      "service": "mdi:calendar-refresh"
+    },
+    "manual_add_public_charging_session": {
+      "service": "mdi:ev-station"
+    }
+  }
+}

@@ -1,0 +1,1631 @@
+{
+  "title": "Cable Juice Planner",
+  "config": {
+    "step": {
+      "general": {
+        "title": "Ogólne",
+        "description": "Język tekstów i powiadomień.",
+        "data": {
+          "language": "Język"
+        },
+        "data_description": {
+          "language": "Język przeglądu, historii ładowania, reguły ładowania i powiadomień."
+        }
+      },
+      "charger": {
+        "title": "Ładowarka - czujniki",
+        "description": "Czujniki ładowarki. Status, moc i oba liczniki kWh są wymagane.",
+        "data": {
+          "status_entity_id": "Status ładowarki",
+          "power_consumtion_entity_id": "Moc ładowania",
+          "kwh_meter_entity_id": "Licznik kWh",
+          "lifetime_kwh_meter_entity_id": "Licznik kWh (całkowity)",
+          "enabled_entity_id": "Ładowarka włączona",
+          "cable_connected_entity_id": "Kabel podłączony",
+          "co2_entity_id": "Intensywność CO₂"
+        },
+        "data_description": {
+          "status_entity_id": "Status ładowarki (Obsługiwane stany: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
+          "power_consumtion_entity_id": "Moc ładowania (W)",
+          "kwh_meter_entity_id": "Użyj sensora całkowania Riemann-sum (metoda: lewa suma Riemanna), jeśli licznik kWh ładowarki działa wolno (np. Easee); w przeciwnym razie użyj licznika całkowitego",
+          "lifetime_kwh_meter_entity_id": "Alternatywa dla kwh_meter_entity_id, jeśli nie chcesz używać licznika całkowitego",
+          "enabled_entity_id": "Opcjonalnie: przełącznik/czujnik pokazujący, czy ładowarka jest włączona (on/off). Gdy jest wyłączona, atrybut charger_enabled czujnika akcji prosi o włączenie.",
+          "cable_connected_entity_id": "Używane tylko, gdy ładowarka nie ma czujnika statusu: pokazuje, czy auto jest podłączone.",
+          "co2_entity_id": "Energi Data Service CO₂ entity_id"
+        }
+      },
+      "charger_specs": {
+        "title": "Ładowarka - parametry",
+        "description": "Do obliczenia, ile można naładować na godzinę, oraz dla czujników prądu.",
+        "data": {
+          "power_voltage": "Napięcie sieci",
+          "charging_phases": "Fazy",
+          "charging_max_amp": "Maks. prąd ładowania",
+          "charging_loss": "Straty ładowania"
+        },
+        "data_description": {
+          "power_voltage": "Napięcie sieciowe",
+          "charging_phases": "Liczba faz, którymi ładuje auto (1-3).",
+          "charging_max_amp": "Maksymalny prąd ładowania (A)",
+          "charging_loss": "Straty ładowania w procentach (0 lub ujemne). -5 oznacza utratę 5 % energii."
+        }
+      },
+      "load_balancing": {
+        "title": "Rozdział mocy",
+        "description": "Miejsce auta we wspólnym przyłączu.",
+        "data": {
+          "site_priority": "Priorytet",
+          "site_phase_order": "Kolejność faz ładowarki"
+        },
+        "data_description": {
+          "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
+          "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki."
+        }
+      },
+      "ev": {
+        "title": "Auto - czujniki (opcjonalnie)",
+        "description": "Czujniki integracji auta. Bez integracji zostaw puste: używany jest wirtualny poziom baterii. Poziom baterii, zasięg i licznik muszą być wszystkie ustawione albo wszystkie puste.",
+        "data": {
+          "usable_battery_level_entity_id": "Poziom baterii",
+          "estimated_battery_range_entity_id": "Zasięg",
+          "odometer_entity_id": "Licznik przebiegu",
+          "charge_port_door_entity_id": "Klapka gniazda ładowania",
+          "charge_cable_entity_id": "Kabel ładowania",
+          "charging_limit_entity_id": "Limit ładowania auta",
+          "location_entity_id": "Lokalizacja",
+          "last_update_entity_id": "Ostatnia aktualizacja",
+          "climate_entity_id": "Klimatyzacja / podgrzewanie"
+        },
+        "data_description": {
+          "usable_battery_level_entity_id": "Musi być dokładny poziom baterii (%)",
+          "estimated_battery_range_entity_id": "Musi być dokładny zasięg",
+          "charge_port_door_entity_id": "Drzwi portu ładowania otwarte/zamknięte (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
+          "charge_cable_entity_id": "Kabel podłączony do EV (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
+          "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit.",
+          "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza",
+          "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut.",
+          "climate_entity_id": "Opcjonalnie: encja klimatyzacji auta. Jej stan pokazuje, czy trwa podgrzewanie; start/stop są wysyłane jako zdarzenia ev_request."
+        }
+      },
+      "ev_specs": {
+        "title": "Auto - bateria",
+        "description": "Bateria auta i jak wcześnie ładowanie ma się zakończyć przed wyjazdem.",
+        "data": {
+          "battery_size": "Użyteczna pojemność baterii",
+          "last_charging_hour_before_departure_buffer": "Ładowanie zakończone przed wyjazdem"
+        },
+        "data_description": {
+          "battery_size": "Użyteczna pojemność baterii; zweryfikuj przez OBD2",
+          "last_charging_hour_before_departure_buffer": "Liczba godzin przed wyjazdem, kiedy ładowanie musi być zakończone. Jeśli brakuje energii, zostanie zaplanowane dodatkowe ładowanie."
+        }
+      },
+      "home": {
+        "title": "Zużycie domu",
+        "description": "Do obliczenia nadwyżki słonecznej do ładowania.",
+        "data": {
+          "power_consumption_entity_id": "Zużycie domu",
+          "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
+          "ignore_consumption_from_entity_ids": "Ignoruj zużycie z"
+        },
+        "data_description": {
+          "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
+          "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
+          "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania"
+        }
+      },
+      "powerwall": {
+        "title": "Magazyn energii (opcjonalnie)",
+        "description": "Wypełnij, jeśli masz magazyn energii.",
+        "data": {
+          "powerwall_watt_flow_entity_id": "Moc magazynu energii",
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak mocy",
+          "powerwall_battery_level_entity_id": "Poziom magazynu energii",
+          "powerwall_battery_size": "Pojemność magazynu energii",
+          "powerwall_charging_power_limit": "Maks. moc ładowania magazynu",
+          "powerwall_discharging_power": "Moc rozładowania magazynu dla auta"
+        },
+        "data_description": {
+          "powerwall_watt_flow_entity_id": "Przepływ mocy baterii domowej (dodatnie=rozładowanie, ujemne=ładowanie; odwróć znak przez home.invert_powerwall_watt_flow_entity_id). Wskazówka: wyłącz rozładowanie podczas ładowania EV",
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak dla home.entity_ids.powerwall_watt_flow_entity_id (ładowanie dodatnie, rozładowanie ujemne)",
+          "powerwall_battery_level_entity_id": "Używane z solar.ev_charge_after_powerwall_battery_level",
+          "powerwall_battery_size": "Pojemność baterii domowej (kWh)",
+          "powerwall_charging_power_limit": "Limit mocy ładowania baterii domowej (W)",
+          "powerwall_discharging_power": "Moc rozładowania baterii domowej (W) używana do ładowania EV powyżej progu"
+        }
+      },
+      "prices_energidataservice": {
+        "title": "Energi Data Service",
+        "description": "Czujniki integracji [Energi Data Service](https://github.com/MTrab/energidataservice).",
+        "data": {
+          "energidataservice_buy_entity_id": "Cena zakupu",
+          "energidataservice_sell_entity_id": "Cena sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "energidataservice_buy_entity_id": "Energi Data Service entity_id ceny",
+          "energidataservice_sell_entity_id": "Energi Data Service entity_id ceny sprzedaży"
+        }
+      },
+      "prices_stromligning": {
+        "title": "Strømligning",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.",
+        "data": {
+          "stromligning_buy_current_price": "Cena zakupu",
+          "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
+          "stromligning_buy_forecasts": "Prognozy ceny zakupu",
+          "stromligning_sell_current_price": "Cena sprzedaży (opcjonalnie)",
+          "stromligning_sell_tomorrow_available": "Cena sprzedaży jutro (opcjonalnie)",
+          "stromligning_sell_forecasts": "Prognozy ceny sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning aktualna cena zakupu",
+          "stromligning_buy_tomorrow_available": "Strømligning ceny zakupu na jutro dostępne",
+          "stromligning_buy_forecasts": "Strømligning prognozy cen zakupu",
+          "stromligning_sell_current_price": "Strømligning aktualna cena sprzedaży",
+          "stromligning_sell_tomorrow_available": "Strømligning ceny sprzedaży na jutro",
+          "stromligning_sell_forecasts": "Strømligning prognozy cen sprzedaży"
+        }
+      },
+      "prices_stromligning_tariffs": {
+        "title": "Strømligning - taryfy przy sprzedaży",
+        "description": "Zostaw puste, aby użyć 0.",
+        "data": {
+          "stromligning_sell_distribution": "Taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Podatek od energii",
+          "stromligning_sell_nettariff": "Taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Taryfa systemowa",
+          "stromligning_sell_surcharge": "Dopłata do ceny spot"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sprzedaż taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Strømligning sprzedaż podatek od energii elektrycznej",
+          "stromligning_sell_nettariff": "Strømligning sprzedaż taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Strømligning sprzedaż taryfa systemowa",
+          "stromligning_sell_surcharge": "Strømligning sprzedaż dopłata do ceny spot"
+        }
+      },
+      "price_fees": {
+        "title": "Zwrot i opłaty",
+        "description": "Kwoty na kWh.",
+        "data": {
+          "refund": "Zwrot",
+          "sell_fee": "Opłata za sprzedaż"
+        },
+        "data_description": {
+          "refund": "Kwota zwrotu od państwa/dostawcy"
+        }
+      },
+      "solar": {
+        "title": "Panele słoneczne (opcjonalnie)",
+        "description": "Wypełnij, jeśli masz panele słoneczne.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Prognoza słoneczna (Solcast)",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Prognoza solarna (W) (Obsługiwane: Solcast PV Forecast)",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. number.PREFIX_solar_sell_fixed_price musi być -1,0 aby użyć ceny spot"
+        }
+      },
+      "solar_charging": {
+        "title": "Ładowanie słoneczne",
+        "description": "Jak nadwyżka słoneczna jest zamieniana na prąd ładowania.",
+        "data": {
+          "solarpower_use_before_minutes": "Pożyczanie nadwyżki słonecznej",
+          "max_to_current_hour": "Wykorzystaj nadwyżkę w ciągu godziny",
+          "allow_grid_charging_above_solar_available": "Dozwolona różnica od nadwyżki",
+          "charging_single_phase_min_amp": "Min. prąd na 1 fazie",
+          "charging_single_phase_max_amp": "Maks. prąd na 1 fazie",
+          "charging_three_phase_min_amp": "Min. prąd na wszystkich fazach"
+        },
+        "data_description": {
+          "solarpower_use_before_minutes": "Liczba minut ’pożyczonych’ z nadwyżki solarnej",
+          "max_to_current_hour": "Wymagaj użycia nadwyżki w bieżącej godzinie",
+          "allow_grid_charging_above_solar_available": "Dopuszczalna różnica w W powyżej(+)/poniżej(−) nadwyżki",
+          "charging_single_phase_min_amp": "Minimalny prąd ładowania 1-fazowy; ustaw 0 aby wyłączyć",
+          "charging_single_phase_max_amp": "Maksymalny prąd ładowania 1-fazowy; ustaw 0 aby wyłączyć",
+          "charging_three_phase_min_amp": "Minimalny prąd ładowania 3-fazowy"
+        }
+      },
+      "weather": {
+        "title": "Pogoda",
+        "description": "Prognoza pogody służy do przewidywania nadwyżki i podgrzewania.",
+        "data": {
+          "hourly_service_entity_id": "Prognoza godzinowa",
+          "daily_service_entity_id": "Prognoza dzienna",
+          "outdoor_temp_entity_id": "Temperatura zewnętrzna"
+        },
+        "data_description": {
+          "hourly_service_entity_id": "Encja prognozy godzinowej",
+          "daily_service_entity_id": "Encja prognozy dziennej",
+          "outdoor_temp_entity_id": "Używane do decyzji o podgrzewaniu/odmrażaniu z dokładniejszą temperaturą niż prognoza"
+        }
+      },
+      "notifications": {
+        "title": "Powiadomienia",
+        "description": "Kto otrzymuje jakie powiadomienia.",
+        "data": {
+          "notify_list": "Powiadamiaj",
+          "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
+          "preheating": "Podgrzewanie start/stop"
+        },
+        "data_description": {
+          "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
+          "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
+          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania"
+        }
+      },
+      "advanced": {
+        "title": "Zaawansowane",
+        "description": "Planowanie, panel i diagnostyka.",
+        "data": {
+          "cron_interval": "Interwał",
+          "dashboard": "Panel na pasku bocznym",
+          "enable_diagnostic_file_log": "Diagnostyczny plik logu",
+          "testing_mode": "Tryb testowy"
+        },
+        "data_description": {
+          "cron_interval": "Minuty między kontrolami planu i ładowania.",
+          "dashboard": "Dodaje gotowy panel Cable Juice Planner do paska bocznego dla tej instancji. Wymaga kart HACS mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card i ultra-vehicle-card.",
+          "enable_diagnostic_file_log": "Zapisuje szczegółowy log do cable_juice_planner_PREFIX.log w folderze konfiguracji (2 MB na plik, 3 rotacje).",
+          "testing_mode": "Oznacza regułę ładowania symbolem 🧪 i pomija kontrolę ładowania, podgrzewanie i inne akcje."
+        }
+      },
+      "database": {
+        "title": "Bazy danych",
+        "description": "Ile historii jest przechowywane.",
+        "data": {
+          "power_values_db_data_to_save": "Wartości mocy",
+          "solar_available_db_data_to_save": "Produkcja słoneczna na typ pogody",
+          "kwh_avg_prices_db_data_to_save": "Historia cen",
+          "drive_efficiency_db_data_to_save": "Efektywność jazdy",
+          "km_kwh_efficiency_db_data_to_save": "km/kWh",
+          "charging_history_db_data_to_save": "Historia ładowania (miesiące)"
+        },
+        "data_description": {
+          "power_values_db_data_to_save": "Liczba dni przechowywania wartości mocy",
+          "solar_available_db_data_to_save": "Przechowywana ilość na poziom zachmurzenia",
+          "kwh_avg_prices_db_data_to_save": "Przechowywana ilość",
+          "drive_efficiency_db_data_to_save": "Przechowywana ilość",
+          "km_kwh_efficiency_db_data_to_save": "Przechowywana ilość",
+          "charging_history_db_data_to_save": "Przechowuj X miesięcy historii ładowania"
+        }
+      },
+      "price_provider": {
+        "title": "Ceny energii",
+        "description": "Wybierz źródło cen godzinowych.",
+        "data": {
+          "price_providers": "Dostawcy cen"
+        }
+      },
+      "user": {
+        "title": "Dodaj Cable Juice Planner",
+        "description": "Co chcesz dodać?",
+        "menu_options": {
+          "instance": "Auto / ładowarka",
+          "site": "Wspólne przyłącze (rozdział mocy)"
+        }
+      },
+      "instance": {
+        "title": "Dodaj auto / ładowarkę",
+        "description": "Cable Juice Planner planuje, kiedy auto ma się ładować. Integracja nie wysyła poleceń: plan i akcje są encjami (np. `sensor.cjp_‹prefix›_charger_action`), których używasz we własnych automatyzacjach.",
+        "data": {
+          "name": "Nazwa auta",
+          "entity_prefix": "Prefiks encji",
+          "language": "Język"
+        },
+        "data_description": {
+          "name": "Opcjonalnie, np. Tesla. Używana jako nazwa urządzenia i w powiadomieniach.",
+          "entity_prefix": "Opcjonalnie. Wszystkie encje zaczynają się od cjp_, prefiks jest dalej: tesla daje sensor.cjp_tesla_overview, puste daje sensor.cjp_overview. Inny prefiks dla każdego auta.",
+          "language": "Język przeglądu, historii ładowania, reguły ładowania i powiadomień."
+        }
+      },
+      "site": {
+        "title": "Wspólne przyłącze",
+        "description": "Rozdział mocy między kilka aut według priorytetu, aby razem nigdy nie przekroczyły bezpiecznika głównego na fazę.",
+        "data": {
+          "fuse_l1": "Bezpiecznik główny L1",
+          "fuse_l2": "Bezpiecznik główny L2",
+          "fuse_l3": "Bezpiecznik główny L3",
+          "margin": "Margines bezpieczeństwa",
+          "voltage": "Napięcie sieci",
+          "phase_l1_entity_id": "Prąd/moc L1",
+          "phase_l2_entity_id": "Prąd/moc L2",
+          "phase_l3_entity_id": "Prąd/moc L3",
+          "urgent_trip_hours": "Podróż wkrótce"
+        },
+        "data_description": {
+          "fuse_l1": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
+          "fuse_l2": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
+          "fuse_l3": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
+          "margin": "Odejmowany od bezpiecznika.",
+          "voltage": "Gdy czujniki faz mierzą moc (W) zamiast prądu (A).",
+          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "urgent_trip_hours": "Planowana podróż w ciągu tylu godzin daje autu pierwszeństwo."
+        }
+      },
+      "import_legacy": {
+        "title": "Import z wersji PyScript",
+        "description": "Znalezione instalacje Cable Juice Planner PyScript:\n{files}\n\nWybierz, z której importować (może mieć inny prefiks niż **{prefix}**). Ustawienia są używane jako domyślne, bazy danych są kopiowane przy pierwszym starcie, a wartości starych pomocników input_* trafiają do nowych encji. Pliki PyScript są tylko czytane.",
+        "data": {
+          "import_source": "Importuj z"
+        }
+      }
+    },
+    "error": {
+      "invalid_prefix": "Użyj 1-50 małych liter, cyfr lub podkreśleń, zaczynając od litery.",
+      "prefix_in_use": "Ten prefiks jest już używany.",
+      "prefix_entities_exist": "Istnieją już encje z tym prefiksem (np. z wersji PyScript).",
+      "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
+      "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
+      "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
+      "min_above_max": "Minimum nie może być większe niż maksimum."
+    },
+    "abort": {
+      "site_exists": "Wspólne przyłącze już istnieje."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Cable Juice Planner",
+        "description": "Wybierz, co zmienić. Integracja zostanie przeładowana po zapisaniu.",
+        "menu_options": {
+          "menu_general": "Ogólne",
+          "menu_charger": "Ładowarka",
+          "menu_ev": "Auto",
+          "menu_home": "Dom i magazyn energii",
+          "menu_prices": "Ceny energii",
+          "menu_solar": "Panele i pogoda",
+          "menu_notifications": "Powiadomienia",
+          "menu_advanced": "Zaawansowane i bazy danych"
+        }
+      },
+      "general": {
+        "title": "Ogólne",
+        "description": "Język tekstów i powiadomień.",
+        "data": {
+          "language": "Język"
+        },
+        "data_description": {
+          "language": "Język przeglądu, historii ładowania, reguły ładowania i powiadomień."
+        }
+      },
+      "charger": {
+        "title": "Ładowarka - czujniki",
+        "description": "Czujniki ładowarki. Status, moc i oba liczniki kWh są wymagane.",
+        "data": {
+          "status_entity_id": "Status ładowarki",
+          "power_consumtion_entity_id": "Moc ładowania",
+          "kwh_meter_entity_id": "Licznik kWh",
+          "lifetime_kwh_meter_entity_id": "Licznik kWh (całkowity)",
+          "enabled_entity_id": "Ładowarka włączona",
+          "cable_connected_entity_id": "Kabel podłączony",
+          "co2_entity_id": "Intensywność CO₂"
+        },
+        "data_description": {
+          "status_entity_id": "Status ładowarki (Obsługiwane stany: on, connect, connected, ready, ready_to_charge, awaiting_authorization, awaiting_start, off, disconnect, disconnected, charging, completed, finished)",
+          "power_consumtion_entity_id": "Moc ładowania (W)",
+          "kwh_meter_entity_id": "Użyj sensora całkowania Riemann-sum (metoda: lewa suma Riemanna), jeśli licznik kWh ładowarki działa wolno (np. Easee); w przeciwnym razie użyj licznika całkowitego",
+          "lifetime_kwh_meter_entity_id": "Alternatywa dla kwh_meter_entity_id, jeśli nie chcesz używać licznika całkowitego",
+          "enabled_entity_id": "Opcjonalnie: przełącznik/czujnik pokazujący, czy ładowarka jest włączona (on/off). Gdy jest wyłączona, atrybut charger_enabled czujnika akcji prosi o włączenie.",
+          "cable_connected_entity_id": "Używane tylko, gdy ładowarka nie ma czujnika statusu: pokazuje, czy auto jest podłączone.",
+          "co2_entity_id": "Energi Data Service CO₂ entity_id"
+        }
+      },
+      "charger_specs": {
+        "title": "Ładowarka - parametry",
+        "description": "Do obliczenia, ile można naładować na godzinę, oraz dla czujników prądu.",
+        "data": {
+          "power_voltage": "Napięcie sieci",
+          "charging_phases": "Fazy",
+          "charging_max_amp": "Maks. prąd ładowania",
+          "charging_loss": "Straty ładowania"
+        },
+        "data_description": {
+          "power_voltage": "Napięcie sieciowe",
+          "charging_phases": "Liczba faz, którymi ładuje auto (1-3).",
+          "charging_max_amp": "Maksymalny prąd ładowania (A)",
+          "charging_loss": "Straty ładowania w procentach (0 lub ujemne). -5 oznacza utratę 5 % energii."
+        }
+      },
+      "load_balancing": {
+        "title": "Rozdział mocy",
+        "description": "Miejsce auta we wspólnym przyłączu.",
+        "data": {
+          "site_priority": "Priorytet",
+          "site_phase_order": "Kolejność faz ładowarki"
+        },
+        "data_description": {
+          "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
+          "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki."
+        }
+      },
+      "ev": {
+        "title": "Auto - czujniki (opcjonalnie)",
+        "description": "Czujniki integracji auta. Bez integracji zostaw puste: używany jest wirtualny poziom baterii. Poziom baterii, zasięg i licznik muszą być wszystkie ustawione albo wszystkie puste.",
+        "data": {
+          "usable_battery_level_entity_id": "Poziom baterii",
+          "estimated_battery_range_entity_id": "Zasięg",
+          "odometer_entity_id": "Licznik przebiegu",
+          "charge_port_door_entity_id": "Klapka gniazda ładowania",
+          "charge_cable_entity_id": "Kabel ładowania",
+          "charging_limit_entity_id": "Limit ładowania auta",
+          "location_entity_id": "Lokalizacja",
+          "last_update_entity_id": "Ostatnia aktualizacja",
+          "climate_entity_id": "Klimatyzacja / podgrzewanie"
+        },
+        "data_description": {
+          "usable_battery_level_entity_id": "Musi być dokładny poziom baterii (%)",
+          "estimated_battery_range_entity_id": "Musi być dokładny zasięg",
+          "charge_port_door_entity_id": "Drzwi portu ładowania otwarte/zamknięte (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
+          "charge_cable_entity_id": "Kabel podłączony do EV (Obsługiwane stany: on, open, plugged, connect, connected, plugged_waiting_for_charge, manual, off, closed, unplugged, disconnect, disconnected)",
+          "charging_limit_entity_id": "Opcjonalnie: aktualny limit ładowania auta. Używany do obliczania strat ładowania i zaokrąglania (Kia/Cupra). Żądany limit jest publikowany jako czujnik charging_limit.",
+          "location_entity_id": "Jeśli nie ustawione, fallback do charger.entity_ids.status_entity_id dla domu/poza",
+          "last_update_entity_id": "Opcjonalnie: czas ostatniej aktualizacji auta. Brak zdarzenia wake_up, jeśli auto zaktualizowało się w ciągu 14 minut.",
+          "climate_entity_id": "Opcjonalnie: encja klimatyzacji auta. Jej stan pokazuje, czy trwa podgrzewanie; start/stop są wysyłane jako zdarzenia ev_request."
+        }
+      },
+      "ev_specs": {
+        "title": "Auto - bateria",
+        "description": "Bateria auta i jak wcześnie ładowanie ma się zakończyć przed wyjazdem.",
+        "data": {
+          "battery_size": "Użyteczna pojemność baterii",
+          "last_charging_hour_before_departure_buffer": "Ładowanie zakończone przed wyjazdem"
+        },
+        "data_description": {
+          "battery_size": "Użyteczna pojemność baterii; zweryfikuj przez OBD2",
+          "last_charging_hour_before_departure_buffer": "Liczba godzin przed wyjazdem, kiedy ładowanie musi być zakończone. Jeśli brakuje energii, zostanie zaplanowane dodatkowe ładowanie."
+        }
+      },
+      "home": {
+        "title": "Zużycie domu",
+        "description": "Do obliczenia nadwyżki słonecznej do ładowania.",
+        "data": {
+          "power_consumption_entity_id": "Zużycie domu",
+          "power_consumption_entity_id_include_powerwall_charging": "Zawiera ładowanie magazynu energii",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zawiera rozładowanie magazynu energii",
+          "ignore_consumption_from_entity_ids": "Ignoruj zużycie z"
+        },
+        "data_description": {
+          "power_consumption_entity_id": "Zużycie domu (W), nie zużycie sieciowe",
+          "power_consumption_entity_id_include_powerwall_charging": "Zużycie domu wraz z ładowaniem baterii domowej (W)",
+          "power_consumption_entity_id_include_powerwall_discharging": "Zużycie domu wraz z rozładowaniem baterii domowej (W)",
+          "ignore_consumption_from_entity_ids": "Lista sensorów mocy do ignorowania"
+        }
+      },
+      "powerwall": {
+        "title": "Magazyn energii (opcjonalnie)",
+        "description": "Wypełnij, jeśli masz magazyn energii.",
+        "data": {
+          "powerwall_watt_flow_entity_id": "Moc magazynu energii",
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak mocy",
+          "powerwall_battery_level_entity_id": "Poziom magazynu energii",
+          "powerwall_battery_size": "Pojemność magazynu energii",
+          "powerwall_charging_power_limit": "Maks. moc ładowania magazynu",
+          "powerwall_discharging_power": "Moc rozładowania magazynu dla auta"
+        },
+        "data_description": {
+          "powerwall_watt_flow_entity_id": "Przepływ mocy baterii domowej (dodatnie=rozładowanie, ujemne=ładowanie; odwróć znak przez home.invert_powerwall_watt_flow_entity_id). Wskazówka: wyłącz rozładowanie podczas ładowania EV",
+          "invert_powerwall_watt_flow_entity_id": "Odwróć znak dla home.entity_ids.powerwall_watt_flow_entity_id (ładowanie dodatnie, rozładowanie ujemne)",
+          "powerwall_battery_level_entity_id": "Używane z solar.ev_charge_after_powerwall_battery_level",
+          "powerwall_battery_size": "Pojemność baterii domowej (kWh)",
+          "powerwall_charging_power_limit": "Limit mocy ładowania baterii domowej (W)",
+          "powerwall_discharging_power": "Moc rozładowania baterii domowej (W) używana do ładowania EV powyżej progu"
+        }
+      },
+      "prices_energidataservice": {
+        "title": "Energi Data Service",
+        "description": "Czujniki integracji [Energi Data Service](https://github.com/MTrab/energidataservice).",
+        "data": {
+          "energidataservice_buy_entity_id": "Cena zakupu",
+          "energidataservice_sell_entity_id": "Cena sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "energidataservice_buy_entity_id": "Energi Data Service entity_id ceny",
+          "energidataservice_sell_entity_id": "Energi Data Service entity_id ceny sprzedaży"
+        }
+      },
+      "prices_stromligning": {
+        "title": "Strømligning",
+        "description": "Czujniki integracji Strømligning. Cena zakupu jest wymagana.",
+        "data": {
+          "stromligning_buy_current_price": "Cena zakupu",
+          "stromligning_buy_tomorrow_available": "Cena zakupu jutro",
+          "stromligning_buy_forecasts": "Prognozy ceny zakupu",
+          "stromligning_sell_current_price": "Cena sprzedaży (opcjonalnie)",
+          "stromligning_sell_tomorrow_available": "Cena sprzedaży jutro (opcjonalnie)",
+          "stromligning_sell_forecasts": "Prognozy ceny sprzedaży (opcjonalnie)"
+        },
+        "data_description": {
+          "stromligning_buy_current_price": "Strømligning aktualna cena zakupu",
+          "stromligning_buy_tomorrow_available": "Strømligning ceny zakupu na jutro dostępne",
+          "stromligning_buy_forecasts": "Strømligning prognozy cen zakupu",
+          "stromligning_sell_current_price": "Strømligning aktualna cena sprzedaży",
+          "stromligning_sell_tomorrow_available": "Strømligning ceny sprzedaży na jutro",
+          "stromligning_sell_forecasts": "Strømligning prognozy cen sprzedaży"
+        }
+      },
+      "prices_stromligning_tariffs": {
+        "title": "Strømligning - taryfy przy sprzedaży",
+        "description": "Zostaw puste, aby użyć 0.",
+        "data": {
+          "stromligning_sell_distribution": "Taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Podatek od energii",
+          "stromligning_sell_nettariff": "Taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Taryfa systemowa",
+          "stromligning_sell_surcharge": "Dopłata do ceny spot"
+        },
+        "data_description": {
+          "stromligning_sell_distribution": "Strømligning sprzedaż taryfa dystrybucyjna",
+          "stromligning_sell_electricity_tax": "Strømligning sprzedaż podatek od energii elektrycznej",
+          "stromligning_sell_nettariff": "Strømligning sprzedaż taryfa sieciowa",
+          "stromligning_sell_systemtariff": "Strømligning sprzedaż taryfa systemowa",
+          "stromligning_sell_surcharge": "Strømligning sprzedaż dopłata do ceny spot"
+        }
+      },
+      "price_fees": {
+        "title": "Zwrot i opłaty",
+        "description": "Kwoty na kWh.",
+        "data": {
+          "refund": "Zwrot",
+          "sell_fee": "Opłata za sprzedaż"
+        },
+        "data_description": {
+          "refund": "Kwota zwrotu od państwa/dostawcy"
+        }
+      },
+      "solar": {
+        "title": "Panele słoneczne (opcjonalnie)",
+        "description": "Wypełnij, jeśli masz panele słoneczne.",
+        "data": {
+          "production_entity_id": "Produkcja słoneczna",
+          "forecast_entity_id": "Prognoza słoneczna (Solcast)",
+          "inverter_discharging_power_limit": "Maks. moc falownika",
+          "enable_selling_during_expensive_hours": "Sprzedawaj energię słoneczną w drogich godzinach"
+        },
+        "data_description": {
+          "production_entity_id": "Produkcja solarna (W)",
+          "forecast_entity_id": "Prognoza solarna (W) (Obsługiwane: Solcast PV Forecast)",
+          "inverter_discharging_power_limit": "Limit mocy rozładowania falownika (W)",
+          "enable_selling_during_expensive_hours": "Włącz sprzedaż w drogich godzinach; jeśli wyłączone, solar idzie do EV. number.PREFIX_solar_sell_fixed_price musi być -1,0 aby użyć ceny spot"
+        }
+      },
+      "solar_charging": {
+        "title": "Ładowanie słoneczne",
+        "description": "Jak nadwyżka słoneczna jest zamieniana na prąd ładowania.",
+        "data": {
+          "solarpower_use_before_minutes": "Pożyczanie nadwyżki słonecznej",
+          "max_to_current_hour": "Wykorzystaj nadwyżkę w ciągu godziny",
+          "allow_grid_charging_above_solar_available": "Dozwolona różnica od nadwyżki",
+          "charging_single_phase_min_amp": "Min. prąd na 1 fazie",
+          "charging_single_phase_max_amp": "Maks. prąd na 1 fazie",
+          "charging_three_phase_min_amp": "Min. prąd na wszystkich fazach"
+        },
+        "data_description": {
+          "solarpower_use_before_minutes": "Liczba minut ’pożyczonych’ z nadwyżki solarnej",
+          "max_to_current_hour": "Wymagaj użycia nadwyżki w bieżącej godzinie",
+          "allow_grid_charging_above_solar_available": "Dopuszczalna różnica w W powyżej(+)/poniżej(−) nadwyżki",
+          "charging_single_phase_min_amp": "Minimalny prąd ładowania 1-fazowy; ustaw 0 aby wyłączyć",
+          "charging_single_phase_max_amp": "Maksymalny prąd ładowania 1-fazowy; ustaw 0 aby wyłączyć",
+          "charging_three_phase_min_amp": "Minimalny prąd ładowania 3-fazowy"
+        }
+      },
+      "weather": {
+        "title": "Pogoda",
+        "description": "Prognoza pogody służy do przewidywania nadwyżki i podgrzewania.",
+        "data": {
+          "hourly_service_entity_id": "Prognoza godzinowa",
+          "daily_service_entity_id": "Prognoza dzienna",
+          "outdoor_temp_entity_id": "Temperatura zewnętrzna"
+        },
+        "data_description": {
+          "hourly_service_entity_id": "Encja prognozy godzinowej",
+          "daily_service_entity_id": "Encja prognozy dziennej",
+          "outdoor_temp_entity_id": "Używane do decyzji o podgrzewaniu/odmrażaniu z dokładniejszą temperaturą niż prognoza"
+        }
+      },
+      "notifications": {
+        "title": "Powiadomienia",
+        "description": "Kto otrzymuje jakie powiadomienia.",
+        "data": {
+          "notify_list": "Powiadamiaj",
+          "efficiency_on_cable_plug_in": "Efektywność jazdy po podłączeniu",
+          "preheating": "Podgrzewanie start/stop"
+        },
+        "data_description": {
+          "notify_list": "Usługi notify otrzymujące powiadomienia CJP (np. notify.mobile_app_telefon). Puste = notify.notify.",
+          "efficiency_on_cable_plug_in": "Powiadom o ostatniej efektywności jazdy po podłączeniu kabla",
+          "preheating": "Powiadom o rozpoczęciu/zatrzymaniu podgrzewania"
+        }
+      },
+      "advanced": {
+        "title": "Zaawansowane",
+        "description": "Planowanie, panel i diagnostyka.",
+        "data": {
+          "cron_interval": "Interwał",
+          "dashboard": "Panel na pasku bocznym",
+          "enable_diagnostic_file_log": "Diagnostyczny plik logu",
+          "testing_mode": "Tryb testowy"
+        },
+        "data_description": {
+          "cron_interval": "Minuty między kontrolami planu i ładowania.",
+          "dashboard": "Dodaje gotowy panel Cable Juice Planner do paska bocznego dla tej instancji. Wymaga kart HACS mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card i ultra-vehicle-card.",
+          "enable_diagnostic_file_log": "Zapisuje szczegółowy log do cable_juice_planner_PREFIX.log w folderze konfiguracji (2 MB na plik, 3 rotacje).",
+          "testing_mode": "Oznacza regułę ładowania symbolem 🧪 i pomija kontrolę ładowania, podgrzewanie i inne akcje."
+        }
+      },
+      "database": {
+        "title": "Bazy danych",
+        "description": "Ile historii jest przechowywane.",
+        "data": {
+          "power_values_db_data_to_save": "Wartości mocy",
+          "solar_available_db_data_to_save": "Produkcja słoneczna na typ pogody",
+          "kwh_avg_prices_db_data_to_save": "Historia cen",
+          "drive_efficiency_db_data_to_save": "Efektywność jazdy",
+          "km_kwh_efficiency_db_data_to_save": "km/kWh",
+          "charging_history_db_data_to_save": "Historia ładowania (miesiące)"
+        },
+        "data_description": {
+          "power_values_db_data_to_save": "Liczba dni przechowywania wartości mocy",
+          "solar_available_db_data_to_save": "Przechowywana ilość na poziom zachmurzenia",
+          "kwh_avg_prices_db_data_to_save": "Przechowywana ilość",
+          "drive_efficiency_db_data_to_save": "Przechowywana ilość",
+          "km_kwh_efficiency_db_data_to_save": "Przechowywana ilość",
+          "charging_history_db_data_to_save": "Przechowuj X miesięcy historii ładowania"
+        }
+      },
+      "price_provider": {
+        "title": "Ceny energii",
+        "description": "Wybierz źródło cen godzinowych.",
+        "data": {
+          "price_providers": "Dostawcy cen"
+        }
+      },
+      "site": {
+        "title": "Wspólne przyłącze",
+        "description": "Rozdział mocy między kilka aut według priorytetu, aby razem nigdy nie przekroczyły bezpiecznika głównego na fazę.",
+        "data": {
+          "fuse_l1": "Bezpiecznik główny L1",
+          "fuse_l2": "Bezpiecznik główny L2",
+          "fuse_l3": "Bezpiecznik główny L3",
+          "margin": "Margines bezpieczeństwa",
+          "voltage": "Napięcie sieci",
+          "phase_l1_entity_id": "Prąd/moc L1",
+          "phase_l2_entity_id": "Prąd/moc L2",
+          "phase_l3_entity_id": "Prąd/moc L3",
+          "urgent_trip_hours": "Podróż wkrótce"
+        },
+        "data_description": {
+          "fuse_l1": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
+          "fuse_l2": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
+          "fuse_l3": "Bezpiecznik główny (lub wspólny limit aut) na fazę.",
+          "margin": "Odejmowany od bezpiecznika.",
+          "voltage": "Gdy czujniki faz mierzą moc (W) zamiast prądu (A).",
+          "phase_l1_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "phase_l2_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "phase_l3_entity_id": "Opcjonalnie: zmierzony prąd (A) lub moc (W) na fazę całego domu. Z wszystkimi trzema zużycie domu jest odejmowane.",
+          "urgent_trip_hours": "Planowana podróż w ciągu tylu godzin daje autu pierwszeństwo."
+        }
+      }
+    },
+    "error": {
+      "invalid_prefix": "Użyj 1-50 małych liter, cyfr lub podkreśleń, zaczynając od litery.",
+      "prefix_in_use": "Ten prefiks jest już używany.",
+      "prefix_entities_exist": "Istnieją już encje z tym prefiksem (np. z wersji PyScript).",
+      "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
+      "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
+      "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
+      "min_above_max": "Minimum nie może być większe niż maksimum."
+    }
+  },
+  "selector": {
+    "import_source": {
+      "options": {
+        "none": "Nie importuj"
+      }
+    },
+    "price_providers": {
+      "options": {
+        "energidataservice": "Energi Data Service",
+        "stromligning": "Strømligning"
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "deactivate_script": {
+        "name": "Dezaktywuj skrypt"
+      },
+      "forced_charging_daily_battery_level": {
+        "name": "Wymuszone ładowanie poniżej dziennego poziomu"
+      },
+      "allow_manual_charging_now": {
+        "name": "Zezwól na ręczne ładowanie teraz"
+      },
+      "allow_manual_charging_solar": {
+        "name": "Zezwól na ręczne ładowanie tylko solarne"
+      },
+      "solar_charging": {
+        "name": "Ładowanie z nadwyżki solarnej"
+      },
+      "fill_up": {
+        "name": "Optymalne ładowanie tygodniowe (bez planu pracy)"
+      },
+      "workplan_charging": {
+        "name": "Ładowanie wg planu pracy"
+      },
+      "trip_preheat": {
+        "name": "Podgrzewanie podróży"
+      },
+      "workday_monday": {
+        "name": "Poniedziałek dzień pracy"
+      },
+      "workday_tuesday": {
+        "name": "Wtorek dzień pracy"
+      },
+      "workday_wednesday": {
+        "name": "Środa dzień pracy"
+      },
+      "workday_thursday": {
+        "name": "Czwartek dzień pracy"
+      },
+      "workday_friday": {
+        "name": "Piątek dzień pracy"
+      },
+      "workday_saturday": {
+        "name": "Sobota dzień pracy"
+      },
+      "workday_sunday": {
+        "name": "Niedziela dzień pracy"
+      },
+      "preheat_monday": {
+        "name": "Podgrzewanie poniedziałek"
+      },
+      "preheat_tuesday": {
+        "name": "Podgrzewanie wtorek"
+      },
+      "preheat_wednesday": {
+        "name": "Podgrzewanie środa"
+      },
+      "preheat_thursday": {
+        "name": "Podgrzewanie czwartek"
+      },
+      "preheat_friday": {
+        "name": "Podgrzewanie piątek"
+      },
+      "preheat_saturday": {
+        "name": "Podgrzewanie sobota"
+      },
+      "preheat_sunday": {
+        "name": "Podgrzewanie niedziela"
+      },
+      "calculate_charging_loss": {
+        "name": "Oblicz straty ładowania"
+      },
+      "powerwall_discharge_above_needed": {
+        "name": "Rozładowanie baterii domowej ponad potrzeby do EV"
+      }
+    },
+    "number": {
+      "solar_sell_fixed_price": {
+        "name": "Stała cena sprzedaży solara"
+      },
+      "preheat_minutes_before": {
+        "name": "Podgrzej X minut przed"
+      },
+      "typical_daily_distance": {
+        "name": "Typowy dzienny dystans (dzień wolny)"
+      },
+      "workday_distance_needed_monday": {
+        "name": "Poniedziałek dystans"
+      },
+      "workday_distance_needed_tuesday": {
+        "name": "Wtorek dystans"
+      },
+      "workday_distance_needed_wednesday": {
+        "name": "Środa dystans"
+      },
+      "workday_distance_needed_thursday": {
+        "name": "Czwartek dystans"
+      },
+      "workday_distance_needed_friday": {
+        "name": "Piątek dystans"
+      },
+      "workday_distance_needed_saturday": {
+        "name": "Sobota dystans"
+      },
+      "workday_distance_needed_sunday": {
+        "name": "Niedziela dystans"
+      },
+      "min_daily_battery_level": {
+        "name": "Dzienne minimum baterii"
+      },
+      "min_trip_battery_level": {
+        "name": "Minimum baterii podróży"
+      },
+      "min_charge_limit_battery_level": {
+        "name": "Minimalny limit ładowania EV"
+      },
+      "max_recommended_charge_limit_battery_level": {
+        "name": "Maksymalny zalecany limit ładowania EV"
+      },
+      "very_cheap_grid_charging_max_battery_level": {
+        "name": "Limit ładowania przy tanim prądzie"
+      },
+      "ultra_cheap_grid_charging_max_battery_level": {
+        "name": "Limit ładowania przy ekstremalnie tanim prądzie"
+      },
+      "battery_level": {
+        "name": "Wirtualny poziom baterii EV"
+      },
+      "completed_battery_level": {
+        "name": "Poziom baterii po zakończeniu ładowania"
+      },
+      "estimated_total_range": {
+        "name": "Wirtualny maksymalny zasięg EV"
+      },
+      "trip_charge_procent": {
+        "name": "Ładowanie podróży do"
+      },
+      "trip_range_needed": {
+        "name": "Podróż dystans w km"
+      },
+      "full_charge_recommended": {
+        "name": "Zalecane pełne ładowanie co"
+      },
+      "ev_charge_after_powerwall_battery_level": {
+        "name": "Ładuj EV powyżej minimum baterii domowej"
+      },
+      "public_charging_session_cost": {
+        "name": "Koszt ładowania publicznego"
+      }
+    },
+    "select": {
+      "forecast_type": {
+        "name": "Wybierz typ prognozy"
+      }
+    },
+    "time": {
+      "workday_departure_monday": {
+        "name": "Poniedziałek wyjazd"
+      },
+      "workday_departure_tuesday": {
+        "name": "Wtorek wyjazd"
+      },
+      "workday_departure_wednesday": {
+        "name": "Środa wyjazd"
+      },
+      "workday_departure_thursday": {
+        "name": "Czwartek wyjazd"
+      },
+      "workday_departure_friday": {
+        "name": "Piątek wyjazd"
+      },
+      "workday_departure_saturday": {
+        "name": "Sobota wyjazd"
+      },
+      "workday_departure_sunday": {
+        "name": "Niedziela wyjazd"
+      },
+      "workday_homecoming_monday": {
+        "name": "Poniedziałek powrót"
+      },
+      "workday_homecoming_tuesday": {
+        "name": "Wtorek powrót"
+      },
+      "workday_homecoming_wednesday": {
+        "name": "Środa powrót"
+      },
+      "workday_homecoming_thursday": {
+        "name": "Czwartek powrót"
+      },
+      "workday_homecoming_friday": {
+        "name": "Piątek powrót"
+      },
+      "workday_homecoming_saturday": {
+        "name": "Sobota powrót"
+      },
+      "workday_homecoming_sunday": {
+        "name": "Niedziela powrót"
+      }
+    },
+    "datetime": {
+      "trip_date_time": {
+        "name": "Wyjazd EV"
+      },
+      "trip_homecoming_date_time": {
+        "name": "Powrót EV"
+      },
+      "last_full_charge": {
+        "name": "Ostatnie pełne ładowanie"
+      }
+    },
+    "button": {
+      "enforce_planning": {
+        "name": "Wymuś planowanie"
+      },
+      "trip_reset": {
+        "name": "Resetuj ładowanie podróży"
+      },
+      "restart_script": {
+        "name": "Przeładuj integrację"
+      }
+    },
+    "sensor": {
+      "current_charging_rule": {
+        "name": "Aktywna reguła ładowania"
+      },
+      "charger_action": {
+        "name": "Akcja ładowarki",
+        "state": {
+          "charge": "Ładuj",
+          "stop": "Stop"
+        }
+      },
+      "charging_limit": {
+        "name": "Limit ładowania auta"
+      },
+      "charger_phase_1_amps": {
+        "name": "ładowarka faza 1 ampery"
+      },
+      "charger_phase_2_amps": {
+        "name": "ładowarka faza 2 ampery"
+      },
+      "charger_phase_3_amps": {
+        "name": "ładowarka faza 3 ampery"
+      },
+      "charging_watts": {
+        "name": "moc ładowania w watach"
+      },
+      "overview": {
+        "name": "Przegląd"
+      },
+      "charging_history": {
+        "name": "Historia ładowania"
+      },
+      "emoji_description": {
+        "name": "Opis emoji"
+      },
+      "kwh_cost_price": {
+        "name": "Cena kWh"
+      },
+      "charge_very_cheap_battery_level": {
+        "name": "Cel przy bardzo tanim prądzie"
+      },
+      "charge_ultra_cheap_battery_level": {
+        "name": "Cel przy ekstremalnie tanim prądzie"
+      },
+      "solar_over_production_current_hour": {
+        "name": "Dostępna produkcja solarna w tej godzinie"
+      },
+      "solar_charged_percentage": {
+        "name": "Procent ładowania z solara"
+      },
+      "drive_efficiency": {
+        "name": "Efektywność jazdy"
+      },
+      "km_per_kwh": {
+        "name": "km/kWh"
+      },
+      "estimated_range": {
+        "name": "Szacowany zasięg"
+      },
+      "drive_efficiency_last_battery_level": {
+        "name": "Poziom baterii przy ostatnim ładowaniu"
+      },
+      "drive_efficiency_last_odometer": {
+        "name": "Przebieg przy ostatnim ładowaniu"
+      },
+      "co2_emitted": {
+        "name": "Emisja CO₂"
+      },
+      "kwh_charged_by_solar": {
+        "name": "kWh naładowane ze słońca"
+      },
+      "site_available_l1": {
+        "name": "Dostępny prąd L1"
+      },
+      "site_available_l2": {
+        "name": "Dostępny prąd L2"
+      },
+      "site_available_l3": {
+        "name": "Dostępny prąd L3"
+      },
+      "site_house_l1": {
+        "name": "Prąd domu L1"
+      },
+      "site_house_l2": {
+        "name": "Prąd domu L2"
+      },
+      "site_house_l3": {
+        "name": "Prąd domu L3"
+      }
+    },
+    "binary_sensor": {
+      "public_charging_session_done": {
+        "name": "Ładowanie publiczne zakończone"
+      }
+    },
+    "event": {
+      "ev_request": {
+        "name": "Żądanie auta",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "wake_up": "Obudź auto",
+              "preheat_start": "Rozpocznij podgrzewanie",
+              "preheat_stop": "Zatrzymaj podgrzewanie"
+            }
+          }
+        }
+      }
+    }
+  },
+  "services": {
+    "debug_info": {
+      "name": "Show debug info",
+      "description": "Shows the state of Cable Juice Planner as a notification (also returned as response).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instance",
+          "description": "The Cable Juice Planner instance (empty = all)."
+        }
+      }
+    },
+    "enforce_planning": {
+      "name": "Enforce planning",
+      "description": "Recalculates the charging plan now.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instance",
+          "description": "The Cable Juice Planner instance (empty = all)."
+        }
+      }
+    },
+    "manual_add_public_charging_session": {
+      "name": "Add public charging session",
+      "description": "Manually adds a public charging session to the charging history. Cannot be undone. Use at least begin and end battery level, battery level added or kWh added. Try without Add to history first.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instance",
+          "description": "The Cable Juice Planner instance (empty = all)."
+        },
+        "charging_session_start": {
+          "name": "Start",
+          "description": "Start time of the charging session."
+        },
+        "battery_level_begin": {
+          "name": "Battery level begin",
+          "description": "Battery level in percent at the start."
+        },
+        "battery_level_end": {
+          "name": "Battery level end",
+          "description": "Battery level in percent at the end."
+        },
+        "battery_level_added": {
+          "name": "Battery level added",
+          "description": "Energy added in percent."
+        },
+        "battery_kwh_added": {
+          "name": "kWh added",
+          "description": "Energy added in kWh."
+        },
+        "total_charging_cost": {
+          "name": "Total cost",
+          "description": "The total cost of the charging session."
+        },
+        "include_charging_loss": {
+          "name": "Include charging loss",
+          "description": "Adjust the added energy for charging loss."
+        },
+        "add_to_history": {
+          "name": "Add to history",
+          "description": "Off = only return the calculation."
+        }
+      }
+    }
+  },
+  "runtime": {
+    "ui": {
+      "common": {
+        "distance_type": "km",
+        "distance_kwh": "km/kWh",
+        "distance_percentage": "km/%",
+        "wh_distance": "Wh/km",
+        "valuta": "zł",
+        "valuta_distance": "zł/km",
+        "valuta_kwh": "zł/kWh",
+        "valuta_percentage": "zł/%",
+        "time": "Czas",
+        "price": "Cena",
+        "total": "Razem",
+        "expense": "Koszt",
+        "drive_efficiency": "Efektywność jazdy"
+      },
+      "calendar": {
+        "month_names": {
+          "jan": "Sty",
+          "feb": "Lut",
+          "mar": "Mar",
+          "apr": "Kwi",
+          "may": "Maj",
+          "jun": "Cze",
+          "jul": "Lip",
+          "aug": "Sie",
+          "sep": "Wrz",
+          "oct": "Paź",
+          "nov": "Lis",
+          "dec": "Gru",
+          "january": "Styczeń",
+          "february": "Luty",
+          "march": "Marzec",
+          "april": "Kwiecień",
+          "may_full": "Maj",
+          "june": "Czerwiec",
+          "july": "Lipiec",
+          "august": "Sierpień",
+          "september": "Wrzesień",
+          "october": "Październik",
+          "november": "Listopad",
+          "december": "Grudzień"
+        },
+        "weekday_names": {
+          "mon": "Pon",
+          "tue": "Wt",
+          "wed": "Śr",
+          "thu": "Czw",
+          "fri": "Pt",
+          "sat": "Sob",
+          "sun": "Nd",
+          "monday": "Poniedziałek",
+          "tuesday": "Wtorek",
+          "wednesday": "Środa",
+          "thursday": "Czwartek",
+          "friday": "Piątek",
+          "saturday": "Sobota",
+          "sunday": "Niedziela"
+        }
+      },
+      "get_hours_plan": {
+        "header": "Ceny energii"
+      },
+      "entity_unavailable": {
+        "title": "Encja niedostępna",
+        "message": "Encja '{entity}' jest niedostępna od {timestamp}",
+        "restart_integration": "Sprawdź integrację lub przeładuj ją, jeśli nie wróci sama."
+      },
+      "set_charging_rule": {
+        "hour_limit": "Osiągnięto limit godzinowy",
+        "day_limit": "Osiągnięto limit dzienny"
+      },
+      "validation_procedure": {
+        "entity_validation": "Sprawdzanie encji",
+        "entity_missing_try_again": "Brakuje niektórych encji\nPonowna próba za 2 minuty",
+        "entity_ids_missing": "Brakuje niektórych identyfikatorów encji\n- {entity_ids}",
+        "entity_unavailable_try_again": "Niektóre encje są niedostępne\nPonowna próba za 2 minuty",
+        "unavailable_entity_ids_title": "Niektóre identyfikatory encji są niedostępne",
+        "check_entity_ids": "Sprawdź identyfikatory encji",
+        "missing_entity_ids_title": "Brakuje niektórych identyfikatorów encji"
+      },
+      "init": {
+        "script_starting": "Uruchamianie Cable Juice Planner",
+        "file_created_message": "Utworzono plik konfiguracji: {file_path}",
+        "add_entities": "Dodaj nowe encje do pulpitów (Dashboard).",
+        "yaml_file_created": "Utworzono plik YAML: {file_path}",
+        "restart_required": "Zrestartuj Home Assistant, aby wczytać zmiany",
+        "error_loading": "Ponowne wczytanie {file_path} za 5 sekund - wystąpił błąd",
+        "created": "Utworzono",
+        "renamed_to": "zmieniono nazwę na",
+        "config_renamed_keys": "Zmieniono nazwy kluczy w pliku {file_path}",
+        "entities_renamed": "Zmieniono nazwy encji w pliku {file_path}",
+        "deprecated_keys_title": "Przestarzałe klucze",
+        "deprecated_keys_in": "Przestarzałe klucze w {file_path}",
+        "remove_these_keys": "Usuń te klucze",
+        "config_updated": "Plik konfiguracyjny {file_path} został zaktualizowany",
+        "entities_package_updated": "Pakiet encji {file_path} został zaktualizowany",
+        "first_run_warning": "Ustaw first_run w {file_path} na false",
+        "loading_config": "Wczytywanie konfiguracji",
+        "config_validation": "Sprawdzanie konfiguracji",
+        "config_validation_failed": "Sprawdzanie konfiguracji nie powiodło się",
+        "charger_not_configured": "Ładowarka nie skonfigurowana; jeśli brak integracji ładowarki, użyj encji EV",
+        "script_stopped": "Skrypt zatrzymany",
+        "check_log": "Sprawdź logi, aby uzyskać więcej informacji"
+      },
+      "emoji_description": {
+        "header": "Opis emoji",
+        "markdown_hint": "Użyj karty Markdown z: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+      },
+      "set_default_entity_states": {
+        "markdown_guide": "Użyj karty Markdown z: {{ states.sensor.{name}_overview.attributes.overview }}",
+        "no_overview": "Brak przeglądu"
+      },
+      "drive_efficiency": {
+        "title": "Efektywność ostatniej jazdy",
+        "distance": "Dystans",
+        "used": "Zużyto"
+      },
+      "load_charging_history": {
+        "default_state": "Użyj karty Markdown z: {{{{ states.sensor.{name}_charging_history.attributes.history }}}}"
+      },
+      "charging_history_combine_and_set": {
+        "too_big_warning": "Home Assistant nie może wyświetlić większej historii",
+        "more_history": "Zobacz więcej historii",
+        "month": "Miesiąc",
+        "estimated_distance": "Szacowane km na podstawie zużycia i efektywności",
+        "charging_allocation": "Alokacja ładowania",
+        "day_kwh": "Dzień kWh",
+        "night_kwh": "Noc kWh",
+        "public_charging_total": "Ładowanie publiczne razem",
+        "public_charing_total": "Ładowanie publiczne razem",
+        "no_history": "Brak historii ładowania"
+      },
+      "cheap_grid_charge_hours": {
+        "entity_not_in_domain": "Nie można pobrać cen energii; {entity} nie jest w domenie sensor",
+        "work_goto_equals_work_homecoming": "{day} wyjazd i powrót są takie same",
+        "work_distance_zero": "Dystans dnia pracy {day} wynosi 0 km",
+        "workplan_settings_error": "Błąd w konfiguracji ładowania wg planu pracy",
+        "last_drive_efficiency": {
+          "title": "Efektywność ostatniej jazdy",
+          "drive_date": "Data jazdy",
+          "last_distance": "Dystans",
+          "used_battery": "Zużyta bateria",
+          "distance_per_kwh": "Dystans na kWh"
+        },
+        "battery_level_expenses": {
+          "title": "Koszty względem poziomu baterii",
+          "current_battery_level": "Aktualny poziom baterii",
+          "solar_share": "Udział solara",
+          "unit_price": "Cena jednostkowa"
+        },
+        "planning_basis": "Pokaż podstawy planowania",
+        "charging_overview_title": "Przegląd ładowania",
+        "offline_prices": "Używanie cen offline dla niektórych godzin",
+        "no_upcoming_charging_planned": "Brak zaplanowanego ładowania",
+        "enough_solar_production": "Wystarczająca produkcja solarna do ładowania",
+        "departure_plan": {
+          "title": "Plan wyjazdów",
+          "day": "Dzień",
+          "need": "Potrzeba",
+          "sun": "Słońce",
+          "no_departure_planned": "Brak zaplanowanych wyjazdów",
+          "solar": "solar",
+          "plan_include_estimations": "Plan zawiera szacowane koszty z sieci, {work_overview_solar_text}poziom baterii",
+          "estimated_daily_charging": "Szacunek dzienny {alternative_cost}zł {alternative_per_kwh}zł/kWh<br>przy {total_kwh}kWh różnicy {difference_cost}zł",
+          "estimated_daily_charging_plan": "Przegląd ładowania (**Dzienny szacunek ładowania**) "
+        },
+        "solar_production_title": "Dostępna nadwyżka produkcji słonecznej",
+        "no_solar_production": "Brak dostępnej nadwyżki produkcji słonecznej",
+        "last_scheduled": "Ostatnio zaplanowano",
+        "no_data": "Brak danych"
+      },
+      "max_local_energy_available_remaining_period": {
+        "powerwall_not_charging_but_should": "Bateria domowa {powerwall_battery_level}% nie ładuje, choć < {powerwall_reserved_battery_level}%",
+        "powerwall_force_stop": "Bateria domowa zatrzymana x̄{powerwall_charging_consumption}W - ładowanie później",
+        "powerwall_charging": "Bateria domowa ładuje x̄{powerwall_charging_consumption}W",
+        "powerwall_discharging": "Bateria domowa rozładowuje x̄{powerwall_discharging_available}W"
+      },
+      "preheat_ev": {
+        "preheating": "Podgrzewanie",
+        "thawing": "Odmrażanie",
+        "preheat_start": "{heating_type} pojazd do {time}",
+        "preheat_cancel": "Podgrzewanie przerwane; brak wyjazdu o {time}"
+      },
+      "ready_to_charge": {
+        "cable_disconnected": "Kabel ładowania odłączony",
+        "cable_connected_ev_not_home": "Kabel podłączony, EV poza domem",
+        "cable_connected_ev_not_updated": "Kabel podłączony, EV nie zaktualizowany",
+        "cable_connected_not_to_ev": "Kabel niepodłączony do EV\nPróba wybudzenia pojazdu",
+        "charge_port_closed": "Port ładowania EV zamknięty\nPróba wybudzenia pojazdu",
+        "ev_unavailable": "Port ładowania EV lub kabel niedostępny\nPróba wybudzenia pojazdu"
+      },
+      "is_charging": {
+        "charging_again": "EV ponownie ładuje",
+        "charging_failed": "Ładowanie nie powiodło się",
+        "fail_title": "Błąd ładowania EV",
+        "charger_unavailable": "Ładowarka niedostępna",
+        "charger_error": "Krytyczny błąd ładowarki; sprawdź integrację lub aplikację",
+        "charger_dynamic_failed": "Błąd dynamicznego limitu prądu",
+        "charger_restart": "Restart ładowarki",
+        "charger_restart_count": "Restart ładowarki, próba {count}",
+        "charger_control_restart_count": "Restart operatora ładowania, próba {count}",
+        "ev_not_charging": "EV nie ładuje prawidłowo",
+        "ev_restart_count": "Restart ładowania EV, próba {count}",
+        "charging_title": "Auto się ładuje"
+      },
+      "charging_without_rule": {
+        "charging_no_rule": "Ładowanie bez reguły {watt}W",
+        "entities_not_available": "Niedostępne encje:",
+        "check_options": "Sprawdź:\n- Zrestartuj zależne, niedostępne integracje\n- Zrestartuj Home Assistant",
+        "ev_charging_no_rule": "EV ładuje bez reguły",
+        "restart_integration": "Encja „{entity_id}” ładuje bez powodu\nSprawdź integrację {integration}"
+      },
+      "charge_if_needed": {
+        "script_deactivated": "Wyłączone",
+        "other_ev_connected": "Inny samochód elektryczny jest podłączony",
+        "no_charging_modes_active": "Brak aktywnych reguł ładowania\nŁadowanie {watt}W",
+        "charging_loss": "Obliczanie strat ładowania, ładowanie do {percentage}%",
+        "manual_charging": "Ręczne ładowanie dozwolone {watt}W",
+        "manual_charging_solar": "Ręczne ładowanie dozwolone, tylko solar {watt}W",
+        "planned_charging": "Ładowanie do {emoji}",
+        "low_battery_but_expensive": "Brak ładowania - prąd zbyt drogi",
+        "low_battery": "Ładowanie, bo poziom baterii < {percentage}%",
+        "solar_production_but_expensive": "Sprzedaż nadwyżki solara - wysoka cena spot ({price}zł)",
+        "solar": "Solar",
+        "powerwall": "Bateria domowa",
+        "local_energy_charging": "{local_energy} ładuje {watt}W",
+        "local_energy_charging_not_needed": "Brak ładowania solarnego - bateria powyżej {percentage}%",
+        "not_charging": "Brak ładowania",
+        "error_charging_max": "Błąd: Skrypt wyłączony, ładowanie maksymalne!!!"
+      },
+      "notify_set_battery_level": {
+        "action": "Ustaw poziom baterii",
+        "title": "Poziom baterii EV",
+        "message": "Pamiętaj, aby ustawić poziom baterii EV w Home Assistant"
+      },
+      "notify_battery_under_daily_battery_level": {
+        "action": "Aktywuj, aby rozpocząć wymuszone ładowanie",
+        "title": "Poziom baterii EV poniżej dziennego minimum",
+        "message": "Poziom baterii poniżej dziennego celu - można włączyć wymuszone ładowanie",
+        "no_charge_expensive_hours": "Brak ładowania w 3 najdroższych godzinach"
+      },
+      "startup": {
+        "configuration": {
+          "header": "Konfiguracja",
+          "charger": "Ładowarka skonfigurowana",
+          "ev": "EV skonfigurowane",
+          "solar": "Solar skonfigurowany",
+          "powerwall": "Bateria domowa skonfigurowana",
+          "configured": "Tak",
+          "not_configured": "Nie"
+        },
+        "setting_entities": "Konfigurowanie encji",
+        "loading_db": "Ładowanie baz danych",
+        "loading_history": "Wczytywanie historii ładowania",
+        "almost_ready": "Prawie gotowe",
+        "ev": {
+          "range": "Zasięg",
+          "battery_level": "Poziom baterii",
+          "estimated_range": "Szacowany zasięg"
+        },
+        "calc_charging_plan": "Obliczanie planu ładowania",
+        "call_all_entities": "Wywołaj usługę pyscript.ev_all_entities, aby zobaczyć wszystkie encje",
+        "imported_databases": "Zaimportowano istniejące bazy danych: {databases}"
+      },
+      "charging_rule_changed": {
+        "charging_rule_conflict": "Konflikt reguł ładowania",
+        "deactivate_optimal_rule": "Deaktywuj optymalne ładowanie tygodniowe",
+        "deactivate_workplan_rule": "Deaktywuj ładowanie wg planu pracy",
+        "reason": "Ładowanie wg planu pracy i optymalne ładowanie tygodniowe nie mogą być aktywne jednocześnie"
+      },
+      "public_charging_session": {
+        "title": "Ładowanie publiczne zakończone",
+        "message": "Proszę wprowadzić koszt ładowania publicznego\nŁadowanie od {start_battery_level}% do {end_battery_level}%\nDodano {added_battery_level}%",
+        "action": "Wprowadź koszt"
+      },
+      "calculate_charging_loss": {
+        "title": "Obliczanie strat ładowania",
+        "calculated": "Straty ładowania obliczone na {percentage}%",
+        "failed": "Nie udało się obliczyć strat ładowania",
+        "failed_title": "Błąd"
+      },
+      "site": {
+        "limited": "Rozdział mocy: {amps} A na {phases} fazach",
+        "waiting": "Rozdział mocy: czeka na wolny prąd"
+      }
+    },
+    "charging_type": {
+      "error": {
+        "description": "Błąd krytyczny, ładowanie awaryjne"
+      },
+      "no_rule": {
+        "description": "Ładowanie bez reguły"
+      },
+      "manual": {
+        "description": "Ładowanie ręczne"
+      },
+      "low_battery": {
+        "description": "Wymuszone ładowanie poniżej dziennego poziomu baterii"
+      },
+      "battery_health": {
+        "description": "Zalecane pełne ładowanie (kondycja baterii)"
+      },
+      "trip": {
+        "description": "Ładowanie przed podróżą / wyjazdem"
+      },
+      "public_charging": {
+        "description": "Ładowanie publiczne"
+      },
+      "first_workday_preparation": {
+        "description": "Przygotowanie na pierwszy dzień pracy"
+      },
+      "second_workday_preparation": {
+        "description": "Przygotowanie na drugi dzień pracy"
+      },
+      "third_workday_preparation": {
+        "description": "Przygotowanie na trzeci dzień pracy"
+      },
+      "fourth_workday_preparation": {
+        "description": "Przygotowanie na czwarty dzień pracy"
+      },
+      "fifth_workday_preparation": {
+        "description": "Przygotowanie na piąty dzień pracy"
+      },
+      "sixth_workday_preparation": {
+        "description": "Przygotowanie na szósty dzień pracy"
+      },
+      "seventh_workday_preparation": {
+        "description": "Przygotowanie na siódmy dzień pracy"
+      },
+      "eighth_workday_preparation": {
+        "description": "Przygotowanie na ósmy dzień pracy"
+      },
+      "fill_up": {
+        "description": "Cotygodniowe doładowanie (1., 4. i 7. dzień)"
+      },
+      "under_min_avg_price": {
+        "description": "Poniżej średniej ceny z ostatnich 14 dni"
+      },
+      "half_min_avg_price": {
+        "description": "25% poniżej średniej ceny z ostatnich 14 dni"
+      },
+      "grid_charging": {
+        "description": "Ładowanie z sieci"
+      },
+      "solar": {
+        "description": "Ładowanie energią słoneczną / nadwyżka"
+      },
+      "solar_corrected": {
+        "description": "Maksymalne ładowanie osiągnięte - nadwyżka solarna"
+      },
+      "powerwall": {
+        "description": "Ładowanie z baterii domowej"
+      },
+      "powerwall_avg_symbol": {
+        "description": "Średnie ładowanie baterii domowej"
+      },
+      "battery_stored": {
+        "description": "Zużycie z baterii"
+      },
+      "charging_loss": {
+        "description": "Obliczanie strat ładowania"
+      },
+      "sunrise": {
+        "description": "Wschód słońca"
+      },
+      "sunset": {
+        "description": "Zachód słońca"
+      },
+      "goto": {
+        "description": "Wyjazd"
+      },
+      "homecoming": {
+        "description": "Powrót"
+      },
+      "battery_usage": {
+        "description": "Poziom baterii przy wyjeździe i powrocie"
+      },
+      "charging_problem": {
+        "description": "Problemy z ładowaniem"
+      },
+      "charging_error": {
+        "description": "Ładowanie nie powiodło się"
+      }
+    },
+    "entity_description": {
+      "deactivate_script": "Wyłącz skrypt; ładowarka i EV nie są już sterowane",
+      "forced_charging_daily_battery_level": "Wymuś ładowanie poniżej dziennego minimum",
+      "allow_manual_charging_now": "Zezwól na ręczne ładowanie siecią/solarem teraz",
+      "allow_manual_charging_solar": "Ogranicz ręczne ładowanie tylko do nadwyżki solarnej",
+      "solar_charging": "Użyj nadwyżki; planuj tygodniowo wg prognozy",
+      "fill_up": "Rozdziela ładowanie wg potrzeb; preferuje tanie godziny",
+      "workplan_charging": "Planuj codziennie wg dni pracy, wyjazdu i dystansu",
+      "trip_preheat": "Podgrzej pojazd przed wyjazdem jeśli potrzebne",
+      "workday_monday": "Ustaw poniedziałek jako dzień pracy",
+      "workday_tuesday": "Ustaw wtorek jako dzień pracy",
+      "workday_wednesday": "Ustaw środę jako dzień pracy",
+      "workday_thursday": "Ustaw czwartek jako dzień pracy",
+      "workday_friday": "Ustaw piątek jako dzień pracy",
+      "workday_saturday": "Ustaw sobotę jako dzień pracy",
+      "workday_sunday": "Ustaw niedzielę jako dzień pracy",
+      "preheat_monday": "Podgrzej pojazd w poniedziałek",
+      "preheat_tuesday": "Podgrzej pojazd we wtorek",
+      "preheat_wednesday": "Podgrzej pojazd w środę",
+      "preheat_thursday": "Podgrzej pojazd w czwartek",
+      "preheat_friday": "Podgrzej pojazd w piątek",
+      "preheat_saturday": "Podgrzej pojazd w sobotę",
+      "preheat_sunday": "Podgrzej pojazd w niedzielę",
+      "calculate_charging_loss": "Automatyzuj pełny cykl aby obliczyć straty; zapisz i powiadom",
+      "powerwall_discharge_above_needed": "Rozładuj baterię domową ponad potrzeby domu do EV (wymaga solar_charging)",
+      "solar_sell_fixed_price": "Stała cena sprzedaży energii słonecznej, używana do obliczeń nadwyżki. Ustaw -1.0 aby używać ceny godzinowej.",
+      "preheat_minutes_before": "Podgrzej pojazd X minut przed wyjazdem jeśli aktywne",
+      "typical_daily_distance": "Typowy dzienny dystans w km, używany do planowania ładowania. Wymaga input_boolean.ev_fill_up.",
+      "workday_distance_needed_monday": "Dystans w km do naładowania na poniedziałek",
+      "workday_distance_needed_tuesday": "Dystans w km do naładowania na wtorek",
+      "workday_distance_needed_wednesday": "Dystans w km do naładowania na środę",
+      "workday_distance_needed_thursday": "Dystans w km do naładowania na czwartek",
+      "workday_distance_needed_friday": "Dystans w km do naładowania na piątek",
+      "workday_distance_needed_saturday": "Dystans w km do naładowania na sobotę",
+      "workday_distance_needed_sunday": "Dystans w km do naładowania na niedzielę",
+      "min_daily_battery_level": "Minimalny poziom baterii (%) przy powrocie do domu",
+      "min_trip_battery_level": "Minimalny poziom baterii (%) przy powrocie z podróży",
+      "min_charge_limit_battery_level": "Minimalny poziom (%) na jaki EV można ustawić",
+      "max_recommended_charge_limit_battery_level": "Maksymalny poziom (%) do codziennego ładowania",
+      "very_cheap_grid_charging_max_battery_level": "Przy bardzo tanim prądzie, naładuj EV do tego poziomu (%). Wymaga input_boolean.ev_fill_up.",
+      "ultra_cheap_grid_charging_max_battery_level": "Przy ekstremalnie tanim prądzie, naładuj EV do tego poziomu (%). Wymaga input_boolean.ev_fill_up.",
+      "completed_battery_level": "Jeśli brak integracji EV, ustaw ten poziom jako pełne naładowanie EV.",
+      "estimated_total_range": "Jeśli brak integracji EV, ustawia szacowany całkowity zasięg w km",
+      "trip_charge_procent": "Ustaw pożądany poziom baterii przy wyjeździe (%)",
+      "trip_range_needed": "Szacowany dystans do przejechania, przeliczany na % baterii",
+      "full_charge_recommended": "Zalecane pełne ładowanie co X dni. EV do 100%. 0 = wyłączone",
+      "ev_charge_after_powerwall_battery_level": "Ładuj EV z baterii domowej, gdy jej poziom > tego progu (%). 0 = wyłączone. Wymaga input_boolean.ev_solar_charging.",
+      "public_charging_session_cost": "Koszt ostatniego ładowania publicznego (nie zł/kWh)",
+      "forecast_type": "Wybierz typ prognozy (EMA, średnia lub trend)",
+      "workday_departure_monday": "Godzina wyjazdu w poniedziałek",
+      "workday_departure_tuesday": "Godzina wyjazdu we wtorek",
+      "workday_departure_wednesday": "Godzina wyjazdu w środę",
+      "workday_departure_thursday": "Godzina wyjazdu w czwartek",
+      "workday_departure_friday": "Godzina wyjazdu w piątek",
+      "workday_departure_saturday": "Godzina wyjazdu w sobotę",
+      "workday_departure_sunday": "Godzina wyjazdu w niedzielę",
+      "workday_homecoming_monday": "Godzina powrotu w poniedziałek",
+      "workday_homecoming_tuesday": "Godzina powrotu we wtorek",
+      "workday_homecoming_wednesday": "Godzina powrotu w środę",
+      "workday_homecoming_thursday": "Godzina powrotu w czwartek",
+      "workday_homecoming_friday": "Godzina powrotu w piątek",
+      "workday_homecoming_saturday": "Godzina powrotu w sobotę",
+      "workday_homecoming_sunday": "Godzina powrotu w niedzielę",
+      "trip_date_time": "Data/godzina wyjazdu EV",
+      "trip_homecoming_date_time": "Data/godzina powrotu EV",
+      "last_full_charge": "Data/godzina ostatniego pełnego ładowania",
+      "enforce_planning": "Przelicz plan ładowania",
+      "trip_reset": "Resetuj ładowanie podróży",
+      "restart_script": "Restartuj skrypt",
+      "charger_action": "Whether the charger should charge now (charge/stop). Use it in your automation; the attributes charger_enabled, mode and updated describe on/off, state and the last calculation.",
+      "charging_limit": "Wanted charge limit of the car in %. Set it in the car with your automation.",
+      "charger_phase_1_amps": "Natężenie prądu w amperach na fazie 1, do użycia w własnych automatyzacjach",
+      "charger_phase_2_amps": "Natężenie prądu w amperach na fazie 2, do użycia w własnych automatyzacjach",
+      "charger_phase_3_amps": "Natężenie prądu w amperach na fazie 3, do użycia w własnych automatyzacjach",
+      "charging_watts": "Moc ładowania w watach, do użycia w własnych automatyzacjach",
+      "kwh_cost_price": "Cena energii za kWh wraz z refundacją i sprzedażą solarów",
+      "charge_very_cheap_battery_level": "Cel gdy cena jest niższa niż najniższa z ostatnich 14 dni",
+      "charge_ultra_cheap_battery_level": "Cel gdy cena jest o 25% niższa niż najniższa z ostatnich 14 dni",
+      "solar_over_production_current_hour": "Produkcja solarna dostępna w bieżącej godzinie (waty)",
+      "solar_charged_percentage": "Procent ładowania pochodzący z energii słonecznej",
+      "drive_efficiency": "Efektywność oparta na podgrzewaniu, dystansie i zużyciu energii",
+      "km_per_kwh": "Kilometry na kWh",
+      "estimated_range": "Szacowany zasięg na podstawie stanu baterii i EMA",
+      "drive_efficiency_last_battery_level": "Poziom baterii podczas ostatniego ładowania (%)",
+      "drive_efficiency_last_odometer": "Przebieg podczas ostatniego ładowania (km)",
+      "co2_emitted": "CO₂ wyemitowane w kg, na podstawie Energi Data Service",
+      "kwh_charged_by_solar": "kWh naładowane energią słoneczną",
+      "public_charging_session_done": "Zaznacz, że ładowanie publiczne zostało zakończone i koszt musi zostać wprowadzony",
+      "ev_request": "Requests for the car: wake_up, preheat_start and preheat_stop. Carry them out with your automation."
+    },
+    "entity_help": {
+      "public_charging": "When a public charging session ends (charge port/cable used away from home), Public charging session done turns on and you get a notification.\n• Enter the total amount in Public charging session cost.\n• The session is added to the charging history about 1 min after entering it.\n• Enter -1 to ignore the session.",
+      "forced_charging": "Forced charging can be enabled manually when the battery level is under the daily minimum.\n• Charging: charges up to the daily minimum ({min_daily_battery_level} %).\n• Cost control: no charging in the most expensive hours (see the attribute expensive_hours).",
+      "manual_charging": "Manual charging starts charging at once without waiting for the plan.\n• Allow manual charging now: charges with max current from the grid and solar.\n• Solar only: charges only with the solar surplus.\nBoth are turned off automatically when the car is plugged in again.",
+      "cheap_targets": "Charge targets at cheap prices:\n• Very cheap target ({charge_very_cheap_battery_level} %): when the price is under the cheapest price of the last 14 days.\n• Ultra cheap target ({charge_ultra_cheap_battery_level} %): when the price is 25 % under the cheapest price of the last 14 days.\nThe targets follow the expected solar surplus of the coming week.",
+      "trip": "Trip charging is planned automatically when:\n• Trip charge percent is above 0 %, or Trip range needed is above 0 km.\n• Trip departure and Trip homecoming are set in the future.\nIt charges what the trip needs (from the percent or the distance). Charging between {max_recommended_charge_limit_battery_level}-100 % happens just before departure to protect the battery.\nTrip reset clears the trip; it is also reset automatically 2 hours after departure.",
+      "solar_charging": "Enabled when there is solar surplus.\n• Charging: uses the surplus; switches between 1 and 3 phases depending on it.\n• Need: follows the surplus compared to the house consumption. Max charge {max_recommended_charge_limit_battery_level} %.\n• Plan: the expected surplus of the week is used by Optimal weekly charging and Work plan charging, so the car charges as much solar as possible.",
+      "fill_up": "Optimal weekly charging can be used on holiday (ignores the work plan).\n• Charging: spread over a week.\n• Need: the difference between the current battery level and the max recommended ({max_recommended_charge_limit_battery_level} %) is split in 3 parts.\n• Plan: finds the cheapest hours. The typical daily distance ({typical_daily_distance} km) is used for days without work.",
+      "deactivate_script": "The charger and the car are not controlled by Cable Juice Planner and work normally (the action is charge with max current).",
+      "workplan": "Work plan charging: enable when you work within the next week.\n• Charging: plans daily charging over a week from workdays and days off.\n• Need: uses departure and homecoming time and the distance of every workday. Minimum battery level at homecoming {min_daily_battery_level} %, max charge {max_recommended_charge_limit_battery_level} %.\n• Plan: picks the cheapest hours from now until the departure of the workday, so the car is always ready.",
+      "full_charge": "Recommended full charge: with an LFP battery a full charge is recommended at least every 14 days or as the car maker says. Set the number of days here; the last full charge is registered automatically.",
+      "charging_loss": "Charging loss calculation – best result when charging from a low level (e.g. 10 %) to 100 %:\n1. Discharge the car as much as possible (max 20 %).\n2. Set the wanted charge limit in the car and Max recommended charge limit (now {max_recommended_charge_limit_battery_level} %, at least 90 %).\n3. Turn on Calculate charging loss and let the car report when it is full.\n4. The result is saved in the options automatically and you get a notification.",
+      "cheap_limits": "Charge level at cheap prices:\n• Cheap: when the price is under the lowest daily average of the last period, charge to {very_cheap_grid_charging_max_battery_level} %.\n• Extra cheap: when the price is another 25 % lower, charge to {ultra_cheap_grid_charging_max_battery_level} %.\nOptimal weekly charging must be enabled.",
+      "battery_preheat": "Battery level and preheating settings:\n• Minimum daily battery level ({min_daily_battery_level} %): at homecoming from work.\n• Minimum trip battery level ({min_trip_battery_level} %): at homecoming from a trip.\n• Minimum charge limit ({min_charge_limit_battery_level} %): the lowest charge limit the car allows.\n• Max recommended charge limit ({max_recommended_charge_limit_battery_level} %): the car maker's recommendation.\n• Preheat X min before ({preheat_minutes_before} min): preheat before leaving for work and trips (the preheat switch per weekday).",
+      "solar_sell_price": "Fixed sell price for the solar surplus. Set it to -1 to use the current hourly sell price.",
+      "powerwall": "Home battery settings:\n• Solar surplus only charges the car when the home battery is above the limit (now {ev_charge_after_powerwall_battery_level} %).\n• Use the home battery for the car: needs Solar charging and Home battery discharge above needed turned on; only energy above the limit is used.\nCreate an automation that disables home battery discharging while the car charges, and only allows it when the switch is on and the battery is above the limit.",
+      "virtual_ev": "Virtual EV (without a car integration):\n• Battery level: set the current battery level of the car when you plug it in.\n• Completed battery level: the level the car stops at.\n• Estimated total range: the realistic max range of the car."
+    }
+  }
+}
