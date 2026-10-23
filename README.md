@@ -167,6 +167,8 @@ Alt kan ændres bagefter under **Konfigurer** på integrationen, via en menu.
 | `sensor.cjp_<prefix>_charger_action` | `charge` eller `stop`: om laderen skal lade nu |
 | ↳ attribut `charger_enabled` | om laderen skal være tændt |
 | ↳ attribut `circuit_phase_1_amps` … `_3_amps` | kredsløbets grænse pr. fase (f.eks. Easee kredsløbsgrænse) |
+| ↳ attribut `charging_limit` | samme ladegrænse som `sensor.cjp_<prefix>_charging_limit` |
+| ↳ attributter `phase_1_amps`, `phase_2_amps`, `phase_3_amps` | samme ladestrøm pr. fase som de tre ampere-sensorer (så en automation kun skal bruge `charger_action`) |
 | ↳ attribut `mode` | `normal`, `deactivated` (slået fra) eller `error` (beregningen fejlede) |
 | ↳ attribut `updated` | tidspunkt for seneste beregning (hjerteslag) |
 | `sensor.cjp_<prefix>_charger_phase_1_amps` … `_3_amps` | ønsket ladestrøm pr. fase i A (0 = fasen bruges ikke) |
@@ -187,21 +189,61 @@ start/stop, tænd/sluk og strøm pr. fase. Du angiver dine egne handlinger, og i
 variablerne `phase_1`, `phase_2`, `phase_3`, `max_phase`, `phases`, `charger_enabled`,
 `fail_safe` og `message`.
 
+Lav én automation pr. bil med blueprinten. Under *Cable Juice Planner* vælger du kun bilens
+**Lader handling** (`sensor.cjp_<prefix>_charger_action` – vælgeren viser kun dem); ladestrømmen
+pr. fase læses fra dens attributter.
+
 Blueprinten har også fail-safe for det, integrationen ikke selv kan dække. Bliver
 `charger_action` utilgængelig, eller er `updated` for gammel, lader den med en fast strøm og
 sender en notifikation.
 
-Easee med blueprinten:
+Under **Ladestatus** angiver du, hvordan blueprinten ser om der lades: en status-sensor
+(laderens eller bilens, f.eks. `charging`/`completed`), en kontakt eller binær sensor der er
+`on` mens der lades, og/eller en effektsensor med en tærskel (standard 500 W). Så gentages start
+ikke ved fail-safe og efter en genstart af Home Assistant, mens der lades eller når der meldes
+færdig (*Tilstande der betyder færdig*, standard `completed` og `finished` som scriptets
+`CHARGER_COMPLETED_STATUS`). En ny ladebeslutning fra integrationen sender altid start.
 
-| Input | Handling |
-|---|---|
-| Start ladning | `easee.action_command` med `action_command: resume` |
-| Stop ladning | `easee.action_command` med `action_command: pause` |
-| Sæt ladestrøm | `easee.set_charger_dynamic_limit` med `current: "{{ max_phase }}"` |
-| Tænd / sluk laderen | `switch.turn_on` / `switch.turn_off` på `switch.<lader>_is_enabled` |
-| Laderens status | `sensor.<lader>_status` |
+Under **Genstart når der ikke lades** kan du tilføje handlinger, der køres når handlingen har
+stået på `charge` i f.eks. 10 minutter, uden at der lades – typisk
+`homeassistant.reload_config_entry` med en af laderens eller bilens entiteter som mål, som
+genindlæser den integration. Det gentages efter yderligere 10 og 20 minutter (højst 3 gange som
+standard), du får en notifikation, og 1 minut efter sendes ladestrøm og start igen. Det kræver
+Ladestatus – uden den kan blueprinten ikke se, om der lades.
 
-### Eksempel: bilen (Tessie)
+Blueprinten har en sektion til **laderen** og en til **bilen**. Alle handlinger er valgfrie: for
+hver opgave udfylder du den dér, hvor dit setup kan gøre det – i laderen, i bilen eller begge
+steder (f.eks. ladestrøm i laderen og ladegrænse i bilen).
+Ved start: ladegrænse i bilen → tænd laderen → ladestrøm i laderen → ladestrøm i bilen →
+start laderen → start bilen. Ved stop stoppes begge.
+
+**Typiske setups**
+
+| Setup | Udfyld | Eksempel |
+|---|---|---|
+| Laderen kan styres, bilen har ingen integration (eller kan ikke styres) | Lader | Easee, Zaptec, Monta, Wallbox eller en OCPP-lader med en "virtuel" bil (batteriniveau sættes manuelt) |
+| Bilen kan styres, laderen har ingen integration ("dum" lader, evt. målt med en energimåler) | Bil | VW/Cupra/Skoda, Kia/Hyundai, Tesla … på en lader uden integration – f.eks. målt med en Shelly 3EM |
+| Både laderen og bilen har en integration | Hver opgave dér hvor den kan | F.eks. strøm og start/stop i laderen og ladegrænse i bilen – eller start/stop og ladegrænse i bilen og strøm i laderen |
+
+**Typiske handlinger** – navnene afhænger af integrationen; find dem under *Udviklerværktøjer →
+Handlinger* og *Tilstande* for din lader og bil:
+
+| Input | Laderens integration | Bilens integration |
+|---|---|---|
+| Start / stop | en start/stop- eller pause/genoptag-service (f.eks. Easee `action_command`), en start/stop-kontakt (f.eks. Monta, Wallbox, OCPP *Charge Control*) eller en knap | en ladekontakt (f.eks. Tesla/Tessie) eller en start/stop-service (f.eks. Kia/Hyundai Connect `start_charge`/`stop_charge`, VW/Cupra-integrationerne) |
+| Ladestrøm | en dynamisk grænse-service (f.eks. Easee, Zaptec) eller en number for maks. strøm (f.eks. OCPP *Maximum Current*, Wallbox *Max charging current*) – `{{ max_phase }}` eller pr. fase `{{ phase_1 }}` … | kun nogle biler har en number for ladestrømmen (f.eks. Tesla/Tessie *charge current*) – `{{ max_phase }}` |
+| Ladegrænse | – | en number for ladegrænsen (f.eks. *charge limit*, *AC charging limit*, *target state of charge*) – `{{ charging_limit }}` |
+| Tænd / sluk | laderens "aktiveret"-kontakt – vælg entiteten, ikke enheden | – |
+| Ladestatus | laderens status-sensor (tilpas *lader*/*færdig*-tilstandene, f.eks. `charging`, `completed`, `finished`, OCPP `Charging`/`Finishing`) eller en effektsensor / energimåler | bilens "lader"-kontakt eller binære sensor, eller bilens ladestatus |
+| Genstart | `homeassistant.reload_config_entry` med en af laderens entiteter som mål | `homeassistant.reload_config_entry` med en af bilens entiteter som mål |
+
+Kan hverken laderen eller bilen sætte ladestrømmen, starter og stopper blueprinten bare
+ladningen – soloverskud og lastfordeling kan så ikke regulere strømmen.
+
+Brug blueprintens variabler (`{{ phase_1 }}`, `{{ max_phase }}`, `{{ charging_limit }}` …)
+frem for at læse sensorerne selv – i fail-safe har variablerne fail-safe-strømmen.
+
+### Eksempel: egne automationer uden blueprinten
 
 ```yaml
 alias: CJP - ladegrænse
