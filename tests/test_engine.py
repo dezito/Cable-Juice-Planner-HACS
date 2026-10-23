@@ -46,7 +46,7 @@ MAX_WATT = 230 * 3 * 16
 
 
 def _texts() -> dict[str, str]:
-    path = Path(__file__).parents[1] / "custom_components" / "cable_juice_planner" / "translations" / "da.json"
+    path = Path(__file__).parents[1] / "custom_components" / "cable_juice_planner" / "texts" / "da.json"
     texts: dict[str, str] = {}
 
     def flatten(data: dict, prefix: str = "") -> None:
@@ -56,7 +56,7 @@ def _texts() -> dict[str, str]:
             else:
                 texts[f"{prefix}{key}"] = value
 
-    flatten(json.loads(path.read_text(encoding="utf-8"))["runtime"])
+    flatten(json.loads(path.read_text(encoding="utf-8")))
     return texts
 
 

@@ -90,7 +90,7 @@ EV_REQUEST_TYPES = ("wake_up", "preheat_start", "preheat_stop")
 
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
-# Languages with runtime texts in translations/<language>.json
+# Languages with runtime texts in texts/<language>.json
 LANGUAGES = {
     "da": "Dansk",
     "en": "English",

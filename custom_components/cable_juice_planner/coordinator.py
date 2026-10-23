@@ -31,7 +31,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import sun as sun_helper
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_change
-from homeassistant.helpers.translation import async_get_translations
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -55,7 +54,7 @@ from .const import (
 )
 from .engine import CJPEngine, JobResult, Snapshot
 from .engine_energy import SOLCAST_ENDINGS, strip_forecast_suffix
-from .formatting import format_charging_rule, translate
+from .formatting import format_charging_rule, load_texts, translate
 from .helpers import float_or_none
 from .history import merge_rows
 from .prices import PRICE_SNAPSHOT_SECONDS, TARIFF_STATE_KEYS
@@ -209,9 +208,7 @@ class CJPCoordinator:
 
     async def async_setup(self) -> None:
         language = normalize_language(self.config.get("language"), normalize_language(self.hass.config.language))
-        prefix = f"component.{DOMAIN}.runtime."
-        translations = await async_get_translations(self.hass, language, "runtime", [DOMAIN])
-        self.texts = {key.removeprefix(prefix): value for key, value in translations.items() if key.startswith(prefix)}
+        self.texts = await self.hass.async_add_executor_job(load_texts, language)
         self.engine = CJPEngine(self.config, self.object_prefix, self.texts, title=self.title)
         if self.site is not None:
             self.site.register(self)

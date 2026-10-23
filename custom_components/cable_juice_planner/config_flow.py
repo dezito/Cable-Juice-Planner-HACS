@@ -51,6 +51,7 @@ RESERVED_PREFIXES = {"site"}  # sensor.cjp_site_* belong to the shared grid conn
 IMPORT_NONE = "none"
 CRON_INTERVALS = ["1", "2", "3", "4", "5", "6", "10", "12", "15", "20", "30"]
 PRICE_PROVIDERS = ["energidataservice", "stromligning"]
+ENERGIDATASERVICE_URL = "https://github.com/MTrab/energidataservice"  # {eds_url} in the step descriptions
 EV_REQUIRED = ("usable_battery_level_entity_id", "estimated_battery_range_entity_id", "odometer_entity_id")
 
 CONFIG_FLOW_STEPS = [
@@ -400,7 +401,7 @@ class CJPFlowPages:
             step_id=step,
             data_schema=build_schema(keys, values_for_form, self._notify_services() if step == "notifications" else None),
             errors=errors,
-            description_placeholders=self._placeholders(),
+            description_placeholders={**self._placeholders(), "eds_url": ENERGIDATASERVICE_URL},
         )
 
     async def async_step_price_provider(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

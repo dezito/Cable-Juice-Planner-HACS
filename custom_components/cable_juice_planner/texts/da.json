@@ -1,0 +1,493 @@
+{
+  "ui": {
+    "common": {
+      "distance_type": "km",
+      "distance_kwh": "Km/kWh",
+      "distance_percentage": "Km/%",
+      "wh_distance": "Wh/km",
+      "valuta": "kr",
+      "valuta_distance": "kr/km",
+      "valuta_kwh": "kr/kWh",
+      "valuta_percentage": "kr/%",
+      "time": "Tid",
+      "price": "Pris",
+      "total": "Ialt",
+      "expense": "Udgift",
+      "drive_efficiency": "Kørsel effektivitet"
+    },
+    "calendar": {
+      "month_names": {
+        "jan": "Jan",
+        "feb": "Feb",
+        "mar": "Mar",
+        "apr": "Apr",
+        "jun": "Jun",
+        "jul": "Jul",
+        "aug": "Aug",
+        "sep": "Sep",
+        "oct": "Okt",
+        "nov": "Nov",
+        "dec": "Dec",
+        "january": "Januar",
+        "february": "Februar",
+        "march": "Marts",
+        "april": "April",
+        "may": "Maj",
+        "june": "Juni",
+        "july": "Juli",
+        "august": "August",
+        "september": "September",
+        "october": "Oktober",
+        "november": "November",
+        "december": "December"
+      },
+      "weekday_names": {
+        "mon": "Man",
+        "tue": "Tir",
+        "wed": "Ons",
+        "thu": "Tor",
+        "fri": "Fre",
+        "sat": "Lør",
+        "sun": "Søn",
+        "monday": "Mandag",
+        "tuesday": "Tirsdag",
+        "wednesday": "Onsdag",
+        "thursday": "Torsdag",
+        "friday": "Fredag",
+        "saturday": "Lørdag",
+        "sunday": "Søndag"
+      }
+    },
+    "get_hours_plan": {
+      "header": "Strøm priser"
+    },
+    "entity_unavailable": {
+      "title": "Entity ikke tilgængelig",
+      "message": "Entity '{entity}' ikke tilgængelig siden {timestamp}",
+      "restart_integration": "Tjek integrationen, eller genindlæs den hvis den ikke kommer tilbage af sig selv."
+    },
+    "set_charging_rule": {
+      "hour_limit": "Timegrænse nået",
+      "day_limit": "Dagsgrænse nået"
+    },
+    "validation_procedure": {
+      "entity_validation": "Validerer entiteter",
+      "entity_missing_try_again": "Nogle entiteter mangler\nPrøver igen om 2 minutter",
+      "entity_ids_missing": "Nogle entity IDs mangler\n- {entity_ids}",
+      "entity_unavailable_try_again": "Nogle entiteter er utilgængelige\nPrøver igen om 2 minutter",
+      "unavailable_entity_ids_title": "Nogle entity IDs er utilgængelige",
+      "check_entity_ids": "Tjek entity IDs",
+      "missing_entity_ids_title": "Nogle entity IDs mangler"
+    },
+    "init": {
+      "script_starting": "Starter Cable Juice Planner",
+      "file_created_message": "Konfigurationsfil oprettet: {file_path}",
+      "add_entities": "Tilføj venligst de nye entiteter til dine Betjeningspaneler sider.",
+      "yaml_file_created": "YAML file oprettet: {file_path}",
+      "restart_required": "Genstart venligst Home Assistant for at indlæse ændringerne",
+      "error_loading": "Indlæser {file_path} igen om 5 sekunder, skete en fejl",
+      "created": "Oprettet",
+      "renamed_to": "omdøbt til",
+      "config_renamed_keys": "Konfigurationsnøgler er blevet omdøbt i {file_path} filen",
+      "entities_renamed": "Entiteter er blevet omdøbt i {file_path} filen",
+      "deprecated_keys_title": "Forældet nøgler",
+      "deprecated_keys_in": "Forældet nøgler i {file_path} filen",
+      "remove_these_keys": "Fjern disse nøgler",
+      "config_updated": "Konfigurationsfilen {file_path} er blevet opdateret",
+      "entities_package_updated": "Entitets-pakken {file_path} er blevet opdateret",
+      "first_run_warning": "Sæt {file_path} filens first_run til false",
+      "loading_config": "Indlæser konfiguration",
+      "config_validation": "Validerer konfiguration",
+      "config_validation_failed": "Konfigurationsvalidering mislykkedes",
+      "charger_not_configured": "Lader ikke konfigureret, hvis ingen lader integration, brug liggende elbil entitetter",
+      "script_stopped": "Script stoppet",
+      "check_log": "Tjek venligst loggen for mere information"
+    },
+    "emoji_description": {
+      "header": "Emoji beskrivelse",
+      "markdown_hint": "Brug Markdown kort med dette i: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+    },
+    "set_default_entity_states": {
+      "markdown_guide": "Brug Markdown kort med dette i: {{ states.sensor.{name}_overview.attributes.overview }}",
+      "no_overview": "Ingen oversigt endnu"
+    },
+    "drive_efficiency": {
+      "title": "Sidste kørsel effektivitet",
+      "distance": "Kilometer",
+      "used": "Brugt"
+    },
+    "load_charging_history": {
+      "default_state": "Brug Markdown kort med dette i: {{{{ states.sensor.{name}_charging_history.attributes.history }}}}"
+    },
+    "charging_history_combine_and_set": {
+      "too_big_warning": "Home Assistant tillader ikke at vise mere historik",
+      "more_history": "Se mere historik",
+      "month": "Måned",
+      "estimated_distance": "Estimeret km udfra forbrug og effektivitet",
+      "charging_allocation": "Ladnings fordeling",
+      "day_kwh": "Dag kWh",
+      "night_kwh": "Nat kWh",
+      "public_charing_total": "Offentlig ladning i alt",
+      "no_history": "Ingen lade historik"
+    },
+    "cheap_grid_charge_hours": {
+      "entity_not_in_domain": "Kan ikke hente strøm priser, {entity} findes ikke under domain sensor",
+      "work_goto_equals_work_homecoming": "{day} afgang og hjemkomst er ens",
+      "work_distance_zero": "{day} arbejdsdag afstand er 0 km",
+      "workplan_settings_error": "Fejl i opsætningen af Arbejdsplan opladning",
+      "last_drive_efficiency": {
+        "title": "Sidste kørsel effektivitet",
+        "drive_date": "Kørselsdato",
+        "last_distance": "Afstand",
+        "used_battery": "Brugt batteri",
+        "distance_per_kwh": "Afstand pr. kWh"
+      },
+      "battery_level_expenses": {
+        "title": "Batteriniveau udgifter",
+        "current_battery_level": "Nuværende batteriniveau",
+        "solar_share": "Solcelle andel",
+        "unit_price": "Enhedspris"
+      },
+      "planning_basis": "Se planlægningsgrundlag",
+      "charging_overview_title": "Opladnings oversigt",
+      "offline_prices": "Bruger offline priser til nogle timepriser",
+      "no_upcoming_charging_planned": "Ingen kommende ladning planlagt",
+      "enough_solar_production": "Nok solcelle produktion til opladning",
+      "departure_plan": {
+        "title": "Afgangs plan",
+        "day": "Dag",
+        "need": "Behov",
+        "sun": "Sol",
+        "no_departure_planned": "Ingen kommende afgang planlagt",
+        "solar": "solcelle",
+        "plan_include_estimations": "Afgangsplan inkludere estimeret udgifter fra nettet, {work_overview_solar_text}batteri niveau",
+        "estimated_daily_charging": "Skøn ved daglig opladning {alternative_cost}kr {alternative_per_kwh}kr/kWh<br>ved {total_kwh}kWh forskel {difference_cost}kr",
+        "estimated_daily_charging_plan": "Lade oversigt (**Dagligt opladningsskøn**)"
+      },
+      "solar_production_title": "Overskydende solproduktion tilgængelig",
+      "no_solar_production": "Ingen overskydende solproduktion tilgængelig",
+      "last_scheduled": "Sidst planlagt",
+      "no_data": "Ingen data"
+    },
+    "max_local_energy_available_remaining_period": {
+      "powerwall_not_charging_but_should": "Husbatteri {powerwall_battery_level}% lader ikke, selvom batteri niveau er <{powerwall_reserved_battery_level}%",
+      "powerwall_force_stop": "Husbatteri standset x̄{powerwall_charging_consumption}W - opladning sker senere",
+      "powerwall_charging": "Husbatteri oplader x̄{powerwall_charging_consumption}W",
+      "powerwall_discharging": "Husbatteri aflader x̄{powerwall_discharging_available}W"
+    },
+    "preheat_ev": {
+      "preheating": "Forvarmer",
+      "thawing": "Optøer",
+      "preheat_start": "{heating_type} bilen til kl. {time}",
+      "preheat_cancel": "Forvarmning af bilen stoppet, pga ingen kørsel kl. {time}"
+    },
+    "ready_to_charge": {
+      "cable_disconnected": "Ladekabel frakoblet",
+      "cable_connected_ev_not_home": "Ladekabel forbundet, men bilen ikke hjemme",
+      "cable_connected_ev_not_updated": "Ladekabel forbundet, men bilen ikke opdateret",
+      "cable_connected_not_to_ev": "Ladekabel ikke forbundet til bilen\nPrøver at vække bilen",
+      "charge_port_closed": "Elbilens ladeport er ikke åben\nPrøver at vække bilen",
+      "ev_unavailable": "Elbilens ladeport eller ladekabel er ikke tilgængelig\nPrøver at vække bilen"
+    },
+    "is_charging": {
+      "charging_again": "Elbil oplader igen",
+      "charging_failed": "Fejl i ladning af elbilen",
+      "fail_title": "Elbil opladning fejlet",
+      "charger_unavailable": "Lader ikke tilgængelig",
+      "charger_error": "Kritisk fejl på lader, tjek integration eller mobile app",
+      "charger_dynamic_failed": "Laderens dynamiske strøm begrænsning fejlede",
+      "charger_restart": "Genstarter laderen",
+      "charger_restart_count": "Genstarter laderen {count}. forsøg",
+      "charger_control_restart_count": "Genstarter ladeoperatør, {count} forsøg",
+      "ev_not_charging": "Elbilen lader ikke som den skal",
+      "ev_restart_count": "Genstarter elbil ladningen, {count} forsøg",
+      "charging_title": "Elbilen lader"
+    },
+    "charging_without_rule": {
+      "charging_no_rule": "Lader uden grund {watt}W",
+      "entities_not_available": "Følgende enheder er ikke tilgængelige",
+      "check_options": "Tjek evt. følgende:\n- Genstart afhænginge integrationer der er offline\n- Genstart Home Assistant",
+      "ev_charging_no_rule": "Elbilen lader uden grund",
+      "restart_integration": "Entity „{entity_id}“ lader uden grund\nTjek {integration} integrationen"
+    },
+    "charge_if_needed": {
+      "script_deactivated": "Deaktiveret",
+      "other_ev_connected": "En anden elbil er forbundet",
+      "no_charging_modes_active": "Ingen laderegler aktiv\n Lader {watt}W",
+      "charging_loss": "Beregner ladetab, lader til {percentage}%",
+      "manual_charging": "Manuel ladning tilladt {watt}W",
+      "manual_charging_solar": "Manuel ladning tilladt, kun sol {watt}W",
+      "planned_charging": "Lader op til {emoji}",
+      "low_battery_but_expensive": "Lader ikke, pga. for dyr strøm",
+      "low_battery": "Lader pga. batteriniveauet <{percentage}%",
+      "solar_production_but_expensive": "Sælger solcelle overproduktion, da rå strøm prisen er dyr ({price}kr.)",
+      "solar": "Solcelle",
+      "powerwall": "Husbatteri",
+      "local_energy_charging": "{local_energy} lader {watt}W",
+      "local_energy_charging_not_needed": "Solcelle lader ikke, batteri over {percentage}%",
+      "not_charging": "Lader ikke",
+      "error_charging_max": "Fejl: Script deaktiveret, lader maks!!!"
+    },
+    "notify_set_battery_level": {
+      "action": "Sæt batteriniveau",
+      "title": "Elbilen batteriniveau",
+      "message": "Husk at sætte batteriniveauet på elbilen i Home Assistant"
+    },
+    "notify_battery_under_daily_battery_level": {
+      "action": "Aktivere for at starte tvangsladningen",
+      "title": "Elbilen batteri under dagligt batteriniveau",
+      "message": "Elbilens batteriniveau er under det daglige batteriniveau, tvangsladning kan aktiveres",
+      "no_charge_expensive_hours": "Lader ikke i de 3 dyreste timer"
+    },
+    "startup": {
+      "configuration": {
+        "header": "Konfiguration",
+        "charger": "Lader konfiguret",
+        "ev": "Elbil konfiguret",
+        "solar": "Solcelle konfiguret",
+        "powerwall": "Husbatteri konfiguret",
+        "configured": "Ja",
+        "not_configured": "Nej"
+      },
+      "setting_entities": "Sætter entiteter op",
+      "loading_db": "Indlæser databaserne",
+      "loading_history": "Indlæser ladehistorik",
+      "almost_ready": "Næsten klar",
+      "ev": {
+        "range": "Rækkevidde",
+        "battery_level": "Batteriniveau",
+        "estimated_range": "Estimeret rækkevidde"
+      },
+      "calc_charging_plan": "Beregner ladeplan",
+      "call_all_entities": "Kald pyscript.ev_all_entities service for at se alle entitier",
+      "imported_databases": "Importeret eksisterende databaser: {databases}"
+    },
+    "charging_rule_changed": {
+      "charging_rule_conflict": "Lade regel konflikt",
+      "deactivate_optimal_rule": "Deaktivere Optimal ugeopladning",
+      "deactivate_workplan_rule": "Deaktivere Arbejdsplan opladning",
+      "reason": "Arbejdsplan opladning & Optimal ugeopladning (uden Arbejdsplan) kan ikke være aktiveret på sammetid"
+    },
+    "public_charging_session": {
+      "title": "Offentlig ladning afsluttet",
+      "message": "Indtast venligst omkostningen for den offentlige ladning\nOpladning var fra {start_battery_level}% til {end_battery_level}%\nTilføjet {added_battery_level}%",
+      "action": "Indtast omkostning"
+    },
+    "calculate_charging_loss": {
+      "title": "Ladetab beregning",
+      "calculated": "Ladetab beregnet til {percentage}%",
+      "failed": "Fejlede i beregningen af ladetab",
+      "failed_title": "Fejl"
+    },
+    "site": {
+      "limited": "Lastfordeling: {amps} A på {phases} fase(r)",
+      "waiting": "Lastfordeling: venter på ledig strøm"
+    }
+  },
+  "charging_type": {
+    "error": {
+      "description": "Kritisk fejl, nødladning"
+    },
+    "no_rule": {
+      "description": "Lading uden grund"
+    },
+    "manual": {
+      "description": "Manuel ladning"
+    },
+    "low_battery": {
+      "description": "Tvangsladning under daglig batteri niveau"
+    },
+    "battery_health": {
+      "description": "Anbefalet fuld ladning"
+    },
+    "trip": {
+      "description": "Tur ladning / afgang"
+    },
+    "public_charging": {
+      "description": "Offentlig ladning"
+    },
+    "first_workday_preparation": {
+      "description": "Første arbejdsdag"
+    },
+    "second_workday_preparation": {
+      "description": "Anden arbejdsdag"
+    },
+    "third_workday_preparation": {
+      "description": "Tredje arbejdsdag"
+    },
+    "fourth_workday_preparation": {
+      "description": "Fjerde arbejdsdag"
+    },
+    "fifth_workday_preparation": {
+      "description": "Femte arbejdsdag"
+    },
+    "sixth_workday_preparation": {
+      "description": "Sjette arbejdsdag"
+    },
+    "seventh_workday_preparation": {
+      "description": "Syvende arbejdsdag"
+    },
+    "eighth_workday_preparation": {
+      "description": "Ottende arbejdsdag"
+    },
+    "fill_up": {
+      "description": "1., 4. & 7. dag opfyldning"
+    },
+    "under_min_avg_price": {
+      "description": "Under gennemsnit pris sidste 14 dage"
+    },
+    "half_min_avg_price": {
+      "description": "25% under gennemsnit pris sidste 14 dage"
+    },
+    "grid_charging": {
+      "description": "Ladning fra elnettet"
+    },
+    "solar": {
+      "description": "Solcelle ladning / overproduktion"
+    },
+    "solar_corrected": {
+      "description": "Maks. opladning nået - soloverskud"
+    },
+    "powerwall": {
+      "description": "Ladning fra husbatteri"
+    },
+    "powerwall_avg_symbol": {
+      "description": "Gennemsnitlig ladning af husbatteri"
+    },
+    "battery_stored": {
+      "description": "Forbrug fra batteri"
+    },
+    "charging_loss": {
+      "description": "Ladetab beregning"
+    },
+    "sunrise": {
+      "description": "Solopgang"
+    },
+    "sunset": {
+      "description": "Solnedgang"
+    },
+    "goto": {
+      "description": "Afgang"
+    },
+    "homecoming": {
+      "description": "Hjemkomst"
+    },
+    "battery_usage": {
+      "description": "Afgang & hjemkomst batteri niveau"
+    },
+    "charging_problem": {
+      "description": "Ladning problemer"
+    },
+    "charging_error": {
+      "description": "Ladning fejlede helt"
+    }
+  },
+  "entity_description": {
+    "deactivate_script": "Deaktiver scriptet, laderen og bilen styres ikke mere",
+    "forced_charging_daily_battery_level": "Gennemtving opladning ved lavt dagligt mål",
+    "allow_manual_charging_now": "Tillad manuel net/sol-ladning nu",
+    "allow_manual_charging_solar": "Begræns manuel ladning til sol-overproduktion",
+    "solar_charging": "Brug overskudsproduktion; planlæg ugentligt ud fra forecast",
+    "fill_up": "Fordeler opladning efter behov; vægter lave priser",
+    "workplan_charging": "Planlæg dagligt efter arbejdsdage, afgang og afstand",
+    "trip_preheat": "Forvarm bilen før afgang når nødvendigt",
+    "workday_monday": "Sætter om mandag er arbejdsdag",
+    "workday_tuesday": "Sætter om tirsdag er arbejdsdag",
+    "workday_wednesday": "Sætter om onsdag er arbejdsdag",
+    "workday_thursday": "Sætter om torsdag er arbejdsdag",
+    "workday_friday": "Sætter om fredag er arbejdsdag",
+    "workday_saturday": "Sætter om lørdag er arbejdsdag",
+    "workday_sunday": "Sætter om søndag er arbejdsdag",
+    "preheat_monday": "Forvarm bilen om mandagen",
+    "preheat_tuesday": "Forvarm bilen om tirsdagen",
+    "preheat_wednesday": "Forvarm bilen om onsdagen",
+    "preheat_thursday": "Forvarm bilen om torsdagen",
+    "preheat_friday": "Forvarm bilen om fredagen",
+    "preheat_saturday": "Forvarm bilen om lørdagen",
+    "preheat_sunday": "Forvarm bilen om søndagen",
+    "calculate_charging_loss": "Automatisér fuld cyklus for at beregne tab; gem og notificér",
+    "powerwall_discharge_above_needed": "Aflad husbatteri over husbehov til EV (kræver solar_charging)",
+    "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris",
+    "preheat_minutes_before": "Forvarm bilen X minutter før afgang, hvis forvarmning er aktiveret",
+    "typical_daily_distance": "Typisk daglig afstand i km, bruges til at planlægge opladning. Kræver aktivering af input_boolean.ev_fill_up.",
+    "workday_distance_needed_monday": "Afstand i km, der skal oplades for mandag arbejdsdag",
+    "workday_distance_needed_tuesday": "Afstand i km, der skal oplades for tirsdag arbejdsdag",
+    "workday_distance_needed_wednesday": "Afstand i km, der skal oplades for onsdag arbejdsdag",
+    "workday_distance_needed_thursday": "Afstand i km, der skal oplades for torsdag arbejdsdag",
+    "workday_distance_needed_friday": "Afstand i km, der skal oplades for fredag arbejdsdag",
+    "workday_distance_needed_saturday": "Afstand i km, der skal oplades for lørdag arbejdsdag",
+    "workday_distance_needed_sunday": "Afstand i km, der skal oplades for søndag arbejdsdag",
+    "min_daily_battery_level": "Minimum daglig batteriniveau i procent, ved hjemkomst",
+    "min_trip_battery_level": "Minimum tur batteriniveau i procent, ved hjemkomst",
+    "min_charge_limit_battery_level": "Minimum batteriniveau i procent, bilen kan sættes til i opladningstilstand",
+    "max_recommended_charge_limit_battery_level": "Maks. anbefalet batteriniveau i procent, bilen lades til dagligt",
+    "very_cheap_grid_charging_max_battery_level": "Ved meget billig strøm, lades bilen til dette niveau i procent. Kræver aktivering af input_boolean.ev_fill_up.",
+    "ultra_cheap_grid_charging_max_battery_level": "Ved ekstremt billig strøm, lades bilen til dette niveau i procent. Kræver aktivering af input_boolean.ev_fill_up.",
+    "completed_battery_level": "Ved ingen bilintegration, sættes dette til det fuldt opladede batteriniveau bilen viser, når den melder opladning færdig. input_number.ev_battery_level opdateres automatisk til dette.",
+    "estimated_total_range": "Ved ingen bilintegration, bruges denne til at sætte det estimerede totale rækkevidde i km",
+    "trip_charge_procent": "Bruges ved turladning til at angive ønsket batteriniveau ved afgang, bilen lades til denne værdi + input_number.ev_min_trip_battery_level (f.eks. 50% + 30% = 80%)",
+    "trip_range_needed": "Bruges ved turladning til at angive det ønskede rækkevidde i km, der skal oplades til ved afgang, km omregnes automatisk til batteriniveau og bilen lades til dette niveau + input_number.ev_min_trip_battery_level (f.eks. 50% + 30% = 80%)",
+    "full_charge_recommended": "Anbefalet fuld opladning minimum hver X dage, for at undgå batteri skader. Bilen lades til 100%. Sæt til 0 for at deaktivere.",
+    "ev_charge_after_powerwall_battery_level": "Oplader elbilen fra gusbatteri, når husbatteri batteriniveau er over dette niveau i procent. Sæt til 0.0 for at deaktivere. Kræver aktivering af input_boolean.ev_solar_charging.",
+    "public_charging_session_cost": "Omkostningen for sidste offentlig ladning (ikke kr/kWh)",
+    "forecast_type": "Vælg prognose type (EMA, gennemsnit eller trend)",
+    "workday_departure_monday": "Afgangstidspunkt for mandag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_departure_tuesday": "Afgangstidspunkt for tirsdag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_departure_wednesday": "Afgangstidspunkt for onsdag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_departure_thursday": "Afgangstidspunkt for torsdag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_departure_friday": "Afgangstidspunkt for fredag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_departure_saturday": "Afgangstidspunkt for lørdag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_departure_sunday": "Afgangstidspunkt for søndag arbejdsdag, bruges til at planlægge opladning og forvarmning",
+    "workday_homecoming_monday": "Hjemkomsttidspunkt for mandag arbejdsdag, bruges til at planlægge opladning",
+    "workday_homecoming_tuesday": "Hjemkomsttidspunkt for tirsdag arbejdsdag, bruges til at planlægge opladning",
+    "workday_homecoming_wednesday": "Hjemkomsttidspunkt for onsdag arbejdsdag, bruges til at planlægge opladning",
+    "workday_homecoming_thursday": "Hjemkomsttidspunkt for torsdag arbejdsdag, bruges til at planlægge opladning",
+    "workday_homecoming_friday": "Hjemkomsttidspunkt for fredag arbejdsdag, bruges til at planlægge opladning",
+    "workday_homecoming_saturday": "Hjemkomsttidspunkt for lørdag arbejdsdag, bruges til at planlægge opladning",
+    "workday_homecoming_sunday": "Hjemkomsttidspunkt for søndag arbejdsdag, bruges til at planlægge opladning",
+    "trip_date_time": "Dato og tidspunkt for tur afgang, bruges til at planlægge opladning og forvarmning",
+    "trip_homecoming_date_time": "Dato og tidspunkt for tur hjemkomst, bruges til at planlægge opladning",
+    "last_full_charge": "Dato og tidspunkt for sidste fuld opladning",
+    "enforce_planning": "Genberegn ladeplan",
+    "trip_reset": "Nulstil tur ladning",
+    "restart_script": "Genstart scriptet",
+    "charger_action": "Om laderen skal lade nu (charge/stop). Brug den i din automation; attributterne charger_enabled, mode og updated beskriver tænd/sluk, tilstand og seneste beregning.",
+    "charging_limit": "Ønsket ladegrænse på bilen i %. Sæt den i bilen med din automation.",
+    "charger_phase_1_amps": "Strømstyrke i ampere på fase 1, til brug med egne automationer",
+    "charger_phase_2_amps": "Strømstyrke i ampere på fase 2, til brug med egne automationer",
+    "charger_phase_3_amps": "Strømstyrke i ampere på fase 3, til brug med egne automationer",
+    "charging_watts": "Ladeeffekt i watt, til brug med egne automationer",
+    "kwh_cost_price": "kWh elpris inkl. refusion og solcelle salgspris",
+    "charge_very_cheap_battery_level": "Mål når prisen er under de sidste 14 dages billigste pris",
+    "charge_ultra_cheap_battery_level": "Mål når prisen er 25% under de sidste 14 dages billigste pris",
+    "solar_over_production_current_hour": "Solcelle produktion til rådighed i nuværende time (watt)",
+    "solar_charged_percentage": "Procentdel af opladning der kommer fra solceller",
+    "drive_efficiency": "Kørsel effektivitet baseret på forvarmning, kørte km og strømforbrug",
+    "km_per_kwh": "Kilometer per kWh",
+    "estimated_range": "Estimerede rækkevidde baseret på nuværende batteriniveau og Exponential Moving Average (EMA)",
+    "drive_efficiency_last_battery_level": "Batteriniveau ved sidste ladning (%)",
+    "drive_efficiency_last_odometer": "Kilometerstand ved sidste ladning (km)",
+    "co2_emitted": "CO₂ udledt i kg, baseret på Energi Data Service CO₂ faktor",
+    "kwh_charged_by_solar": "kWh opladet af solcellerne",
+    "public_charging_session_done": "Marker at offentlig ladning er afsluttet og omkostning skal indtastes",
+    "ev_request": "Forespørgsler til bilen: wake_up, preheat_start og preheat_stop. Udfør dem med din automation."
+  },
+  "entity_help": {
+    "public_charging": "Når en offentlig ladning er afsluttet (ladelågen/kablet blev brugt væk fra hjemmet), slås Offentlig opladning afsluttet til, og du får en notifikation.\n• Indtast det samlede beløb i Offentlig ladning pris.\n• Ladningen tilføjes automatisk til ladehistorikken ca. 1 min efter indtastning.\n• Indtast -1 for at ignorere ladningen.",
+    "forced_charging": "Tvangsladning kan aktiveres manuelt, hvis batteriniveauet falder under det daglige minimumsniveau.\n• Opladning: lader op til det daglige minimumsniveau ({min_daily_battery_level} %).\n• Omkostningskontrol: der lades ikke i de dyreste timer (se attributten expensive_hours).",
+    "manual_charging": "Manuel ladning starter ladningen med det samme uden at vente på planen.\n• Tillad manuel ladning nu: lader med maks. strøm fra nettet og solcellerne.\n• Kun på sol: lader kun med solcelleoverskuddet.\nBegge slås automatisk fra, når bilen tilsluttes igen.",
+    "cheap_targets": "Opladningsgrænser ved billige strømpriser:\n• Mål ved meget billig strøm ({charge_very_cheap_battery_level} %): når prisen er under de sidste 14 dages billigste pris.\n• Mål ved ekstremt billig strøm ({charge_ultra_cheap_battery_level} %): når prisen er 25 % under de sidste 14 dages billigste pris.\nGrænserne reguleres efter den forventede solcelleoverproduktion en uge frem.",
+    "trip": "Tur-opladningen planlægges automatisk, når betingelserne er opfyldt:\n• Tur ladeprocent er over 0 %, eller Tur rækkevidde er over 0 km.\n• Tur afgang og Tur hjemkomst er sat til et fremtidigt tidspunkt.\nDer lades op til det, turen kræver (ud fra ladeprocenten eller distancen). Opladning mellem {max_recommended_charge_limit_battery_level}-100 % sker lige inden afgang for at skåne batteriet.\nNulstil tur sletter turen igen; den nulstilles også automatisk 2 timer efter afgang.",
+    "solar_charging": "Aktiveres når der er overproduktion fra solcellerne.\n• Opladning: udnytter overskydende solenergi; der skiftes mellem 1 og 3 faser efter overskuddet.\n• Behov: tilpasses solcelleoverproduktionen i forhold til husets forbrug. Maks. opladning {max_recommended_charge_limit_battery_level} %.\n• Plan: den forventede overproduktion i løbet af ugen bruges i Optimal ugeopladning og Arbejdsplan opladning, så bilen lades mest muligt med solenergi.",
+    "fill_up": "Optimal ugeopladning kan aktiveres ved ferie (ignorerer arbejdsplanen).\n• Opladning: fordeles over en uge.\n• Behov: forskellen mellem det nuværende batteriniveau og det maksimalt anbefalede ({max_recommended_charge_limit_battery_level} %) deles i 3 dele.\n• Plan: finder de billigste tidspunkter. Typisk daglig afstand ({typical_daily_distance} km) bruges for dage uden arbejde.",
+    "deactivate_script": "Laderen og elbilen styres ikke af Cable Juice Planner og fungerer normalt (handlingen er charge med maks. strøm).",
+    "workplan": "Arbejdsplan opladning: aktiveres ved arbejde inden for den næste uge.\n• Opladning: planlægger daglig opladning over en uge ud fra arbejdsdage og fridage.\n• Behov: tager højde for afgangs- og hjemkomsttidspunkt og afstanden for hver arbejdsdag. Minimum batteriniveau ved hjemkomst {min_daily_battery_level} %, maks. opladning {max_recommended_charge_limit_battery_level} %.\n• Plan: vælger de billigste tidspunkter fra nu og frem til arbejdsdagens afgang, så bilen altid er klar.",
+    "full_charge": "Anbefalet fuld ladning: har bilen et LFP-batteri, anbefales en fuld ladning mindst hver 14. dag eller som bilproducenten foreskriver. Antal dage sættes her; seneste fulde ladning registreres automatisk.",
+    "charging_loss": "Beregning af ladetab – bedst resultat ved at lade fra lav procent (f.eks. 10 %) til 100 %:\n1. Aflad bilen mest muligt (maks. 20 %).\n2. Sæt den ønskede ladeprocent i bilen og Maks. anbefalet ladegrænse (nu {max_recommended_charge_limit_battery_level} %, minimum 90 %).\n3. Slå Beregn ladetab til, og lad bilen selv melde når den er fuldt opladet.\n4. Resultatet gemmes automatisk i indstillingerne, og du får en notifikation.",
+    "cheap_limits": "Ladeprocent ved billig strøm:\n• Normal billig strøm: er prisen under den laveste gennemsnitspris pr. døgn i den seneste periode, lades til {very_cheap_grid_charging_max_battery_level} %.\n• Ekstra billig strøm: er prisen yderligere 25 % lavere, lades til {ultra_cheap_grid_charging_max_battery_level} %.\nOptimal ugeopladning skal være slået til.",
+    "battery_preheat": "Batteriniveau- og forvarmningsindstillinger:\n• Minimum dagligt batteriniveau ({min_daily_battery_level} %): ved hjemkomst fra arbejde.\n• Minimum tur batteriniveau ({min_trip_battery_level} %): ved hjemkomst fra en tur.\n• Minimum ladegrænse ({min_charge_limit_battery_level} %): bilens laveste mulige ladegrænse.\n• Maks. anbefalet ladegrænse ({max_recommended_charge_limit_battery_level} %): bilproducentens anbefaling.\n• Forvarm X min før ({preheat_minutes_before} min): forvarm bilen før afgang til arbejde og ture (forvarm-kontakten pr. ugedag).",
+    "solar_sell_price": "Fast salgspris for solcelleoverproduktion. Sæt den til -1 for at bruge den aktuelle timesalgspris.",
+    "powerwall": "Husbatteri-indstillinger:\n• Solcelleoverskud lader kun bilen, når husbatteriet er over grænsen (nu {ev_charge_after_powerwall_battery_level} %).\n• Brug husbatteriets strøm til bilen: kræver at Solcelleoverskud til opladning og Husbatteri aflader over behov er slået til; kun strøm over grænsen bruges.\nLav en automation der slår husbatteriets afladning fra, når bilen lader, og kun tillader den når kontakten er slået til og batteriet er over grænsen.",
+    "virtual_ev": "Virtuel elbil (uden bilintegration):\n• Batteriniveau: sæt bilens nuværende batteriniveau, når den tilsluttes.\n• Færdig batteriniveau: niveauet bilen stopper ved.\n• Estimeret samlet rækkevidde: bilens realistiske maks. rækkevidde."
+  }
+}
