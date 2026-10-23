@@ -181,8 +181,11 @@ Alt kan ændres bagefter under **Konfigurer** på integrationen, via en menu.
 Blueprinten installeres automatisk sammen med integrationen: ved opstart lægges den i
 `config/blueprints/automation/cable_juice_planner/charger_control.yaml` og findes derefter under
 *Indstillinger → Automatiseringer og scener → Blueprints* som **Cable Juice Planner - styr
-laderen**. Kommer der en ny version med en HACS-opdatering, erstattes filen kun, hvis du ikke
-selv har rettet i den.
+laderen**. Filen overskrives aldrig af sig selv. Kommer der en ny version med en HACS-opdatering (eller
+har du selv rettet i filen), dukker der efter genstart en reparation op under *Indstillinger →
+System → Reparationer*. Vælger du at opdatere, erstattes filen med den medfølgende version, og
+automationer, der bruger den, genindlæses. Ignorerer du den, beholder du din egen fil. Slettes
+filen, lægges den nyeste version ind igen ved næste genstart.
 
 [`charger_control.yaml`](custom_components/cable_juice_planner/blueprints/charger_control.yaml) klarer
 start/stop, tænd/sluk og strøm pr. fase. Du angiver dine egne handlinger, og i dem kan du bruge
