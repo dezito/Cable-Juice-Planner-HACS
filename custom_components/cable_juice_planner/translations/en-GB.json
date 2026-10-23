@@ -1132,5 +1132,18 @@
         }
       }
     }
+  },
+  "issues": {
+    "blueprint_update": {
+      "title": "New version of the blueprint {name}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Update the blueprint {name}",
+            "description": "Cable Juice Planner comes with a version of the blueprint **{name}** that differs from `{path}`.\n\nSelect **Submit** to replace the file with the bundled version and reload the automations that use it. Changes you made to the file yourself are overwritten – copy it to another file name first if you want to keep them.\n\nIgnore this repair to keep your own file."
+          }
+        }
+      }
+    }
   }
 }

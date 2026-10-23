@@ -2,7 +2,9 @@
   "domain": "cable_juice_planner",
   "name": "Cable Juice Planner",
   "after_dependencies": [
+    "blueprint",
     "recorder",
+    "repairs",
     "sun",
     "weather"
   ],
