@@ -48,7 +48,7 @@ The plan uses electricity prices, solar surplus, home battery and the car's actu
 - **🪫 Forced charging below the daily battery level** (up to e.g. 30 %), but not in the most expensive hours
 - **💸 Cheap and very cheap power:** charge higher (e.g. 70 % / 90 %) when the power is cheap or extra cheap –
   together with Optimal weekly charging, or on its own with **Charge on cheap power**
-- **📈 Full charge every X days** for the battery's sake (above the max recommended limit). It counts as done
+- **💯 Full charge every X days** for the battery's sake (above the max recommended limit). It counts as done
   from 99 %, as a cold battery may stop there.
 
 > [!NOTE]

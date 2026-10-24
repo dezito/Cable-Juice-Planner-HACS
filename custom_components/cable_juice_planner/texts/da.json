@@ -105,7 +105,14 @@
     },
     "emoji_description": {
       "header": "Emoji beskrivelse",
-      "markdown_hint": "Brug Markdown kort med dette i: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+      "markdown_hint": "Brug Markdown kort med dette i: {{ states.sensor.{name}_emoji_description.attributes.description }}",
+      "groups": {
+        "charge": "Ladning",
+        "workday": "Arbejdsdage",
+        "drive": "Kørsel",
+        "status": "Status",
+        "info": "Info"
+      }
     },
     "set_default_entity_states": {
       "markdown_guide": "Brug Markdown kort med dette i: {{ states.sensor.{name}_overview.attributes.overview }}",
@@ -171,9 +178,9 @@
     },
     "max_local_energy_available_remaining_period": {
       "powerwall_not_charging_but_should": "Husbatteri {powerwall_battery_level}% lader ikke, selvom batteri niveau er <{powerwall_reserved_battery_level}%",
-      "powerwall_force_stop": "Husbatteri standset x̄{powerwall_charging_consumption}W - opladning sker senere",
-      "powerwall_charging": "Husbatteri oplader x̄{powerwall_charging_consumption}W",
-      "powerwall_discharging": "Husbatteri aflader x̄{powerwall_discharging_available}W"
+      "powerwall_force_stop": "Husbatteri standset {powerwall_charging_consumption}W⌛ - opladning sker senere",
+      "powerwall_charging": "Husbatteri oplader {powerwall_charging_consumption}W⌛",
+      "powerwall_discharging": "Husbatteri aflader {powerwall_discharging_available}W⌛"
     },
     "preheat_ev": {
       "preheating": "Forvarmer",
@@ -292,7 +299,7 @@
       "description": "Kritisk fejl, nødladning"
     },
     "no_rule": {
-      "description": "Lading uden grund"
+      "description": "Ladning uden grund"
     },
     "manual": {
       "description": "Manuel ladning"
@@ -354,8 +361,8 @@
     "powerwall": {
       "description": "Ladning fra husbatteri"
     },
-    "powerwall_avg_symbol": {
-      "description": "Gennemsnitlig ladning af husbatteri"
+    "average": {
+      "description": "Gennemsnit (W) over seneste periode"
     },
     "battery_stored": {
       "description": "Forbrug fra batteri"

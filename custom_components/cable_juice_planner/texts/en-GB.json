@@ -106,7 +106,14 @@
     },
     "emoji_description": {
       "header": "Emoji description",
-      "markdown_hint": "Use Markdown card with: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+      "markdown_hint": "Use Markdown card with: {{ states.sensor.{name}_emoji_description.attributes.description }}",
+      "groups": {
+        "charge": "Charging",
+        "workday": "Workdays",
+        "drive": "Driving",
+        "status": "Status",
+        "info": "Info"
+      }
     },
     "set_default_entity_states": {
       "markdown_guide": "Use Markdown card with: {{ states.sensor.{name}_overview.attributes.overview }}",
@@ -173,9 +180,9 @@
     },
     "max_local_energy_available_remaining_period": {
       "powerwall_not_charging_but_should": "Home battery {powerwall_battery_level}% not charging though below {powerwall_reserved_battery_level}%",
-      "powerwall_force_stop": "Home battery stopped x̄{powerwall_charging_consumption}W - charging later",
-      "powerwall_charging": "Home battery charging x̄{powerwall_charging_consumption}W",
-      "powerwall_discharging": "Home battery discharging x̄{powerwall_discharging_available}W"
+      "powerwall_force_stop": "Home battery stopped {powerwall_charging_consumption}W⌛ - charging later",
+      "powerwall_charging": "Home battery charging {powerwall_charging_consumption}W⌛",
+      "powerwall_discharging": "Home battery discharging {powerwall_discharging_available}W⌛"
     },
     "preheat_ev": {
       "preheating": "Preheating",
@@ -356,8 +363,8 @@
     "powerwall": {
       "description": "Charging from home battery"
     },
-    "powerwall_avg_symbol": {
-      "description": "Average home battery charging"
+    "average": {
+      "description": "Average (W) over the last period"
     },
     "battery_stored": {
       "description": "Consumption from home battery"
