@@ -106,7 +106,14 @@
     },
     "emoji_description": {
       "header": "Опис emoji",
-      "markdown_hint": "Використайте картку Markdown з: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+      "markdown_hint": "Використайте картку Markdown з: {{ states.sensor.{name}_emoji_description.attributes.description }}",
+      "groups": {
+        "charge": "Заряджання",
+        "workday": "Робочі дні",
+        "drive": "Поїздки",
+        "status": "Статус",
+        "info": "Інформація"
+      }
     },
     "set_default_entity_states": {
       "markdown_guide": "Картка Markdown з: {{ states.sensor.{name}_overview.attributes.overview }}",
@@ -173,9 +180,9 @@
     },
     "max_local_energy_available_remaining_period": {
       "powerwall_not_charging_but_should": "Домашня батарея {powerwall_battery_level}% не заряджається, хоча < {powerwall_reserved_battery_level}%",
-      "powerwall_force_stop": "Домашню батарею зупинено x̄{powerwall_charging_consumption}Вт — заряджання пізніше",
-      "powerwall_charging": "Домашня батарея заряджається x̄{powerwall_charging_consumption}Вт",
-      "powerwall_discharging": "Домашня батарея розряджається x̄{powerwall_discharging_available}Вт"
+      "powerwall_force_stop": "Домашню батарею зупинено {powerwall_charging_consumption}Вт⌛ — заряджання пізніше",
+      "powerwall_charging": "Домашня батарея заряджається {powerwall_charging_consumption}Вт⌛",
+      "powerwall_discharging": "Домашня батарея розряджається {powerwall_discharging_available}Вт⌛"
     },
     "preheat_ev": {
       "preheating": "Прогрів",
@@ -356,8 +363,8 @@
     "powerwall": {
       "description": "Заряджання від домашньої батареї"
     },
-    "powerwall_avg_symbol": {
-      "description": "Середнє заряджання домашньої батареї"
+    "average": {
+      "description": "Середнє (Вт) за останній період"
     },
     "battery_stored": {
       "description": "Споживання з батареї"

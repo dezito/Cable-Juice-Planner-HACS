@@ -41,6 +41,7 @@ from .const import (
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_TYPES,
+    EMOJI_DESCRIPTION_GROUPS,
     ENTITY_UNAVAILABLE_STATES,
     EV_PLUGGED_STATES,
     EV_UNPLUGGED_STATES,
@@ -1155,10 +1156,15 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                 self.set_attr(entry["entity_name"], "name", f"{entry['emoji']} {self.t(f'charging_type.{key}.description', default='No description')}")
 
     def emoji_description(self) -> None:
-        items_sorted = sorted(CHARGING_TYPES.items(), key=lambda kv: float(kv[1].get("priority", 0)))
-        lines = [f"* **{entry.get('emoji', '❓')} {self.t(f'charging_type.{key}.description', default='No description')}**" for key, entry in items_sorted]
+        lines = [f"## {self.t('ui.emoji_description.header')} ##"]
+        for group, inline in EMOJI_DESCRIPTION_GROUPS:
+            entries = sorted(((key, entry) for key, entry in CHARGING_TYPES.items() if entry.get("group") == group), key=lambda kv: float(kv[1].get("priority", 0)))
+            items = [f"**{entry.get('emoji', '❓')} {self.t(f'charging_type.{key}.description', default='No description')}**" for key, entry in entries]
+            if items:
+                lines.append(f"### {self.t(f'ui.emoji_description.groups.{group}')}")
+                lines.extend([f"* {' · '.join(items)}"] if inline else [f"* {item}" for item in items])
         self.set_state("emoji_description", self.t("ui.emoji_description.markdown_hint", name=self.name))
-        self.set_attr("emoji_description", "description", "\n".join([f"## {self.t('ui.emoji_description.header')} ##", *lines]))
+        self.set_attr("emoji_description", "description", "\n".join(lines))
 
     def set_default_entity_states(self) -> None:
         self.set_state("overview", self.t("ui.set_default_entity_states.markdown_guide", name=self.name))

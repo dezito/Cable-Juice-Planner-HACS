@@ -106,7 +106,14 @@
     },
     "emoji_description": {
       "header": "Emoji-Beschreibung",
-      "markdown_hint": "Markdown-Karte verwenden mit: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+      "markdown_hint": "Markdown-Karte verwenden mit: {{ states.sensor.{name}_emoji_description.attributes.description }}",
+      "groups": {
+        "charge": "Laden",
+        "workday": "Arbeitstage",
+        "drive": "Fahrten",
+        "status": "Status",
+        "info": "Info"
+      }
     },
     "set_default_entity_states": {
       "markdown_guide": "Markdown-Karte verwenden mit: {{ states.sensor.{name}_overview.attributes.overview }}",
@@ -173,9 +180,9 @@
     },
     "max_local_energy_available_remaining_period": {
       "powerwall_not_charging_but_should": "Hausbatterie {powerwall_battery_level}% lädt nicht, obwohl < {powerwall_reserved_battery_level}%",
-      "powerwall_force_stop": "Hausbatterie gestoppt x̄{powerwall_charging_consumption}W - späteres Laden",
-      "powerwall_charging": "Hausbatterie lädt x̄{powerwall_charging_consumption}W",
-      "powerwall_discharging": "Hausbatterie entlädt x̄{powerwall_discharging_available}W"
+      "powerwall_force_stop": "Hausbatterie gestoppt {powerwall_charging_consumption}W⌛ - späteres Laden",
+      "powerwall_charging": "Hausbatterie lädt {powerwall_charging_consumption}W⌛",
+      "powerwall_discharging": "Hausbatterie entlädt {powerwall_discharging_available}W⌛"
     },
     "preheat_ev": {
       "preheating": "Vorheizen",
@@ -356,8 +363,8 @@
     "powerwall": {
       "description": "Laden aus der Hausbatterie"
     },
-    "powerwall_avg_symbol": {
-      "description": "Durchschnittliches Laden der Hausbatterie"
+    "average": {
+      "description": "Durchschnitt (W) im letzten Zeitraum"
     },
     "battery_stored": {
       "description": "Verbrauch aus der Batterie"

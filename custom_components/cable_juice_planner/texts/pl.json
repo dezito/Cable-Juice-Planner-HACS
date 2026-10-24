@@ -106,7 +106,14 @@
     },
     "emoji_description": {
       "header": "Opis emoji",
-      "markdown_hint": "Użyj karty Markdown z: {{ states.sensor.{name}_emoji_description.attributes.description }}"
+      "markdown_hint": "Użyj karty Markdown z: {{ states.sensor.{name}_emoji_description.attributes.description }}",
+      "groups": {
+        "charge": "Ładowanie",
+        "workday": "Dni robocze",
+        "drive": "Jazda",
+        "status": "Status",
+        "info": "Informacje"
+      }
     },
     "set_default_entity_states": {
       "markdown_guide": "Użyj karty Markdown z: {{ states.sensor.{name}_overview.attributes.overview }}",
@@ -173,9 +180,9 @@
     },
     "max_local_energy_available_remaining_period": {
       "powerwall_not_charging_but_should": "Bateria domowa {powerwall_battery_level}% nie ładuje, choć < {powerwall_reserved_battery_level}%",
-      "powerwall_force_stop": "Bateria domowa zatrzymana x̄{powerwall_charging_consumption}W - ładowanie później",
-      "powerwall_charging": "Bateria domowa ładuje x̄{powerwall_charging_consumption}W",
-      "powerwall_discharging": "Bateria domowa rozładowuje x̄{powerwall_discharging_available}W"
+      "powerwall_force_stop": "Bateria domowa zatrzymana {powerwall_charging_consumption}W⌛ - ładowanie później",
+      "powerwall_charging": "Bateria domowa ładuje {powerwall_charging_consumption}W⌛",
+      "powerwall_discharging": "Bateria domowa rozładowuje {powerwall_discharging_available}W⌛"
     },
     "preheat_ev": {
       "preheating": "Podgrzewanie",
@@ -356,8 +363,8 @@
     "powerwall": {
       "description": "Ładowanie z baterii domowej"
     },
-    "powerwall_avg_symbol": {
-      "description": "Średnie ładowanie baterii domowej"
+    "average": {
+      "description": "Średnia (W) z ostatniego okresu"
     },
     "battery_stored": {
       "description": "Zużycie z baterii"
