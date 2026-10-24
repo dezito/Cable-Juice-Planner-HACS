@@ -67,14 +67,29 @@ The plan uses electricity prices, solar surplus, home battery and the car's actu
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
   [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund
 - **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
-- **Public charging:** detected automatically (with EV integration). You enter the price
-  afterwards, and the session is remembered across restarts.
-- **[Charging loss](#charging-loss):** measured continuously per charging power from Home Assistant's history, and
-  optionally used by the plan. A one-time measurement is still possible.
-- **[Learn driving distance](#learn-driving-distance):** km per weekday and the typical daily distance from the odometer
-- **[Analysis](#analysis):** the economy per month compared with daily charging and the lowest possible price,
-  driving against the outdoor temperature, ready at departure, battery capacity over time, and planned against
-  actually charged
+- **[Public charging](#public-charging)** (with EV integration)
+  - a charge away from home is detected automatically: time, battery level at start and end, and percentage added
+  - you get a notification, enter the total price, and the charge is added to the history and the economy
+  - waiting sessions are remembered across restarts, and charges can also be added with a service
+- **[Charging loss](#charging-loss)**
+  - **measured continuously** from the charger's kWh meter and the car's battery level, also back in Home
+    Assistant's history – no full charge needed
+  - per charging power (< 2,5 kW, 2,5-4 kW, 4-7 kW, > 7 kW), so the model can tell the car's fixed use from the
+    charger's loss – a low power (solar on 1 phase) loses the most
+  - **Use measured charging loss:** the plan uses the measured loss per hour at that hour's power instead of the
+    configured one
+  - a one-time measurement from low to full is still possible
+- **[Learn driving distance](#learn-driving-distance)**
+  - the odometer is read every evening, and from the last 8 weeks CJP suggests the **km per workday** in the work plan
+    (the median per weekday) and the **typical daily distance** for optimal weekly charging (75th percentile)
+  - the suggestions are always shown, and with **Learn driving distance** on, the numbers are set automatically
+- **[Analysis](#analysis)**
+  - economy per month: kWh per source (grid, solar, home battery, public), cost and price/km
+  - saved compared with daily charging, and a score for how close the price came to the lowest possible
+  - driving efficiency against the outdoor temperature (how much more the car uses at 0 °C)
+  - whether the car was ready at each work plan departure
+  - planned the evening before against actually charged
+  - battery capacity over time, and the charging loss per power
 - **CO₂ emissions** and **kWh charged by solar**
 - **Very detailed charging history**
   - each charge: time, charging reason, percentage, kWh, price and price/kWh
@@ -84,7 +99,10 @@ The plan uses electricity prices, solar surplus, home battery and the car's actu
 - **Overviews:** last drive's efficiency, costs for the current battery level,
   charging overview, departure plan, estimate for daily charging and solar surplus forecast
 - **Fail-safe:** see [Fail-safe](#fail-safe)
-- **Ready-made dashboard** in the sidebar
+- **[Ready-made dashboard](#dashboard)** in the sidebar, one per car, built from your setup
+  - **Overview:** battery level forecast, prices with solar and the charging plan, status, trip, manual charging and history
+  - **Settings:** all charging rules, work plan per weekday, battery levels and charging loss, each with "Read more"
+  - **Analysis:** the analysis above plus the history of battery, charge limit, driving efficiency and solar
 - **Languages:** Danish, English, German, Polish and Ukrainian
 - **Does not run in Home Assistant's main thread:** all calculations run in the integration's own
   worker thread, so Home Assistant isn't blocked while the plan is calculated
@@ -354,7 +372,8 @@ The settings from the dashboard are entities that are kept across restarts:
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |
 | `select` | forecast type |
-| `button` | force planning, reset trip, recalculate charging loss, export data |
+| `button` | force planning, reset trip, recalculate charging loss, export data, reset dashboard |
+| `binary_sensor` | public charging session done (waiting for the price) |
 
 If you click a setting, a short explanation is shown under **Attributes** (`description`
 and `help`). The plan is recalculated 5 seconds after a change.
@@ -389,8 +408,8 @@ your setup. Cards for things you haven't set up are removed.
   with solar and charging plan, current charging rule, status, manual charging, forced charging (only while it is
   relevant), trip, public charging (only while a session waits for its price), the charging history and the
   integration's overview
-- **Settings:** charging rules, work plan per weekday, weekly charging, battery levels, cheap power, full charge,
-  solar/home battery, charging loss – with "Read more" from the entities' help texts. Preheating is only shown
+- **Settings:** charging rules, work plan per weekday (incl. learn driving distance), weekly charging, battery
+  levels, cheap power, full charge, solar/home battery, charging loss, virtual EV – with "Read more" from the entities' help texts. Preheating is only shown
   with a car integration that has a climate entity.
 - **Analysis:** see [Analysis](#analysis), plus the history of battery, charge limit, driving efficiency and solar
 

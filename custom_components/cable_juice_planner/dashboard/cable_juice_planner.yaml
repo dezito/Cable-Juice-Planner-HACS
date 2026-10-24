@@ -1428,7 +1428,7 @@ views:
       - entity: sensor.cjp_charging_limit
         name:
           type: entity
-      - entity: sensor.cjp_charging_watts
+      - entity: sensor.bil_lader_power
         name:
           type: entity
       - entity: sensor.bil_lader_status
@@ -2138,7 +2138,7 @@ views:
     cards:
     - type: heading
       heading: '@@section_drive_temperature@@'
-      icon: mdi:thermometer-car
+      icon: mdi:snowflake-thermometer
     - type: markdown
       content: "<details><summary>@@read_more@@</summary>\n\n@@drive_temperature_explain@@\n\n</details>"
       grid_options:
