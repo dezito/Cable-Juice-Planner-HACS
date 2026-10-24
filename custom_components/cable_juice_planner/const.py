@@ -180,8 +180,8 @@ CHARGING_TYPES = {
     "charging_error": {"priority": 1000, "emoji": "❌", "group": "status"},
 }
 
-# the sections of the emoji description, in order; inline = all on one line
-EMOJI_DESCRIPTION_GROUPS = (("charge", False), ("workday", True), ("drive", False), ("status", False), ("info", True))
+# the sections of the emoji description, in order
+EMOJI_DESCRIPTION_GROUPS = ("charge", "workday", "drive", "status", "info")
 
 # Same nested layout as <prefix>_config.yaml in the PyScript version, so the ported
 # algorithm reads CONFIG["charger"]["charging_max_amp"] etc. unchanged. Values the
