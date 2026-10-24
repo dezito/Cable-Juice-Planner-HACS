@@ -1428,7 +1428,7 @@ views:
       - entity: sensor.cjp_charging_limit
         name:
           type: entity
-      - entity: sensor.cjp_charging_watts
+      - entity: sensor.bil_lader_power
         name:
           type: entity
       - entity: sensor.bil_lader_status
