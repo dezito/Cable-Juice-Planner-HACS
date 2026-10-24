@@ -993,6 +993,9 @@
       "trip_reset": {
         "name": "Nulstil tur ladning"
       },
+      "reset_dashboard": {
+        "name": "Nulstil dashboard"
+      },
       "export_data": {
         "name": "Eksportér data"
       },

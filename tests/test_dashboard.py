@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import yaml
 
+from homeassistant.core import HomeAssistant
+
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.dashboard import render_dashboard
 
+from .conftest import MOCK_OPTIONS, OBJECT_PREFIX, async_setup, async_unload_and_join, make_entry, set_source_states
 from .test_engine import OPTIONS
 
 
@@ -148,3 +151,35 @@ def test_analysis_sections() -> None:
     headings = [c["heading"] for c in _cards(yaml.safe_load(text)["views"][2]) if c.get("type") == "heading"]
     for heading in ("Kørsel og temperatur", "Klar til afgang", "Planlagt mod faktisk ladet", "Batterikapacitet"):
         assert heading in headings
+
+
+async def test_sidebar_dashboard_can_be_edited_and_reset(hass: HomeAssistant, hass_ws_client, tmp_path) -> None:
+    hass.config.config_dir = str(tmp_path)
+    set_source_states(hass)
+    entry = make_entry(options={**MOCK_OPTIONS, "dashboard": True})
+    await async_setup(hass, entry)
+    client = await hass_ws_client(hass)
+
+    async def command(message: dict) -> dict:
+        await client.send_json_auto_id({"url_path": "cjp-test", **message})
+        response = await client.receive_json()
+        assert response["success"], response
+        return response["result"]
+
+    generated = await command({"type": "lovelace/config"})
+    assert generated["views"]
+    # storage mode: the frontend offers the edit UI and the raw configuration editor
+    panel = hass.data["frontend_panels"]["cjp-test"]
+    assert panel.config == {"mode": "storage"}
+
+    await command({"type": "lovelace/config/save", "config": {"views": [{"title": "Mine"}]}})
+    assert await command({"type": "lovelace/config"}) == {"views": [{"title": "Mine"}]}
+
+    # the edits survive a reload, the generated dashboard is not shown over them
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert await command({"type": "lovelace/config"}) == {"views": [{"title": "Mine"}]}
+
+    await hass.services.async_call("button", "press", {"entity_id": f"button.{OBJECT_PREFIX}_reset_dashboard"}, blocking=True)
+    assert await command({"type": "lovelace/config"}) == generated
+    await async_unload_and_join(hass, entry)

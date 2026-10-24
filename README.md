@@ -394,9 +394,10 @@ your setup. Cards for things you haven't set up are removed.
   with a car integration that has a climate entity.
 - **Analysis:** see [Analysis](#analysis), plus the history of battery, charge limit, driving efficiency and solar
 
-The generated dashboard cannot be edited in the UI. If you want to customise it, copy
-the content into a regular dashboard (**Edit → Raw configuration editor**) and turn
-**Dashboard in the sidebar** off.
+You can edit the dashboard like any other (**Edit**, or **⋮ → Raw configuration editor** to copy it).
+Once you save your changes, your version is kept, and changes to the dashboard in later updates of
+the integration no longer show up. Press **Reset dashboard** (on the integration's device) to throw
+your changes away and go back to the generated dashboard.
 
 ---
 
