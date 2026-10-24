@@ -218,6 +218,9 @@
       "export_data": {
         "default": "mdi:database-export"
       },
+      "reset_dashboard": {
+        "default": "mdi:view-dashboard-edit"
+      },
       "recalculate_charging_loss": {
         "default": "mdi:database-refresh"
       }

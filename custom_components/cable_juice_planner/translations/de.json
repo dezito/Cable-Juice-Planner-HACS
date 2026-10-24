@@ -993,6 +993,9 @@
       "trip_reset": {
         "name": "Reiseladung zurücksetzen"
       },
+      "reset_dashboard": {
+        "name": "Dashboard zurücksetzen"
+      },
       "export_data": {
         "name": "Daten exportieren"
       },

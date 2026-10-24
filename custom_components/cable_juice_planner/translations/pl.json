@@ -993,6 +993,9 @@
       "trip_reset": {
         "name": "Resetuj ładowanie podróży"
       },
+      "reset_dashboard": {
+        "name": "Resetuj pulpit"
+      },
       "export_data": {
         "name": "Eksportuj dane"
       },

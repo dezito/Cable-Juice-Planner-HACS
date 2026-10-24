@@ -993,6 +993,9 @@
       "trip_reset": {
         "name": "Reset trip charging"
       },
+      "reset_dashboard": {
+        "name": "Reset dashboard"
+      },
       "export_data": {
         "name": "Export data"
       },

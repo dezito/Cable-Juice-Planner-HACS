@@ -10,13 +10,17 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .backup import BACKUP_DIR, async_export
 from .const import BUTTON_KEYS, EV_BUTTON_KEYS, is_ev_configured
 from .coordinator import CJPCoordinator
+from .dashboard import async_reset_dashboard
 from .entity import CJPEntity
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: CJPCoordinator = entry.runtime_data
     keys = [*BUTTON_KEYS, *(EV_BUTTON_KEYS if is_ev_configured(coordinator.config) else ())]
-    async_add_entities([*(CJPButton(coordinator, "button", key) for key in keys), CJPExportButton(coordinator, "button", "export_data")])
+    entities = [*(CJPButton(coordinator, "button", key) for key in keys), CJPExportButton(coordinator, "button", "export_data")]
+    if coordinator.config.get("dashboard"):
+        entities.append(CJPResetDashboardButton(coordinator, "button", "reset_dashboard"))
+    async_add_entities(entities)
 
 
 class CJPButton(CJPEntity, ButtonEntity):
@@ -40,3 +44,12 @@ class CJPExportButton(CJPEntity, ButtonEntity):
             title=f"📟{self.coordinator.title}",
             notification_id=f"{self.coordinator.object_prefix}_backup",
         )
+
+
+class CJPResetDashboardButton(CJPEntity, ButtonEntity):
+    """Throw away the edits made to the sidebar dashboard in the UI."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    async def async_press(self) -> None:
+        await async_reset_dashboard(self.hass, self.coordinator.prefix)
