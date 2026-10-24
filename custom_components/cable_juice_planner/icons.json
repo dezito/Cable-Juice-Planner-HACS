@@ -1,9 +1,6 @@
 {
   "entity": {
     "switch": {
-      "deactivate_script": {
-        "default": "mdi:cancel"
-      },
       "forced_charging_daily_battery_level": {
         "default": "mdi:battery-charging-low"
       },
@@ -72,12 +69,18 @@
       },
       "powerwall_discharge_above_needed": {
         "default": "mdi:power-plug-battery"
+      },
+      "cheap_grid_charging": {
+        "default": "mdi:cash-clock"
+      },
+      "learn_driving_distance": {
+        "default": "mdi:map-marker-distance"
+      },
+      "use_measured_charging_loss": {
+        "default": "mdi:chart-bell-curve-cumulative"
       }
     },
     "number": {
-      "solar_sell_fixed_price": {
-        "default": "mdi:cash-multiple"
-      },
       "preheat_minutes_before": {
         "default": "mdi:timer-cog-outline"
       },
@@ -203,9 +206,6 @@
       },
       "trip_homecoming_date_time": {
         "default": "mdi:calendar-end"
-      },
-      "last_full_charge": {
-        "default": "mdi:battery-check"
       }
     },
     "button": {
@@ -215,8 +215,11 @@
       "trip_reset": {
         "default": "mdi:restore"
       },
-      "restart_script": {
-        "default": "mdi:restart"
+      "export_data": {
+        "default": "mdi:database-export"
+      },
+      "recalculate_charging_loss": {
+        "default": "mdi:database-refresh"
       }
     },
     "sensor": {
@@ -307,6 +310,18 @@
       },
       "site_house_l3": {
         "default": "mdi:home-lightning-bolt-outline"
+      },
+      "last_full_charge": {
+        "default": "mdi:battery-check"
+      },
+      "charging_loss_model": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "economy": {
+        "default": "mdi:cash-multiple"
+      },
+      "analysis": {
+        "default": "mdi:car-clock"
       }
     },
     "binary_sensor": {
@@ -329,6 +344,12 @@
     },
     "manual_add_public_charging_session": {
       "service": "mdi:ev-station"
+    },
+    "export_data": {
+      "service": "mdi:database-export"
+    },
+    "import_data": {
+      "service": "mdi:database-import"
     }
   }
 }

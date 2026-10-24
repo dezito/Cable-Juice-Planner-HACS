@@ -21,6 +21,7 @@ from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from queue import SimpleQueue
 from typing import Any, Callable
 
+import astral
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
@@ -28,12 +29,16 @@ from homeassistant.core import CoreState, Event, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import sun as sun_helper
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_change
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CHARGER_CHARGING_STATUS,
+    CHARGER_COMPLETED_STATUS,
+    CHARGER_READY_STATUS,
+    CHARGING_LOSS_METER_TIMEOUT,
+    MIGRATED_LAST_FULL_CHARGE,
     CONF_ENTITY_PREFIX,
     DOMAIN,
     ENTITY_UNAVAILABLE_STATES,
@@ -53,23 +58,29 @@ from .const import (
     object_prefix,
 )
 from .engine import CJPEngine, JobResult, Snapshot
+from .engine_loss import LOSS_GROUP_SIZE, as_series, resample_steps
 from .engine_energy import SOLCAST_ENDINGS, strip_forecast_suffix
 from .formatting import format_charging_rule, load_texts, translate
 from .helpers import float_or_none
 from .history import merge_rows
 from .prices import PRICE_SNAPSHOT_SECONDS, TARIFF_STATE_KEYS
+from .backup import async_load_backup, async_restore_databases, pending_restores
 from .storage import CJPStorage, load_legacy_databases
 
 _LOGGER = logging.getLogger(__name__)
 
 STATISTICS_REFRESH_SECONDS = 300
 SETTINGS_DEBOUNCE_SECONDS = 5
+CHARGING_LOSS_STATISTICS_DAYS = 730  # the most long-term statistics read for the charging loss
+CHARGING_LOSS_STATISTICS_CHUNK_DAYS = 30
+# charger states with the car plugged in (a connection window for the economy)
+CONNECTED_STATUS = (*CHARGER_READY_STATUS, *CHARGER_CHARGING_STATUS, *CHARGER_COMPLETED_STATUS)
 FORECAST_TIMEOUT = 30
 PUBLIC_CHARGING_COST_DELAY = 60
 BATTERY_LEVEL_WAIT = datetime.timedelta(minutes=30)
 
 # Settings with their own trigger (as the PyScript state triggers)
-RULE_KEYS = ("fill_up", "workplan_charging", "deactivate_script")
+RULE_KEYS = ("fill_up", "workplan_charging")
 CHARGE_TRIGGER_KEYS = ("allow_manual_charging_now", "allow_manual_charging_solar", "calculate_charging_loss")
 TRIP_KEYS = ("trip_charge_procent", "trip_range_needed", "trip_date_time", "trip_homecoming_date_time")
 
@@ -94,6 +105,8 @@ class CJPCoordinator:
         self.data: dict[str, Any] = {}
         self.attributes: dict[str, dict[str, Any]] = {}
         self.settings: dict[str, Any] = {}
+        # platform.key -> state from an imported backup, used by the entities instead of their last state
+        self.restore_settings: dict[str, str] = {}
         self.setting_limits: dict[str, dict[str, float]] = {}
         self.started = False
         self.ignore_next_update = False
@@ -103,6 +116,8 @@ class CJPCoordinator:
         self._unsubs: list[Callable[[], None]] = []
         self._started_unsub: Callable[[], None] | None = None
         self._settings_debounce: Callable[[], None] | None = None
+        self._charging_loss_timeout: Callable[[], None] | None = None
+        self._charging_loss_lock = asyncio.Lock()  # the history is read by one task at a time
         self._public_cost_task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
 
@@ -226,7 +241,32 @@ class CJPCoordinator:
                 platform = next(iter(device.identifiers))[0]
             self._platforms[entity_id] = platform
 
+        await self._async_apply_restore()
         self.set_charging_rule(f"📟{self.t('ui.init.script_starting')}")
+
+    async def _async_apply_restore(self) -> None:
+        """Databases and settings of a backup imported or chosen in the config flow (backup.py)."""
+        name = pending_restores(self.hass).pop(self.entry.entry_id, None)
+        if name is None and (name := self.entry.data.get("restore_backup")):
+            # only once, the restored databases are saved from now on
+            data = {key: value for key, value in self.entry.data.items() if key != "restore_backup"}
+            self.hass.config_entries.async_update_entry(self.entry, data=data)
+        if not name:
+            return
+        try:
+            backup = await async_load_backup(self.hass, name)
+        except HomeAssistantError as err:
+            _LOGGER.error("Could not restore the Cable Juice Planner backup: %s", err)
+            return
+        restored = await async_restore_databases(self.storage, backup)
+        self.restore_settings = dict(backup.get("settings") or {})
+        _LOGGER.info("Restored backup %s: databases %s, %s settings", name, ", ".join(restored) or "none", len(self.restore_settings))
+        persistent_notification.async_create(
+            self.hass,
+            self.t("ui.backup.imported", file=name, databases=", ".join(restored) or "-"),
+            title=f"📟{self.title}",
+            notification_id=f"{self.object_prefix}_backup",
+        )
 
     @callback
     def async_start(self) -> None:
@@ -251,6 +291,8 @@ class CJPCoordinator:
         self._unsubs.clear()
         if self._settings_debounce:
             self._settings_debounce()
+        if self._charging_loss_timeout:
+            self._charging_loss_timeout()
         for task in (self._public_cost_task, *self._tasks):
             if task and not task.done():
                 task.cancel()
@@ -308,6 +350,11 @@ class CJPCoordinator:
                     log_lines.append(f"📟{t('ui.startup.imported_databases', databases=', '.join(sorted(imported)))}")
             if databases.get("runtime") is None and self.legacy_prefix:
                 databases["runtime"] = await self._async_legacy_runtime_state()
+            if (migrated := self.entry.data.get(MIGRATED_LAST_FULL_CHARGE)) and (moment := dt_util.parse_datetime(migrated)):
+                # the value of the former datetime entity (version 2.3)
+                runtime = databases.get("runtime") or {}
+                runtime.setdefault("sensors", {}).setdefault("last_full_charge", dt_util.as_local(moment).replace(tzinfo=None))
+                databases["runtime"] = runtime
 
             self.set_charging_rule(f"📟{t('ui.startup.loading_history')}")
             await self._async_setup_buffers()
@@ -344,6 +391,10 @@ class CJPCoordinator:
                 ]
             self._register_triggers()
             self.started = True
+            # the first time the whole history, then every hour the last day
+            self._background(self._async_charging_loss_refresh(backfill=not self.engine.charging_loss_backfilled()), "charging_loss_history")
+            self._background(self._async_economy_refresh(), "economy")
+            self._background(self._async_analysis_refresh(), "analysis")
             if self.last_job.get("worker_thread"):
                 log_lines.append(f"📟Worker: {self.last_job['worker_thread']}")
         except Exception as err:  # noqa: BLE001
@@ -368,6 +419,7 @@ class CJPCoordinator:
         legacy = self.legacy_prefix
         last_battery_level = f"sensor.{legacy}_drive_efficiency_last_battery_level"
         public_session = f"binary_sensor.{legacy}_public_charging_session_done"
+        legacy_full_charge = self.hass.states.get(f"input_datetime.{legacy}_last_full_charge")
         numeric = {
             "co2_emitted": f"input_number.{legacy}_co2_emitted",
             "kwh_charged_by_solar": f"input_number.{legacy}_kwh_charged_by_solar",
@@ -408,6 +460,8 @@ class CJPCoordinator:
             runtime["last_battery_level_attributes"] = {
                 key: value for key, value in state.attributes.items() if key.startswith("battery_level_expenses") or key == "last_drive_efficiency_data"
             }
+        if legacy_full_charge is not None and (moment := dt_util.parse_datetime(legacy_full_charge.state)):
+            runtime["sensors"]["last_full_charge"] = moment.replace(tzinfo=None)
         if (state := states[public_session]) is not None:
             runtime["public_charging_session_done"] = state.state if state.state in ("on", "off") else "off"
             runtime["public_charging_session"] = list(state.attributes.get("public_charging_session") or [])
@@ -465,8 +519,11 @@ class CJPCoordinator:
         self._unsubs.append(track(self._job_handler("hour_end", include_forecast=True), minute=59, second=0))
         self._unsubs.append(track(self._job_handler("price_update", include_prices=True), minute=2, second=0))
         self._unsubs.append(track(self._job_handler("append_prices"), hour=5, minute=0, second=0))
+        self._unsubs.append(track(self._economy_daily, hour=3, minute=41, second=0))
+        self._unsubs.append(track(self._analysis_daily, hour=3, minute=47, second=0))
         if self.ev_configured:
             self._unsubs.append(track(self._job_handler("preheat_cron"), minute="/5", second=0))
+            self._unsubs.append(track(self._charging_loss_hourly, minute=17, second=0))
 
         charger = self.config["charger"]["entity_ids"]
         ev = self.config["ev_car"]["entity_ids"]
@@ -508,7 +565,7 @@ class CJPCoordinator:
     @callback
     def _charger_status_changed(self, value, old_value) -> None:
         if self.settings.get("calculate_charging_loss"):
-            self._background(self.async_run_job("calculate_charging_loss", "status", value, old_value), "charging_loss")
+            self._background(self._async_charging_loss("status", value, old_value), "charging_loss")
         self._background(self._async_charger_status_flow(value, old_value), "charger_status")
 
     async def _async_charger_status_flow(self, value, old_value) -> None:
@@ -526,7 +583,30 @@ class CJPCoordinator:
     @callback
     def _kwh_meter_changed(self, value, old_value) -> None:
         if self.settings.get("calculate_charging_loss"):
-            self._background(self.async_run_job("calculate_charging_loss", "kwh_meter", value, old_value), "charging_loss")
+            self._background(self._async_charging_loss("kwh_meter", value, old_value), "charging_loss")
+
+    async def _async_charging_loss(self, source: str, value=None, old_value=None) -> None:
+        """Charging loss measurement. After charging completed the engine waits for the
+        kWh meter; a slow meter that never updates is read once CHARGING_LOSS_METER_TIMEOUT
+        later."""
+        result = await self.async_run_job("calculate_charging_loss", source, value, old_value)
+        if result.value == "wait_for_meter":
+            self._cancel_charging_loss_timeout()
+            self._charging_loss_timeout = async_call_later(self.hass, CHARGING_LOSS_METER_TIMEOUT, self._charging_loss_timed_out)
+        elif not self.settings.get("calculate_charging_loss"):
+            self._cancel_charging_loss_timeout()
+
+    @callback
+    def _charging_loss_timed_out(self, _now) -> None:
+        self._charging_loss_timeout = None
+        if self.settings.get("calculate_charging_loss"):
+            self._background(self._async_charging_loss("timeout"), "charging_loss")
+
+    @callback
+    def _cancel_charging_loss_timeout(self) -> None:
+        if self._charging_loss_timeout:
+            self._charging_loss_timeout()
+            self._charging_loss_timeout = None
 
     @callback
     def _charger_cable_changed(self, value, old_value) -> None:
@@ -560,10 +640,10 @@ class CJPCoordinator:
         """Run the PyScript state trigger of a setting. True if it already planned."""
         if key in RULE_KEYS:
             self._background(self.async_run_job("charging_rule_changed", key, value, include_forecast=True), "rule_changed")
-            return key == "deactivate_script"
+            return False
         if key in CHARGE_TRIGGER_KEYS:
             if key == "calculate_charging_loss":
-                self._background(self.async_run_job("calculate_charging_loss", "switch", value), "charging_loss")
+                self._background(self._async_charging_loss("switch", value), "charging_loss")
             self._background(self.async_run_job("charge_trigger", key, include_forecast=True), "charge_trigger")
             return True
         if key in TRIP_KEYS:
@@ -589,8 +669,8 @@ class CJPCoordinator:
             self._background(self.async_run_job("charge_trigger", key, include_forecast=True), "enforce_planning")
         elif key == "trip_reset":
             self._background(self.async_run_job("trips_changed", key, None), "trip_reset")
-        elif key == "restart_script":
-            self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
+        elif key == "recalculate_charging_loss":
+            self._background(self.async_recalculate_charging_loss(), "charging_loss_recalculate")
 
     async def _async_public_cost_flow(self, value) -> None:
         result = await self.async_run_job("public_charging_cost_changed", float_or_none(value))
@@ -707,8 +787,8 @@ class CJPCoordinator:
             if (state := self.hass.states.get(entity_id)) is not None:
                 states[entity_id] = state.state
         self._prune_buffers()
-        location, elevation = sun_helper.get_astral_location(self.hass)
-        observer = sun_helper.get_astral_observer(self.hass) if hasattr(sun_helper, "get_astral_observer") else None
+        # like sun.get_astral_observer (HA 2026.10+), built here so older HA versions work too
+        observer = astral.Observer(self.hass.config.latitude, self.hass.config.longitude, self.hass.config.elevation)
         snapshot = Snapshot(
             now=now,
             tz=dt_util.get_default_time_zone(),
@@ -719,7 +799,7 @@ class CJPCoordinator:
             units=units,
             buffers={entity_id: list(rows) for entity_id, rows in self._buffers.items()},
             statistics={entity_id: list(rows) for entity_id, rows in self._statistics.items()},
-            astral=(location, elevation, observer),
+            astral=observer,
             site=self.site.snapshot_for(self, now) if self.site is not None and self.entry.entry_id in self.site.members else None,
         )
         # like the shared price cache of the PyScript version: refreshed at most once an hour
@@ -874,6 +954,265 @@ class CJPCoordinator:
             if rows:
                 result[key] = rows
         return result
+
+    # ------------------------------------------------------------------ #
+    # Charging loss per power (engine_loss.py)
+    # ------------------------------------------------------------------ #
+
+    @callback
+    def _charging_loss_hourly(self, _now) -> None:
+        self._background(self._async_charging_loss_refresh(), "charging_loss_history")
+
+    async def _async_charging_loss_refresh(self, backfill: bool = False) -> None:
+        """Find charging loss segments in the recorder: the last day every hour, at the first start
+        the whole raw history and, before it, the hourly long-term statistics."""
+        if not self.ev_configured or "recorder" not in self.hass.config.components:
+            return
+        async with self._charging_loss_lock:
+            await self._async_charging_loss_read(backfill)
+
+    async def _async_charging_loss_read(self, backfill: bool) -> None:
+        from homeassistant.components.recorder import get_instance, history  # noqa: PLC0415
+        from homeassistant.components.recorder.statistics import get_metadata, statistics_during_period  # noqa: PLC0415
+
+        instance = get_instance(self.hass)
+        charger = self.config["charger"]["entity_ids"]
+        soc_id = self.config["ev_car"]["entity_ids"]["usable_battery_level_entity_id"]
+        meter_id = charger["kwh_meter_entity_id"]
+        power_id = charger["power_consumtion_entity_id"]
+        if not (soc_id and meter_id and power_id):
+            return
+        phase_ids = [f"sensor.{self.object_prefix}_charger_phase_{i}_amps" for i in (1, 2, 3)]
+        end = dt_util.utcnow()
+        raw_start = end - datetime.timedelta(days=getattr(instance, "keep_days", 10) if backfill else 1.1)
+        ids = [soc_id, meter_id, *phase_ids]
+
+        def raw_history(entity_ids):
+            return instance.async_add_executor_job(
+                partial(
+                    history.get_significant_states, self.hass, raw_start, end, entity_ids, None,
+                    include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                )
+            )
+
+        try:
+            metadata = await instance.async_add_executor_job(partial(get_metadata, self.hass, statistic_ids={*ids, power_id}))
+            states = await raw_history(ids)
+            power_stats = await instance.async_add_executor_job(
+                statistics_during_period, self.hass, raw_start, end, {power_id}, "5minute", None, {"mean", "min", "max"}
+            )
+            if not power_stats.get(power_id):
+                # no statistics for the power sensor (no state_class): its raw readings, which can be many
+                states.update(await raw_history([power_id]))
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Charging loss: could not load the history: %s", err)
+            return
+
+        def unit(entity_id):
+            if entity_id in metadata:
+                return metadata[entity_id][1].get("unit_of_measurement")
+            state = self.hass.states.get(entity_id)
+            return state.attributes.get("unit_of_measurement") if state else None
+
+        power_factor = 1000.0 if unit(power_id) == "kW" else 1.0
+        meter_factor = {"Wh": 0.001, "MWh": 1000.0}.get(unit(meter_id), 1.0)
+
+        def series(entity_id, factor=1.0):
+            rows = [(state.last_changed.timestamp(), state.state) for state in states.get(entity_id, [])]
+            return [(ts, value * factor) for ts, value in as_series(rows)]
+
+        def stat_ts(row):
+            start = row.get("start")
+            return start.timestamp() if isinstance(start, datetime.datetime) else float(start)
+
+        power_rows = [
+            (stat_ts(row), row["mean"] * power_factor, row["min"] * power_factor, row["max"] * power_factor)
+            for row in power_stats.get(power_id, []) if None not in (row.get("mean"), row.get("min"), row.get("max"))
+        ]
+        if not power_rows:
+            # no statistics for the power sensor: the raw readings in 5 minute steps
+            power_rows = resample_steps(series(power_id, power_factor), raw_start.timestamp(), end.timestamp())
+        data: dict[str, Any] = {
+            "soc": series(soc_id),
+            "meter": series(meter_id, meter_factor),
+            "power": power_rows,
+            "phases": [series(entity_id) for entity_id in phase_ids],
+        }
+
+        _LOGGER.debug("Charging loss: history %s battery level, %s meter, %s power rows", len(data["soc"]), len(data["meter"]), len(data["power"]))
+        groups = (await self.async_run_job("charging_loss_update", {**data, "backfill": False})).value or {}
+        if not backfill:
+            return
+
+        # older charging from the hourly statistics, 30 days at a time, only as far back as a
+        # group still misses measurements (a full group keeps its newest anyway)
+        chunk_end = raw_start
+        for _ in range(CHARGING_LOSS_STATISTICS_DAYS // CHARGING_LOSS_STATISTICS_CHUNK_DAYS):
+            if groups and all(count >= LOSS_GROUP_SIZE for count in groups.values()):
+                break
+            chunk_start = chunk_end - datetime.timedelta(days=CHARGING_LOSS_STATISTICS_CHUNK_DAYS)
+            try:
+                hourly = await instance.async_add_executor_job(
+                    statistics_during_period, self.hass, chunk_start, chunk_end, {soc_id, meter_id, power_id}, "hour", None, {"mean", "min", "max", "change"}
+                )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Charging loss: could not load the statistics: %s", err)
+                break
+            if not hourly.get(power_id):
+                break  # before the statistics of the power sensor began
+            hours: dict[float, dict] = {}
+            for row in hourly.get(power_id, []):
+                if row.get("mean") is not None:
+                    hours.setdefault(stat_ts(row), {})
+                    hours[stat_ts(row)].update(power_mean=row["mean"] * power_factor, power_min=(row.get("min") or 0.0) * power_factor, power_max=(row.get("max") or 0.0) * power_factor)
+            for row in hourly.get(meter_id, []):
+                if row.get("change") is not None and stat_ts(row) in hours:
+                    hours[stat_ts(row)]["kwh"] = row["change"] * meter_factor
+            for row in hourly.get(soc_id, []):
+                if row.get("mean") is not None and stat_ts(row) in hours:
+                    hours[stat_ts(row)]["soc"] = row["mean"]
+            _LOGGER.debug("Charging loss: statistics %s - %s, %s hours", chunk_start.date(), chunk_end.date(), len(hours))
+            groups = (await self.async_run_job("charging_loss_update", {"hours": [{"start": ts, **values} for ts, values in hours.items()]})).value or groups
+            chunk_end = chunk_start
+        await self.async_run_job("charging_loss_update", {"backfill": True})
+        _LOGGER.info("Charging loss: history read back to %s, measurements per group %s", chunk_end.date(), groups)
+
+    # ------------------------------------------------------------------ #
+    # Charging economy per month (engine_economy.py)
+    # ------------------------------------------------------------------ #
+
+    @callback
+    def _economy_daily(self, _now) -> None:
+        self._background(self._async_economy_refresh(), "economy")
+
+    async def _async_economy_refresh(self) -> None:
+        """Hourly prices and the odometer per month from the long-term statistics; the first
+        time also the connection windows of the last days from the charger's status."""
+        if "recorder" not in self.hass.config.components:
+            return
+        from homeassistant.components.recorder import get_instance, history  # noqa: PLC0415
+        from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
+
+        instance = get_instance(self.hass)
+        prices_cfg = self.config["prices"]["entity_ids"]
+        price_id = prices_cfg["energidataservice_buy_entity_id"] or prices_cfg["stromligning_buy_current_price"]
+        odometer_id = self.config["ev_car"]["entity_ids"]["odometer_entity_id"] if self.ev_configured else ""
+        status_id = self.config["charger"]["entity_ids"]["status_entity_id"]
+        end = dt_util.utcnow()
+        keep_days = getattr(instance, "keep_days", 10)
+        backfill = not self.engine.economy_db.get("backfilled")
+        data: dict[str, Any] = {}
+
+        def stat_ts(row):
+            start = row.get("start")
+            return start.timestamp() if isinstance(start, datetime.datetime) else float(start)
+
+        try:
+            if price_id:
+                stats = await instance.async_add_executor_job(
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=keep_days + 5), end, {price_id}, "hour", None, {"mean"}
+                )
+                data["prices"] = {stat_ts(row): row["mean"] for row in stats.get(price_id, []) if row.get("mean") is not None}
+                if not data["prices"]:
+                    # no long-term statistics (no state_class): the raw history, the price changes every hour
+                    start = end - datetime.timedelta(days=keep_days)
+                    raw = await instance.async_add_executor_job(
+                        partial(
+                            history.get_significant_states, self.hass, start, end, [price_id], None,
+                            include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                        )
+                    )
+                    series = as_series((state.last_changed.timestamp(), state.state) for state in raw.get(price_id, []))
+                    data["prices"] = {row[0]: row[1] for row in resample_steps(series, start.timestamp(), end.timestamp(), 3600.0)}
+            if odometer_id:
+                months = await instance.async_add_executor_job(
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=400), end, {odometer_id}, "month", None, {"change"}
+                )
+                data["odometer_months"] = {
+                    dt_util.as_local(dt_util.utc_from_timestamp(stat_ts(row))).strftime("%Y-%m"): row["change"]
+                    for row in months.get(odometer_id, []) if row.get("change") is not None
+                }
+            if backfill and status_id:
+                states = await instance.async_add_executor_job(
+                    partial(
+                        history.get_significant_states, self.hass, end - datetime.timedelta(days=keep_days), end, [status_id], None,
+                        include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                    )
+                )
+                windows, start = [], None
+                for state in states.get(status_id, []):
+                    connected = state.state in CONNECTED_STATUS
+                    if connected and start is None:
+                        start = state.last_changed.timestamp()
+                    elif not connected and start is not None and state.state not in ENTITY_UNAVAILABLE_STATES:
+                        windows.append((start, state.last_changed.timestamp()))
+                        start = None
+                data["windows"] = windows
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Economy: could not load the statistics: %s", err)
+            return
+        _LOGGER.debug("Economy: %s hourly prices, %s odometer months, %s windows", len(data.get("prices", {})), len(data.get("odometer_months", {})), len(data.get("windows", [])))
+        await self.async_run_job("economy_update", data)
+        if backfill:
+            await self.async_run_job("economy_mark_backfilled")
+
+    # ------------------------------------------------------------------ #
+    # Analysis: drives against the outdoor temperature (engine_analysis.py)
+    # ------------------------------------------------------------------ #
+
+    @callback
+    def _analysis_daily(self, _now) -> None:
+        self._background(self._async_analysis_refresh(), "analysis")
+
+    async def _async_analysis_refresh(self) -> None:
+        """Hourly outdoor temperatures for the drives; the first time also the drives of the
+        recorder's raw history (unplugging to plugging in, odometer and battery level)."""
+        if not self.ev_configured or "recorder" not in self.hass.config.components:
+            return
+        from homeassistant.components.recorder import get_instance, history  # noqa: PLC0415
+        from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
+
+        instance = get_instance(self.hass)
+        temp_id = self.config["forecast"]["entity_ids"]["outdoor_temp_entity_id"]
+        ev = self.config["ev_car"]["entity_ids"]
+        status_id = self.config["charger"]["entity_ids"]["status_entity_id"]
+        end = dt_util.utcnow()
+        keep_days = getattr(instance, "keep_days", 10)
+        backfill = not self.engine.analysis_backfilled()
+        data: dict[str, Any] = {"backfill": backfill}
+        try:
+            if temp_id:
+                stats = await instance.async_add_executor_job(
+                    statistics_during_period, self.hass, end - datetime.timedelta(days=keep_days + 5), end, {temp_id}, "hour", None, {"mean"}
+                )
+                data["temps"] = {
+                    (row["start"].timestamp() if isinstance(row["start"], datetime.datetime) else float(row["start"])): row["mean"]
+                    for row in stats.get(temp_id, []) if row.get("mean") is not None
+                }
+            if backfill and status_id and ev["odometer_entity_id"] and ev["usable_battery_level_entity_id"]:
+                ids = [status_id, ev["odometer_entity_id"], ev["usable_battery_level_entity_id"]]
+                states = await instance.async_add_executor_job(
+                    partial(
+                        history.get_significant_states, self.hass, end - datetime.timedelta(days=keep_days), end, ids, None,
+                        include_start_time_state=True, significant_changes_only=False, minimal_response=False, no_attributes=True,
+                    )
+                )
+                data["status"] = [
+                    (state.last_changed.timestamp(), state.state in CONNECTED_STATUS)
+                    for state in states.get(status_id, []) if state.state not in ENTITY_UNAVAILABLE_STATES
+                ]
+                data["odometer"] = as_series((state.last_changed.timestamp(), state.state) for state in states.get(ev["odometer_entity_id"], []))
+                data["soc"] = as_series((state.last_changed.timestamp(), state.state) for state in states.get(ev["usable_battery_level_entity_id"], []))
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Analysis: could not load the history: %s", err)
+            return
+        _LOGGER.debug("Analysis: %s hourly temperatures, %s status changes", len(data.get("temps", {})), len(data.get("status", [])))
+        await self.async_run_job("analysis_update", data)
+
+    async def async_recalculate_charging_loss(self) -> None:
+        """button recalculate_charging_loss: forget the measurements and read the whole history again."""
+        await self.async_run_job("charging_loss_reset")
+        await self._async_charging_loss_refresh(backfill=True)
 
     async def _async_refresh_statistics(self, force: bool = False) -> None:
         hour = dt_util.now().replace(minute=0, second=0, microsecond=0)

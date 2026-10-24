@@ -1,255 +1,267 @@
 <img src="custom_components/cable_juice_planner/brand/icon.png" alt="Cable Juice Planner" width="128" align="right">
 
-# 🚗Cable Juice Planner🔋🌞📅 til Home Assistant
+# 🚗Cable Juice Planner🔋🌞📅 for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
 [![GitHub Release](https://img.shields.io/github/v/release/dezito/Cable-Juice-Planner-HACS)](https://github.com/dezito/Cable-Juice-Planner-HACS/releases)
 [![License](https://img.shields.io/github/license/dezito/Cable-Juice-Planner-HACS)](LICENSE)
 
-Planlægger opladning af elbilen ud fra en arbejdsplan eller de billigste tider over en uge.
-Planen bruger elpriser, solcelleoverskud, husbatteri og bilens faktiske forbrug.
+Plans EV charging based on a work plan or the cheapest times over a week.
+The plan uses electricity prices, solar surplus, home battery and the car's actual consumption.
 
 > [!NOTE]
-> Dette er **integrationsudgaven** af Cable Juice Planner, som installeres via HACS. Den erstatter
-> [PyScript-udgaven](https://github.com/dezito/Cable-Juice-Planner) og kan importere dens
-> konfiguration og databaser. Se [Skift fra PyScript-udgaven](#skift-fra-pyscript-udgaven).
+> This is the **integration version** of Cable Juice Planner, installed via HACS. It replaces the
+> [PyScript version](https://github.com/dezito/Cable-Juice-Planner) and can import its
+> configuration and databases. See [Switching from the PyScript version](#switching-from-the-pyscript-version).
 
 > [!IMPORTANT]
-> Integrationen **sender ingen kommandoer** til laderen eller bilen. Planen udstilles som
-> [handlings-entiteter](#sådan-styrer-du-laderen-og-bilen), og du styrer selv laderen med en
-> automation. Til det følger der en [blueprint](#blueprint-styr-laderen) med fail-safe med.
+> The integration **sends no commands** to the charger or the car. The plan is exposed as
+> [action entities](#how-to-control-the-charger-and-the-car), and you control the charger yourself with an
+> automation. A [blueprint](#blueprint-charger-control) with fail-safe is included for this.
 
 <a href="https://sloth.nu/tesla_solar_demo.gif" target="_blank"><img src="images/tesla_solar_demo_small.gif" width="49%"></a><a href="https://sloth.nu/virtual_ev_demo.gif" target="_blank"><img src="images/virtual_ev_demo_small.gif" width="49%"></a>
 
-![Opladningsperiode](images/charging_period.png)
+![Charging period](images/charging_period.png)
 
 ---
 
-## Ladereglerne
+## Charging rules
 
-- **☀️ Solcelleoverskud til opladning**
-  - Bilen lades med solcellernes overskudsproduktion. Den kan bruge hele timens overskud, også selvom
-    opladningen først starter senere i timen.
-  - Kan også indstilles til X minutter tilbage. Med f.eks. 15 min deles timen op i fire
-    (13:00, 13:15, 13:30 og 13:45), og overskuddet bruges i de intervaller.
-- **🏢 Arbejdsplan opladning**
-  - Angiv antal kilometer, afgang, hjemkomst og forvarmning pr. arbejdsdag. Integrationen finder de
-    billigste tider at lade på og forvarmer bilen til afgang, hvis det er valgt.
-- **📅 Optimal ugeopladning (uden arbejdsplan)**
-  - Angiv hvor mange kilometer du typisk kører om dagen. Forskellen mellem det nuværende
-    batteriniveau (f.eks. 27 %) og **elbilens maks. anbefalede ladeprocent** (f.eks. 90 %) deles op i
-    tre dele (63 % / 3 = 21 %). Integrationen lader så i de billigste tider 1, 4 og 7 dage frem.
-- **🧳 Tur:** lad til en procent eller til et antal km før en afgang, evt. med forvarmning
-- **🔌 Manuel ladning** (f.eks. gæster), evt. kun på solcelleoverskud
-- **🪫 Tvangsladning under dagligt batteriniveau** (op til f.eks. 30 %), men ikke i de dyreste timer
-- **💸 Billig og meget billig strøm:** lad automatisk højere op, når strømmen er ekstra billig
+- **☀️ Solar surplus charging**
+  - The car is charged with the solar panels' surplus production. It can use the whole hour's surplus, even if
+    charging only starts later in the hour.
+  - Can also be set to X minutes back. With e.g. 15 min the hour is split into four
+    (13:00, 13:15, 13:30 and 13:45), and the surplus is used in those intervals.
+- **🏢 Work Plan charging**
+  - Set the number of kilometres, departure, arrival and preheating per workday. The integration finds the
+    cheapest times to charge and preheats the car for departure, if selected.
+  - When the car is away on a workday and hasn't come home yet, only the way back (half the distance) is
+    left for that day.
+  - The km per weekday can be [learned](#learn-driving-distance) from the odometer.
+- **📅 Optimal weekly charging (no Work Plan)**
+  - Set how many kilometres you typically drive per day. Every day, enough is always charged for that
+    distance plus the daily minimum, in the day's cheapest hours. The rest up to the **EV max
+    recommended charging limit** (e.g. 90 %) is only charged in the week's cheapest hours (the cheapest 30 %), and
+    only if the next 24 hours aren't clearly cheaper.
+- **🧳 Trip:** charge to a percentage or to a number of km before a departure, optionally with preheating
+- **🔌 Manual charging** (e.g. guests), optionally on solar surplus only
+- **🪫 Forced charging below the daily battery level** (up to e.g. 30 %), but not in the most expensive hours
+- **💸 Cheap and very cheap power:** charge higher (e.g. 70 % / 90 %) when the power is cheap or extra cheap –
+  together with Optimal weekly charging, or on its own with **Charge on cheap power**
+- **📈 Full charge every X days** for the battery's sake (above the max recommended limit). It counts as done
+  from 99 %, as a cold battery may stop there.
 
 > [!NOTE]
-> Er alle laderegler slået fra, lader Cable Juice Planner som en almindelig lader med maks. strøm.
+> If all charging rules are turned off, Cable Juice Planner charges like a regular charger at max. current.
 
-## Funktioner
+## Features
 
-- **Elbil-integration eller virtuel elbil:** uden bil i Home Assistant indtaster du selv
-  batteriniveauet, når kablet sættes i
-- **Solceller og Solcast (valgfrit):** overskud nu og prognose fremover, fra
-  [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) og/eller egen historik
-- **Husbatteri (valgfrit):** lad husbatteriet til et bestemt niveau først, og lad bilen fra
-  husbatteriet over et minimum
-- **Flere biler på samme hovedsikring:** [lastfordeling](#flere-biler-lastfordeling) med prioritet og fasefølge
-- **Husets forbrug** estimeres ud fra egen historik (uden bil, husbatteri og ignorerede forbrugere)
-- **Prisudbydere:** [Energi Data Service](https://github.com/MTrab/energidataservice) og/eller
-  [Strømligning](https://github.com/MTrab/stromligning), inkl. salgspris, tariffer og refusion af elafgift
-- **Realistisk forbrug** ud fra kørselsmønstret: kørselseffektivitet, km/kWh, Wh/km og estimeret rækkevidde
-- **Offentlig opladning:** registreres automatisk (med bil-integration). Du indtaster prisen
-  bagefter, og sessionen huskes også efter en genstart.
-- **Ladetab:** kan beregnes automatisk og gemmes
-- **CO₂-udledning** og **kWh ladet af solcellerne**
-- **Meget detaljeret ladehistorik**
-  - hver ladning: tid, ladegrund, procent, kWh, pris og kr/kWh
-  - pr. måned: km, kWh, andel fra solceller, pris og kr/kWh
-  - fordeling mellem dag og nat
-  - offentlig ladning
-- **Oversigter:** sidste køreturs effektivitet, udgifter for nuværende batteriniveau,
-  ladeoversigt, afgangsplan, skøn ved daglig opladning og solcelleoverskud-prognose
-- **Fail-safe:** se [Fail-safe](#fail-safe)
-- **Færdigt dashboard** i sidepanelet
-- **Sprog:** dansk, engelsk, tysk, polsk og ukrainsk
-- **Kører ikke i Home Assistants hovedtråd:** alle beregninger kører i integrationens egen
-  worker-tråd, så Home Assistant ikke blokeres mens planen regnes ud
+- **EV integration or virtual EV:** without a car in Home Assistant you enter the
+  battery level yourself when the cable is plugged in
+- **Solar and Solcast (optional):** surplus now and forecast ahead, from
+  [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and/or own history
+- **Home battery (optional):** charge the home battery to a certain level first, and charge the car from
+  the home battery above a minimum
+- **Multiple cars on the same main fuse:** [load balancing](#multiple-cars-load-balancing) with priority and phase order
+- **House consumption** is estimated from own history (excluding car, home battery and ignored consumers)
+- **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
+  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund
+- **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
+- **Public charging:** detected automatically (with EV integration). You enter the price
+  afterwards, and the session is remembered across restarts.
+- **[Charging loss](#charging-loss):** measured continuously per charging power from Home Assistant's history, and
+  optionally used by the plan. A one-time measurement is still possible.
+- **[Learn driving distance](#learn-driving-distance):** km per weekday and the typical daily distance from the odometer
+- **[Analysis](#analysis):** the economy per month compared with daily charging and the lowest possible price,
+  driving against the outdoor temperature, ready at departure, battery capacity over time, and planned against
+  actually charged
+- **CO₂ emissions** and **kWh charged by solar**
+- **Very detailed charging history**
+  - each charge: time, charging reason, percentage, kWh, price and price/kWh
+  - per month: km, kWh, share from solar, price and price/kWh
+  - split between day and night
+  - public charging
+- **Overviews:** last drive's efficiency, costs for the current battery level,
+  charging overview, departure plan, estimate for daily charging and solar surplus forecast
+- **Fail-safe:** see [Fail-safe](#fail-safe)
+- **Ready-made dashboard** in the sidebar
+- **Languages:** Danish, English, German, Polish and Ukrainian
+- **Does not run in Home Assistant's main thread:** all calculations run in the integration's own
+  worker thread, so Home Assistant isn't blocked while the plan is calculated
 
-| Sidste køretur | Batteriniveau-udgifter | Ladeoversigt |
+| Last drive | Battery level costs | Charging overview |
 | --- | --- | --- |
-| ![Sidste kørsel effektivitet](images/last_drive_efficiency.png) | ![Batteriniveau-udgifter](images/battery_level_costs.png) | ![Ladeoversigt](images/charging_overview.png) |
+| ![Last drive efficiency](images/last_drive_efficiency.png) | ![Battery level costs](images/battery_level_costs.png) | ![Charging overview](images/charging_overview.png) |
 
-| Oversigt | Historik | Solcelleoverskud |
+| Overview | History | Solar surplus |
 | --- | --- | --- |
-| ![Oversigt](images/overview.png) | ![Historik](images/history.png) | ![Solcelleoverskud](images/solar_overproduction.png) |
+| ![Overview](images/overview.png) | ![History](images/history.png) | ![Solar surplus](images/solar_overproduction.png) |
 
 ---
 
-## Krav
+## Requirements
 
-- Home Assistant **2025.1** eller nyere med recorder (standard)
-- En lader med **status**-, **effekt**- (W) og **kWh**-sensorer
-- Prisintegration: [Energi Data Service](https://github.com/MTrab/energidataservice) og/eller [Strømligning](https://github.com/MTrab/stromligning)
-- Valgfrit:
-  - bil-integration (batteriniveau, rækkevidde og kilometertæller, og gerne ladeport, ladegrænse og position)
-  - solcelleproduktion (W) og [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar)
-  - en vejr-integration med `weather.get_forecasts`, f.eks.
+- Home Assistant **2025.1** or newer with recorder (default). The [analysis](#analysis) and the charging loss read
+  its history: the longer `purge_keep_days`, the more there is from the first day (e.g. 30 days).
+- A charger with **status**, **power** (W) and **kWh** sensors
+- Price integration: [Energi Data Service](https://github.com/MTrab/energidataservice) and/or [Strømligning](https://github.com/MTrab/stromligning)
+- Optional:
+  - EV integration (battery level, range and odometer, and preferably charge port, charge limit and location)
+  - solar production (W) and [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar)
+  - a weather integration with `weather.get_forecasts`, e.g.
     [Meteorologisk institutt](https://www.home-assistant.io/integrations/met/),
-    [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) eller
+    [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
     [OpenWeather](https://www.home-assistant.io/integrations/openweathermap/)
-- Til dashboardet (HACS frontend): `mushroom`, `stack-in-card`, `numberbox-card`,
-  `apexcharts-card`, `config-template-card` og `ultra-vehicle-card`
+- For the dashboard (HACS frontend): `mushroom`, `apexcharts-card`, `config-template-card` and `card-mod`
 
-### Testet med
+### Tested with
 
-| Lader | Bil | Inverter |
+| Charger | Car | Inverter |
 |---|---|---|
 | [Easee](https://github.com/nordicopen/easee_hass) | [Tesla](https://github.com/alandtse/tesla), [TeslaFi](https://github.com/jhansche/ha-teslafi), [Tessie](https://www.home-assistant.io/integrations/tessie/), [Polestar](https://github.com/pypolestar/polestar_api), [Cupra WeConnect](https://github.com/daernsinstantfortress/cupra_we_connect), [Kia UVO](https://github.com/Hyundai-Kia-Connect/kia_uvo) | [Huawei Solar](https://github.com/wlcrs/huawei_solar), [Fronius](https://www.home-assistant.io/integrations/fronius/), [Kostal](https://www.home-assistant.io/integrations/kostal_plenticore/), [Solarman](https://github.com/StephanJoubert/home_assistant_solarman/) |
 
-Laderen styres af din egen automation, så andre ladere virker også, hvis de kan startes,
-stoppes og have ampere sat fra Home Assistant.
+The charger is controlled by your own automation, so other chargers work too, as long as they can be started,
+stopped and have their amps set from Home Assistant.
 
 ---
 
 ## Installation
 
-### HACS (anbefalet)
+### HACS (recommended)
 
-[![Åbn dit Home Assistant og tilføj repoet i HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-HACS&category=integration)
+[![Open your Home Assistant and add the repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-HACS&category=integration)
 
-1. **HACS** → ⋮ → **Custom repositories**: tilføj `https://github.com/dezito/Cable-Juice-Planner-HACS` som **Integration**.
-2. Søg efter **Cable Juice Planner**, installer den, og genstart Home Assistant.
-3. Tilføj integrationen:
+1. **HACS** → ⋮ → **Custom repositories**: add `https://github.com/dezito/Cable-Juice-Planner-HACS` as **Integration**.
+2. Search for **Cable Juice Planner**, install it, and restart Home Assistant.
+3. Add the integration:
 
-   [![Åbn dit Home Assistant og tilføj Cable Juice Planner.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=cable_juice_planner)
+   [![Open your Home Assistant and add Cable Juice Planner.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=cable_juice_planner)
 
-   eller **Indstillinger → Enheder og tjenester → Tilføj integration → Cable Juice Planner**.
-4. Lav automationen, der styrer laderen, f.eks. med [blueprinten](#blueprint-styr-laderen).
+   or **Settings → Devices & services → Add integration → Cable Juice Planner**.
+4. Create the automation that controls the charger, e.g. with the [blueprint](#blueprint-charger-control).
 
-### Manuelt
+### Manual
 
-Kopiér `custom_components/cable_juice_planner` til `config/custom_components/cable_juice_planner`, og genstart Home Assistant.
-
----
-
-## Opsætning
-
-Opsætningen sker i brugerfladen, fordelt på sider med hjælpetekster:
-
-1. **Bil:** navn (bruges som enhedens navn og i notifikationer), prefix og sprog. Alle entity
-   id'er starter med `cjp_`. Uden prefix hedder de `sensor.cjp_overview`, og med prefixet
-   `tesla` hedder de `sensor.cjp_tesla_overview`. Brug ét prefix pr. bil.
-2. **Lader:** status, effekt, kWh-målere, tænd/sluk, kabel og CO₂, samt spænding, faser,
-   maks. ampere og ladetab
-3. **Lastfordeling:** prioritet og fasefølge (kun med en [fælles el-tilslutning](#flere-biler-lastfordeling))
-4. **Elbil:** batteriniveau, rækkevidde, kilometertæller, ladeport/-kabel, ladegrænse,
-   position, opdateringstid og klima, samt batteristørrelse. Spring siden over, hvis du ikke har
-   en bil-integration (virtuel elbil).
-5. **Hus og husbatteri:** forbrug, ignorerede forbrugere, husbatteriets niveau og effekt
-6. **Prisudbydere:** Energi Data Service og/eller Strømligning, refusion og salgsgebyr
-7. **Solceller, solcelleopladning og vejr** (kun med solceller)
-8. **Notifikationer, avanceret** (interval, dashboard, diagnostisk fil-log, testtilstand) **og database**
-
-Entitetsvælgerne viser kun relevante entiteter: batteriniveau kun `battery`-sensorer, effekt
-kun `power`-sensorer, kWh kun `energy`-sensorer, priserne kun entiteter fra prisintegrationerne
-og prognosen kun Solcast.
-
-Alt kan ændres bagefter under **Konfigurer** på integrationen, via en menu.
+Copy `custom_components/cable_juice_planner` to `config/custom_components/cable_juice_planner` and restart Home Assistant.
 
 ---
 
-## Sådan styrer du laderen og bilen
+## Setup
 
-| Entitet | Indhold |
+Setup is done in the UI, split into pages with help texts:
+
+1. **Car:** name (used as the device name and in notifications), prefix and language. All entity
+   ids start with `cjp_`. Without a prefix they are named `sensor.cjp_overview`, and with the prefix
+   `tesla` they are named `sensor.cjp_tesla_overview`. Use one prefix per car.
+2. **Charger:** status, power, kWh meters, on/off, cable and CO₂, as well as voltage, phases,
+   max. amps and charging loss
+3. **Load balancing:** priority and phase order (only with a [shared grid connection](#multiple-cars-load-balancing))
+4. **EV:** battery level, range, odometer, charge port/cable, charge limit,
+   location, update time and climate, as well as battery size. Skip the page if you don't have
+   an EV integration (virtual EV).
+5. **House and home battery:** consumption, ignored consumers, the home battery's level and power
+6. **Price providers:** Energi Data Service and/or Strømligning, refund and selling fee
+7. **Solar panels, solar charging and weather** (only with solar panels), incl. a fixed solar sell price (−1 = the hourly price)
+8. **Notifications, advanced** (interval, dashboard, diagnostic file log, testing mode) **and databases**
+
+The entity selectors only show relevant entities: battery level only `battery` sensors, power
+only `power` sensors, kWh only `energy` sensors, prices only entities from the price integrations
+and the forecast only Solcast.
+
+Everything can be changed afterwards under **Configure** on the integration, via a menu.
+
+---
+
+## How to control the charger and the car
+
+| Entity | Content |
 |---|---|
-| `sensor.cjp_<prefix>_charger_action` | `charge` eller `stop`: om laderen skal lade nu |
-| ↳ attribut `charger_enabled` | om laderen skal være tændt |
-| ↳ attribut `circuit_phase_1_amps` … `_3_amps` | kredsløbets grænse pr. fase (f.eks. Easee kredsløbsgrænse) |
-| ↳ attribut `charging_limit` | samme ladegrænse som `sensor.cjp_<prefix>_charging_limit` |
-| ↳ attributter `phase_1_amps`, `phase_2_amps`, `phase_3_amps` | samme ladestrøm pr. fase som de tre ampere-sensorer (så en automation kun skal bruge `charger_action`) |
-| ↳ attribut `mode` | `normal`, `deactivated` (slået fra) eller `error` (beregningen fejlede) |
-| ↳ attribut `updated` | tidspunkt for seneste beregning (hjerteslag) |
-| `sensor.cjp_<prefix>_charger_phase_1_amps` … `_3_amps` | ønsket ladestrøm pr. fase i A (0 = fasen bruges ikke) |
-| `sensor.cjp_<prefix>_charging_watts` | ønsket ladeeffekt |
-| `sensor.cjp_<prefix>_charging_limit` | ønsket ladegrænse på bilen i % (kun med bil-integration) |
-| `event.cjp_<prefix>_ev_request` | `wake_up`, `preheat_start` (data: `departure`, `defrost`) og `preheat_stop` |
+| `sensor.cjp_<prefix>_charger_action` | `charge` or `stop`: whether the charger should charge now |
+| ↳ attribute `charger_enabled` | whether the charger should be enabled |
+| ↳ attribute `circuit_phase_1_amps` … `_3_amps` | the circuit's limit per phase (e.g. Easee circuit limit) |
+| ↳ attribute `charging_limit` | same charge limit as `sensor.cjp_<prefix>_charging_limit` |
+| ↳ attributes `phase_1_amps`, `phase_2_amps`, `phase_3_amps` | same charging current per phase as the three amps sensors (so an automation only needs `charger_action`) |
+| ↳ attribute `mode` | `normal` or `error` (the calculation failed) |
+| ↳ attribute `updated` | time of the latest calculation (heartbeat) |
+| `sensor.cjp_<prefix>_charger_phase_1_amps` … `_3_amps` | desired charging current per phase in A (0 = phase not used) |
+| `sensor.cjp_<prefix>_charging_watts` | desired charging power |
+| `sensor.cjp_<prefix>_charging_limit` | desired charge limit on the car in % (only with EV integration) |
+| `event.cjp_<prefix>_ev_request` | `wake_up`, `preheat_start` (data: `departure`, `defrost`) and `preheat_stop` |
 
-### Blueprint: styr laderen
+### Blueprint: charger control
 
-Blueprinten installeres automatisk sammen med integrationen: ved opstart lægges den i
-`config/blueprints/automation/cable_juice_planner/charger_control.yaml` og findes derefter under
-*Indstillinger → Automatiseringer og scener → Blueprints* som **Cable Juice Planner - styr
-laderen**. Filen overskrives aldrig af sig selv. Kommer der en ny version med en HACS-opdatering (eller
-har du selv rettet i filen), dukker der efter genstart en reparation op under *Indstillinger →
-System → Reparationer*. Vælger du at opdatere, erstattes filen med den medfølgende version, og
-automationer, der bruger den, genindlæses. Ignorerer du den, beholder du din egen fil. Slettes
-filen, lægges den nyeste version ind igen ved næste genstart.
+The blueprint is installed automatically with the integration: on startup it is placed in
+`config/blueprints/automation/cable_juice_planner/charger_control.yaml` and can then be found under
+*Settings → Automations & scenes → Blueprints* as **Cable Juice Planner - charger
+control**. The file is never overwritten on its own. If a new version arrives with a HACS update (or
+you have edited the file yourself), a repair shows up after restart under *Settings →
+System → Repairs*. If you choose to update, the file is replaced with the bundled version, and
+automations using it are reloaded. If you ignore it, you keep your own file. If the file is
+deleted, the latest version is put back on the next restart.
 
-[`charger_control.yaml`](custom_components/cable_juice_planner/blueprints/charger_control.yaml) klarer
-start/stop, tænd/sluk og strøm pr. fase. Du angiver dine egne handlinger, og i dem kan du bruge
-variablerne `phase_1`, `phase_2`, `phase_3`, `max_phase`, `phases`, `charger_enabled`,
-`fail_safe` og `message`.
+[`charger_control.yaml`](custom_components/cable_juice_planner/blueprints/charger_control.yaml) handles
+start/stop, on/off and current per phase. You provide your own actions, and in them you can use
+the variables `phase_1`, `phase_2`, `phase_3`, `max_phase`, `phases`, `charger_enabled`,
+`fail_safe` and `message`.
 
-Lav én automation pr. bil med blueprinten. Under *Cable Juice Planner* vælger du kun bilens
-**Lader handling** (`sensor.cjp_<prefix>_charger_action` – vælgeren viser kun dem); ladestrømmen
-pr. fase læses fra dens attributter.
+Create one automation per car with the blueprint. Under *Cable Juice Planner* you only select the car's
+**Charger action** (`sensor.cjp_<prefix>_charger_action` – the selector only shows those); the charging current
+per phase is read from its attributes.
 
-Blueprinten har også fail-safe for det, integrationen ikke selv kan dække. Bliver
-`charger_action` utilgængelig, eller er `updated` for gammel, lader den med en fast strøm og
-sender en notifikation.
+The blueprint also has fail-safe for what the integration can't cover itself. If
+`charger_action` becomes unavailable, or `updated` is too old, it charges at a fixed current and
+sends a notification.
 
-Under **Ladestatus** angiver du, hvordan blueprinten ser om der lades: en status-sensor
-(laderens eller bilens, f.eks. `charging`/`completed`), en kontakt eller binær sensor der er
-`on` mens der lades, og/eller en effektsensor med en tærskel (standard 500 W). Så gentages start
-ikke ved fail-safe og efter en genstart af Home Assistant, mens der lades eller når der meldes
-færdig (*Tilstande der betyder færdig*, standard `completed` og `finished` som scriptets
-`CHARGER_COMPLETED_STATUS`). En ny ladebeslutning fra integrationen sender altid start.
+Under **Charging state** you specify how the blueprint sees whether it is charging: a status sensor
+(the charger's or the car's, e.g. `charging`/`completed`), a switch or binary sensor that is
+`on` while charging, and/or a power sensor with a threshold (default 500 W). This way start isn't repeated
+on fail-safe and after a Home Assistant restart while charging or when charging is reported
+done (*States that mean done*, default `completed` and `finished` like the script's
+`CHARGER_COMPLETED_STATUS`). A new charging decision from the integration always sends start.
 
-Under **Genstart når der ikke lades** kan du tilføje handlinger, der køres når handlingen har
-stået på `charge` i f.eks. 10 minutter, uden at der lades – typisk
-`homeassistant.reload_config_entry` med en af laderens eller bilens entiteter som mål, som
-genindlæser den integration. Det gentages efter yderligere 10 og 20 minutter (højst 3 gange som
-standard), du får en notifikation, og 1 minut efter sendes ladestrøm og start igen. Det kræver
-Ladestatus – uden den kan blueprinten ikke se, om der lades.
+Under **Restart when not charging** you can add actions that run when the action has
+been `charge` for e.g. 10 minutes without charging – typically
+`homeassistant.reload_config_entry` targeting one of the charger's or the car's entities, which
+reloads that integration. This is repeated after another 10 and 20 minutes (at most 3 times by
+default), you get a notification, and 1 minute later the charging current and start are sent again. It requires
+*Charging state* – without it the blueprint can't tell whether it is charging.
 
-Blueprinten har en sektion til **laderen** og en til **bilen**. Alle handlinger er valgfrie: for
-hver opgave udfylder du den dér, hvor dit setup kan gøre det – i laderen, i bilen eller begge
-steder (f.eks. ladestrøm i laderen og ladegrænse i bilen).
-Ved start: ladegrænse i bilen → tænd laderen → ladestrøm i laderen → ladestrøm i bilen →
-start laderen → start bilen. Ved stop stoppes begge.
+The blueprint has one section for the **charger** and one for the **car**. All actions are optional: for
+each task you fill it in where your setup can do it – in the charger, in the car or both
+(e.g. charging current in the charger and charge limit in the car).
+On start: charge limit in the car → enable the charger → charging current in the charger → charging current in the car →
+start the charger → start the car. On stop, both are stopped.
 
-**Typiske setups**
+**Typical setups**
 
-| Setup | Udfyld | Eksempel |
+| Setup | Fill in | Example |
 |---|---|---|
-| Laderen kan styres, bilen har ingen integration (eller kan ikke styres) | Lader | Easee, Zaptec, Monta, Wallbox eller en OCPP-lader med en "virtuel" bil (batteriniveau sættes manuelt) |
-| Bilen kan styres, laderen har ingen integration ("dum" lader, evt. målt med en energimåler) | Bil | VW/Cupra/Skoda, Kia/Hyundai, Tesla … på en lader uden integration – f.eks. målt med en Shelly 3EM |
-| Både laderen og bilen har en integration | Hver opgave dér hvor den kan | F.eks. strøm og start/stop i laderen og ladegrænse i bilen – eller start/stop og ladegrænse i bilen og strøm i laderen |
+| The charger can be controlled, the car has no integration (or can't be controlled) | Charger | Easee, Zaptec, Monta, Wallbox or an OCPP charger with a "virtual" car (battery level set manually) |
+| The car can be controlled, the charger has no integration ("dumb" charger, optionally measured with an energy meter) | Car | VW/Cupra/Skoda, Kia/Hyundai, Tesla … on a charger without integration – e.g. measured with a Shelly 3EM |
+| Both the charger and the car have an integration | Each task where it can be done | E.g. current and start/stop in the charger and charge limit in the car – or start/stop and charge limit in the car and current in the charger |
 
-**Typiske handlinger** – navnene afhænger af integrationen; find dem under *Udviklerværktøjer →
-Handlinger* og *Tilstande* for din lader og bil:
+**Typical actions** – the names depend on the integration; find them under *Developer tools →
+Actions* and *States* for your charger and car:
 
-| Input | Laderens integration | Bilens integration |
+| Input | Charger integration | Car integration |
 |---|---|---|
-| Start / stop | en start/stop- eller pause/genoptag-service (f.eks. Easee `action_command`), en start/stop-kontakt (f.eks. Monta, Wallbox, OCPP *Charge Control*) eller en knap | en ladekontakt (f.eks. Tesla/Tessie) eller en start/stop-service (f.eks. Kia/Hyundai Connect `start_charge`/`stop_charge`, VW/Cupra-integrationerne) |
-| Ladestrøm | en dynamisk grænse-service (f.eks. Easee, Zaptec) eller en number for maks. strøm (f.eks. OCPP *Maximum Current*, Wallbox *Max charging current*) – `{{ max_phase }}` eller pr. fase `{{ phase_1 }}` … | kun nogle biler har en number for ladestrømmen (f.eks. Tesla/Tessie *charge current*) – `{{ max_phase }}` |
-| Ladegrænse | – | en number for ladegrænsen (f.eks. *charge limit*, *AC charging limit*, *target state of charge*) – `{{ charging_limit }}` |
-| Tænd / sluk | laderens "aktiveret"-kontakt – vælg entiteten, ikke enheden | – |
-| Ladestatus | laderens status-sensor (tilpas *lader*/*færdig*-tilstandene, f.eks. `charging`, `completed`, `finished`, OCPP `Charging`/`Finishing`) eller en effektsensor / energimåler | bilens "lader"-kontakt eller binære sensor, eller bilens ladestatus |
-| Genstart | `homeassistant.reload_config_entry` med en af laderens entiteter som mål | `homeassistant.reload_config_entry` med en af bilens entiteter som mål |
+| Start / stop | a start/stop or pause/resume service (e.g. Easee `action_command`), a start/stop switch (e.g. Monta, Wallbox, OCPP *Charge Control*) or a button | a charge switch (e.g. Tesla/Tessie) or a start/stop service (e.g. Kia/Hyundai Connect `start_charge`/`stop_charge`, the VW/Cupra integrations) |
+| Charging current | a dynamic limit service (e.g. Easee, Zaptec) or a number for max. current (e.g. OCPP *Maximum Current*, Wallbox *Max charging current*) – `{{ max_phase }}` or per phase `{{ phase_1 }}` … | only some cars have a number for the charging current (e.g. Tesla/Tessie *charge current*) – `{{ max_phase }}` |
+| Charge limit | – | a number for the charge limit (e.g. *charge limit*, *AC charging limit*, *target state of charge*) – `{{ charging_limit }}` |
+| Enable / disable | the charger's "enabled" switch – select the entity, not the device | – |
+| Charging state | the charger's status sensor (adjust the *charging*/*done* states, e.g. `charging`, `completed`, `finished`, OCPP `Charging`/`Finishing`) or a power sensor / energy meter | the car's "charging" switch or binary sensor, or the car's charging status |
+| Restart | `homeassistant.reload_config_entry` targeting one of the charger's entities | `homeassistant.reload_config_entry` targeting one of the car's entities |
 
-Kan hverken laderen eller bilen sætte ladestrømmen, starter og stopper blueprinten bare
-ladningen – soloverskud og lastfordeling kan så ikke regulere strømmen.
+If neither the charger nor the car can set the charging current, the blueprint just starts and stops
+charging – solar surplus and load balancing then can't regulate the current.
 
-Brug blueprintens variabler (`{{ phase_1 }}`, `{{ max_phase }}`, `{{ charging_limit }}` …)
-frem for at læse sensorerne selv – i fail-safe har variablerne fail-safe-strømmen.
+Use the blueprint's variables (`{{ phase_1 }}`, `{{ max_phase }}`, `{{ charging_limit }}` …)
+rather than reading the sensors yourself – in fail-safe the variables hold the fail-safe current.
 
-### Eksempel: egne automationer uden blueprinten
+### Example: your own automations without the blueprint
 
 ```yaml
-alias: CJP - ladegrænse
+alias: CJP - charge limit
 triggers:
   - trigger: state
     entity_id: sensor.cjp_charging_limit
@@ -258,11 +270,11 @@ conditions:
 actions:
   - action: number.set_value
     target:
-      entity_id: number.min_bil_charge_limit
+      entity_id: number.my_car_charge_limit
     data:
       value: "{{ trigger.to_state.state | int }}"
 ---
-alias: CJP - væk og forvarm bilen
+alias: CJP - wake and preheat the car
 triggers:
   - trigger: state
     entity_id: event.cjp_ev_request
@@ -272,185 +284,265 @@ actions:
         sequence:
           - action: button.press
             target:
-              entity_id: button.min_bil_wake
+              entity_id: button.my_car_wake
       - conditions: "{{ trigger.to_state.attributes.event_type == 'preheat_start' }}"
         sequence:
           - action: climate.turn_on
             target:
-              entity_id: climate.min_bil_climate
+              entity_id: climate.my_car_climate
       - conditions: "{{ trigger.to_state.attributes.event_type == 'preheat_stop' }}"
         sequence:
           - action: climate.turn_off
             target:
-              entity_id: climate.min_bil_climate
+              entity_id: climate.my_car_climate
 ```
 
 ### Fail-safe
 
-- **Beregningen fejler:** `mode: error`, og handlingen bliver `charge` med maks. strøm og det
-  anbefalede maksimum som ladegrænse. Efter 3 fejl i træk genindlæses integrationen.
-- **Integrationen er slået fra** (*Deaktiver scriptet*): `mode: deactivated`, og handlingen
-  bliver `charge` med maks. strøm.
-- **Laderen lader ikke, selvom den skal:** `charger_enabled` slås fra og til (op til 3 gange)
-  med notifikationer undervejs.
-- **Priser eller Solcast mangler:** der planlægges ud fra integrationens egne databaser.
-- **Integrationen er stoppet eller hænger:** det dækker [blueprinten](#blueprint-styr-laderen).
+- **The calculation fails:** `mode: error`, and the action becomes `charge` with max. current and the
+  recommended maximum as charge limit. After 3 failures in a row, the integration is reloaded.
+- **The charger doesn't charge even though it should:** `charger_enabled` is toggled off and on (up to 3 times)
+  with notifications along the way.
+- **Prices or Solcast are missing:** planning uses the integration's own databases.
+- **The integration has stopped or hangs:** this is covered by the [blueprint](#blueprint-charger-control).
 
 ---
 
-## Flere biler (lastfordeling)
+## Multiple cars (load balancing)
 
-Lader flere biler på samme el-tilslutning, kan de tilsammen overstige hovedsikringen. Tilføj
-derfor én **Fælles el-tilslutning** (**Tilføj integration → Cable Juice Planner → Fælles el-tilslutning**):
+If several cars charge on the same grid connection, together they can exceed the main fuse. So add
+one **Shared grid connection** (**Add integration → Cable Juice Planner → Shared grid connection**):
 
-| Felt | Betydning |
+| Field | Meaning |
 |---|---|
-| Hovedsikring L1/L2/L3 | grænsen pr. fase (eller den del bilerne tilsammen må bruge) |
-| Sikkerhedsmargin | trækkes fra sikringen (standard 1 A) |
-| Strøm/effekt L1/L2/L3 (valgfri) | husets målte strøm (A) eller effekt (W) pr. fase, f.eks. fra en HAN/P1-måler |
-| Netspænding | omregner W til A |
-| Tur snart | en tur inden for så mange timer giver bilen forrang (standard 12) |
+| Main fuse L1/L2/L3 | the limit per phase (or the share the cars may use together) |
+| Safety margin | subtracted from the fuse (default 1 A) |
+| Current/power L1/L2/L3 (optional) | the house's measured current (A) or power (W) per phase, e.g. from a HAN/P1 meter |
+| Grid voltage | converts W to A |
+| Trip soon | a trip within this many hours gives the car precedence (default 12) |
 
-Under hver bil vælger du **prioritet** (1 = først) og **fasefølge** (L1-L2-L3, L2-L3-L1 eller
-L3-L1-L2), så 1-fase-ladning belaster den rigtige fase.
+Under each car you choose **priority** (1 = first) and **phase order** (L1-L2-L3, L2-L3-L1 or
+L3-L1-L2), so 1-phase charging loads the right phase.
 
-- **Rækkefølge:** bilerne ordnes efter prioritet. En bil under dagligt minimum, eller med en tur
-  inden for *Tur snart*, går forrest.
-- **Planlægning:** hver bil får en kapacitet pr. time. Den er sikringen minus margin, minus husets
-  forventede forbrug (gennemsnit af samme time den sidste uge, kun med fase-sensorer), minus det
-  bilerne foran har reserveret. Er der ikke plads til fuld strøm, lader bilen med færre ampere,
-  og resten planlægges i andre billige timer.
-- **1 eller 3 faser:** den største effekt, der passer inden for den ledige strøm pr. fase, vælges.
-  Bilen kan altså skifte til 1 fase, når en fase er fyldt.
-- **Live:** ampere begrænses altid til det, der er ledigt lige nu. Ændrer en bil foran sin plan eller
-  sit strømforbrug, genberegnes bilerne bagved efter 15 sekunder. Med fase-sensorer begrænses bilen
-  med lavest prioritet med det samme, hvis en fase går over sikringen.
+- **Order:** the cars are ordered by priority. A car below the daily minimum, or with a trip
+  within *Trip soon*, goes first.
+- **Planning:** each car gets a capacity per hour. It is the fuse minus margin, minus the house's
+  expected consumption (average of the same hour over the last week, only with phase sensors), minus what
+  the cars ahead have reserved. If there isn't room for full current, the car charges with fewer amps,
+  and the rest is planned in other cheap hours.
+- **1 or 3 phases:** the highest power that fits within the available current per phase is chosen.
+  So the car can switch to 1 phase when a phase is full.
+- **Live:** amps are always limited to what is available right now. If a car ahead changes its plan or
+  its current draw, the cars behind are recalculated after 15 seconds. With phase sensors, the car
+  with the lowest priority is limited immediately if a phase exceeds the fuse.
 
-| Sensor | Indhold |
+| Sensor | Content |
 |---|---|
-| `sensor.cjp_site_available_l1` … `_l3` | ledig strøm pr. fase (attributten `cars` viser rækkefølge og hver bils ønske) |
-| `sensor.cjp_site_house_l1` … `_l3` | husets strøm pr. fase, uden bilerne |
+| `sensor.cjp_site_available_l1` … `_l3` | available current per phase (the `cars` attribute shows the order and each car's request) |
+| `sensor.cjp_site_house_l1` … `_l3` | the house's current per phase, excluding the cars |
 
 ---
 
-## Entiteter
+## Entities
 
-Indstillingerne fra dashboardet er entiteter, som huskes ved genstart:
+The settings from the dashboard are entities that are kept across restarts:
 
-| Type | Eksempler |
+| Type | Examples |
 |---|---|
-| `switch` | laderegler, arbejdsdage og forvarmning pr. dag, manuel ladning, tvangsladning, beregn ladetab, deaktiver |
-| `number` | km pr. arbejdsdag, batteriniveauer, ladeprocent ved billig strøm, tur, fuld ladning hver X dage, pris for offentlig ladning, virtuel elbil |
-| `time` | afgang og hjemkomst pr. arbejdsdag |
-| `datetime` | turens afgang og hjemkomst, sidste fulde opladning |
-| `select` | prognosetype |
-| `button` | gennemtving planlægning, nulstil tur, genindlæs integrationen |
+| `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance |
+| `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging, virtual EV |
+| `time` | departure and arrival per workday |
+| `datetime` | the trip's departure and arrival |
+| `select` | forecast type |
+| `button` | force planning, reset trip, recalculate charging loss, export data |
 
-Klikker du på en indstilling, står der en kort forklaring under **Attributter** (`description`
-og `help`). Planen beregnes igen 5 sekunder efter en ændring.
+If you click a setting, a short explanation is shown under **Attributes** (`description`
+and `help`). The plan is recalculated 5 seconds after a change.
 
-Resultaterne er bl.a. `sensor.cjp_current_charging_rule`, `_overview`, `_charging_history`,
+The results include `sensor.cjp_current_charging_rule`, `_overview`, `_charging_history`,
 `_emoji_description`, `_kwh_cost_price`, `_drive_efficiency`, `_km_per_kwh`, `_estimated_range`,
-`_co2_emitted` og `_kwh_charged_by_solar`. Store attributter (markdown, planer) gemmes ikke i
-recorder-databasen.
+`_co2_emitted`, `_kwh_charged_by_solar`, `_last_full_charge` (set by the integration when the battery was
+full), `_charging_loss_model`, `_economy` and `_analysis`. Large attributes (markdown, plans, measurements)
+are not stored in the recorder database.
 
-### Offentlig opladning
+### Public charging
 
-Med bil-integration registreres en ladning væk fra hjemmet automatisk: tid, batteriniveau ved
-start og slut, og tilføjede procent.
+With an EV integration, a charge away from home is detected automatically: time, battery level at
+start and end, and percentage added.
 
-1. Indtast den samlede pris i `number.cjp_public_charging_session_cost`.
-   Indtaster du `-1`, slettes ladningen.
-2. Efter ca. 1 minut lægges ladningen i historikken, og feltet nulstilles.
-3. Har du flere ladninger, så indtast dem i den rækkefølge, de er sket.
+1. Enter the total price in `number.cjp_public_charging_session_cost`.
+   If you enter `-1`, the charge is deleted.
+2. After about 1 minute the charge is added to the history, and the field is reset.
+3. If you have several charges, enter them in the order they happened.
 
-Ladninger kan også tilføjes med servicen `cable_juice_planner.manual_add_public_charging_session`.
+Charges can also be added with the `cable_juice_planner.manual_add_public_charging_session` service.
 
 ---
 
 ## Dashboard
 
-Med **Dashboard i sidepanelet** slået til (standard) får hver bil sit eget dashboard,
-f.eks. `/cjp-planner` (uden prefix) eller `/cjp-tesla`. Det bygges ved hver opstart ud fra
-din opsætning. Kort for ting, du ikke har sat op, bliver fjernet.
+With **Dashboard in the sidebar** enabled (default), each car gets its own dashboard,
+e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`. It is built on every startup from
+your setup. Cards for things you haven't set up are removed.
 
-Det genererede dashboard kan ikke redigeres i brugerfladen. Vil du tilpasse det, så kopiér
-indholdet over i et almindeligt dashboard (**Rediger → Raw configuration editor**), og slå
-**Dashboard i sidepanelet** fra.
+- **Overview:** battery level with forecast and planned charging hours, electricity prices (Energi Data Service/Strømligning)
+  with solar and charging plan, current charging rule, status, manual charging, forced charging (only while it is
+  relevant), trip, public charging (only while a session waits for its price), the charging history and the
+  integration's overview
+- **Settings:** charging rules, work plan per weekday, weekly charging, battery levels, cheap power, full charge,
+  solar/home battery, charging loss – with "Read more" from the entities' help texts. Preheating is only shown
+  with a car integration that has a climate entity.
+- **Analysis:** see [Analysis](#analysis), plus the history of battery, charge limit, driving efficiency and solar
+
+The generated dashboard cannot be edited in the UI. If you want to customise it, copy
+the content into a regular dashboard (**Edit → Raw configuration editor**) and turn
+**Dashboard in the sidebar** off.
+
+---
+
+## Charging loss
+
+The charging loss is what is lost between the charger and the car's battery. It is not constant: the car's
+electronics use a fixed amount while it charges, so a low power (solar on 1 phase at 6 A) loses much more than
+3 × 16 A.
+
+**Measured continuously.** From the car's battery level and the charger's kWh meter in Home Assistant's history
+(the last days raw, before that the hourly statistics), CJP finds parts of a charge from one change of the
+battery level to a later one (at least 5 %), with the same power and phases all the way. Per power group
+(< 2,5 kW, 2,5-4 kW, 4-7 kW, > 7 kW) the newest 10 are kept, reading only as far back as a group needs.
+With measurements in two or more groups the model separates the fixed use from the charger's own loss.
+
+- `sensor.cjp_<prefix>_charging_loss_model`: the loss at the max charging power, and in the attributes the
+  measurements, the model and **kWh from the charger per 1 %**. That number is what the plan needs, and it does
+  not depend on the battery size: if `battery_size` is set too high or too low, only the loss percentage moves.
+- **Use measured charging loss** (switch): the plan uses the measured loss instead of the configured one –
+  per hour at that hour's power when there is a model, else the measured loss at the max power. Off by default.
+- **Recalculate charging loss** (button): forgets the measurements and reads the history again.
+
+**One-time measurement.** **Calculate charging loss** measures one charge from low to full (at least 30
+percentage points) and saves the result in the configuration. It waits up to 30 min. for a slow kWh meter after
+the charge.
+
+---
+
+## Learn driving distance
+
+The odometer is read every evening. From the last 8 weeks CJP suggests the km per weekday (the median, so one
+long trip doesn't count) and the typical daily distance (the 75th percentile, a buffer above a normal day).
+The suggestions are always shown as the `learned_distance` attribute of the number entities. With **Learn driving
+distance** on, the numbers are set to them once there are enough days. Extra driving in a week is covered by the
+daily minimum battery level.
+
+---
+
+## Analysis
+
+The **Analysis** view of the dashboard. Everything is calculated from Home Assistant's history and CJP's own
+data, and refreshed every night.
+
+| Section | What it shows | From |
+|---|---|---|
+| **Economy** | per month: kWh per source (grid, solar, home battery, public), what it cost and kr/km, and what the same kWh would have cost at the average price, with **daily charging** (cheapest until the next departure, like most smart chargers) and at the **lowest possible** price while plugged in. *Saved* is the saving over daily charging, and *Score* how close the price came to the lowest, measured from the average (100 % = the cheapest hours) | the charging history, the plug-in times and hourly prices (the recorder's history, then saved by CJP every hour) and the odometer's statistics |
+| **Driving and temperature** | km/kWh against the outdoor temperature, and how much more energy per km the car uses at 0 °C than at 20 °C | drives from unplugging to plugging in, and the outdoor temperature's statistics |
+| **Ready at departure** | whether the car had the battery level it needed at each work plan departure | saved at every departure from the first start |
+| **Planned against actually charged** | the kWh planned the evening before against what was charged, and how much was outside the plan (manual, forced charging …) | saved every evening from the first start |
+| **Battery capacity** | kWh from the charger per 1 % per month and power group. Rising over the years = less capacity (compare the same month year by year, winter is higher) | the charging loss measurements |
+| **Charging loss per power** | the measured loss with the model, see [Charging loss](#charging-loss) | |
+
+The comparisons need plug-in times and hourly prices, which the recorder has for its `purge_keep_days`. Older
+months show only kWh per source, cost and kr/km. "Daily charging" uses the work plan as it is set now.
 
 ---
 
 ## Services
 
-| Service | Beskrivelse |
+| Service | Description |
 |---|---|
-| `cable_juice_planner.enforce_planning` | Beregn planen igen nu |
-| `cable_juice_planner.manual_add_public_charging_session` | Beregn (og evt. gem) en offentlig ladning |
-| `cable_juice_planner.debug_info` | Returnerer intern status til fejlfinding |
+| `cable_juice_planner.enforce_planning` | Recalculate the plan now |
+| `cable_juice_planner.manual_add_public_charging_session` | Calculate (and optionally save) a public charging session |
+| `cable_juice_planner.debug_info` | Returns internal state for troubleshooting |
+| `cable_juice_planner.export_data` | Save a backup of data and settings (see below) |
+| `cable_juice_planner.import_data` | Replace data and settings with a backup |
 
-Alle services tager valgfrit `config_entry_id`, så de kun rammer én bil.
+All services optionally take `config_entry_id` so they only affect one car (`import_data` requires it).
 
 ---
 
-## Skift fra PyScript-udgaven
+## Backup: export and import of data
+
+A backup is one JSON file in `/config/cable_juice_planner_backups/` with the databases, the settings (switches, numbers, ...) and the configuration from the setup. The folder is included in Home Assistant's own backups.
+
+- **When you delete a car**, a backup is saved automatically (`…_deleted.json`) before the databases are removed.
+- **Export** with the *Export data* button on the device, under **Configure → Backup** or with `cable_juice_planner.export_data`.
+- **Import into a new car**: when you create a new one, the setup offers to restore one of the backups. The configuration is pre-filled, and databases and settings are restored on first start.
+- **Import into an existing car** under **Configure → Backup** or with `cable_juice_planner.import_data` (`file: cjp_tesla_20261024_120000.json`). Databases and settings are replaced, and the integration is reloaded. The current data is first saved as `…_before_import.json`, so an import can be undone. With `restore_configuration` the configuration is also taken over. Leave it off when the backup comes from another Home Assistant.
+
+---
+
+## Switching from the PyScript version
 
 > [!WARNING]
-> Lad PyScript-udgaven køre, mens integrationen tilføjes. Ellers er dens hjælpere og sensorer
-> væk, og deres værdier kan ikke kopieres.
+> Keep the PyScript version running while the integration is added. Otherwise its helpers and sensors
+> are gone, and their values can't be copied.
 
-1. Tilføj integrationen. Findes der PyScript-filer (`ev_config.yaml`, `ev2_config.yaml`, …),
-   spørger opsætningen hvilken installation der skal importeres:
-   - værdierne fra `<navn>_config.yaml` udfyldes på siderne
-   - `<navn>_*_db.yaml` (ladehistorik, effektværdier, solproduktion, kWh-priser,
-     køreeffektivitet og km/kWh) importeres ved første start
-   - værdierne fra `input_boolean/input_number/input_select/input_datetime.<navn>_*` og
-     template-sensorerne kopieres til de nye entiteter
-2. Lav automationerne på [handlings-entiteterne](#sådan-styrer-du-laderen-og-bilen), men lad dem
-   være slået fra, så længe PyScript-udgaven styrer laderen. De nye entiteter starter med `cjp_`
-   og støder ikke sammen med PyScript-udgavens `ev_*`.
-3. Sammenlign planerne et par dage.
-4. Fjern `pyscript/ev.py` og `packages/ev.yaml`, genstart, og slå automationerne til.
+1. Add the integration. If PyScript files exist (`ev_config.yaml`, `ev2_config.yaml`, …),
+   the setup asks which installation should be imported:
+   - the values from `<name>_config.yaml` are filled in on the pages
+   - `<name>_*_db.yaml` (charging history, power values, solar production, kWh prices,
+     driving efficiency and km/kWh) are imported on first start
+   - the values from `input_boolean/input_number/input_select/input_datetime.<name>_*` and
+     the template sensors are copied to the new entities
+2. Create the automations on the [action entities](#how-to-control-the-charger-and-the-car), but keep them
+   turned off as long as the PyScript version controls the charger. The new entities start with `cjp_`
+   and don't collide with the PyScript version's `ev_*`.
+3. Compare the plans for a few days.
+4. Remove `pyscript/ev.py` and `packages/ev.yaml`, restart, and turn the automations on.
 
-PyScript-filerne bliver kun læst, aldrig ændret. Integrationen gemmer sine egne data i `.storage`.
+The PyScript files are only read, never changed. The integration stores its own data in `.storage`.
 
 | PyScript | Integration |
 |---|---|
-| `ev_config.yaml` | Opsætning / **Konfigurer** i brugerfladen |
+| `ev_config.yaml` | Setup / **Configure** in the UI |
 | `input_boolean.ev_*` | `switch.cjp_*` |
 | `input_number.ev_*` | `number.cjp_*` |
 | `input_datetime.ev_workday_*` | `time.cjp_*` |
-| `input_datetime.ev_trip_*`, `_last_full_charge` | `datetime.cjp_*` |
+| `input_datetime.ev_trip_*` | `datetime.cjp_*` |
+| `input_datetime.ev_last_full_charge` | `sensor.cjp_last_full_charge` (set by the integration) |
 | `input_button.ev_*` | `button.cjp_*` |
-| Ladekommandoer (`charge_switch`, `charging_amps`, `wake_up`, dynamiske grænser, …) | [Handlings-entiteter](#sådan-styrer-du-laderen-og-bilen) + automation |
-| Andre biler på laderen | [Fælles el-tilslutning](#flere-biler-lastfordeling) |
+| Charging commands (`charge_switch`, `charging_amps`, `wake_up`, dynamic limits, …) | [Action entities](#how-to-control-the-charger-and-the-car) + automation |
+| Other cars on the charger | [Shared grid connection](#multiple-cars-load-balancing) |
 | `pyscript.ev_manual_add_public_charging_session` | `cable_juice_planner.manual_add_public_charging_session` |
-| Opdateringsscripts og `shell_command` | HACS |
+| Update scripts and `shell_command` | HACS |
 
-### Ændringer i forhold til PyScript-udgaven
+### Changes compared to the PyScript version
 
-- Ingen kommandoer til lader eller bil. Se [handlings-entiteterne](#sådan-styrer-du-laderen-og-bilen).
-- Lastfordeling mellem flere biler med prioritet og hovedsikring.
-- Forbrugshistorik gemmes også uden solceller og Solcast.
-- Offentlige ladninger huskes efter en genstart.
-- Den samme notifikation sendes højst én gang i timen.
-- Historikken læses fra en buffer i hukommelsen i stedet for 70+ recorder-opslag pr. planlægning.
+- No commands to the charger or car. See the [action entities](#how-to-control-the-charger-and-the-car).
+- Load balancing between multiple cars with priority and main fuse.
+- Consumption history is also stored without solar panels and Solcast.
+- Public charging sessions are remembered across restarts.
+- Optimal weekly charging: always enough for the day's driving, the rest only in the week's cheapest hours
+  (instead of splitting the need in 3 parts).
+- The charging loss is measured continuously, and the dashboard has an [analysis](#analysis) of the economy and the driving.
+- The last full charge is a sensor set by the integration (was an `input_datetime`).
+- The same notification is sent at most once per hour.
+- History is read from an in-memory buffer instead of 70+ recorder queries per planning run.
 
 ---
 
-## Fejlfinding
+## Troubleshooting
 
-- Slå **Diagnostisk fil-log** til under **Konfigurer → Avanceret**. Loggen skrives til
-  `cable_juice_planner_<prefix>.log` i konfigurationsmappen.
-- Eller slå debug-log til i `configuration.yaml`:
+- Turn on **Diagnostic file log** under **Configure → Advanced**. The log is written to
+  `cable_juice_planner_<prefix>.log` in the config folder.
+- Or enable debug logging in `configuration.yaml`:
   ```yaml
   logger:
     logs:
       custom_components.cable_juice_planner: debug
   ```
-- Kald `cable_juice_planner.debug_info` under **Udviklerværktøjer → Handlinger**, og vedhæft svaret, når du opretter et issue.
+- Call `cable_juice_planner.debug_info` under **Developer tools → Actions**, and attach the response when you open an issue.
 
 ---
 
-## Licens
+## License
 
-GPL-3.0, se [LICENSE](LICENSE).
+GPL-3.0, see [LICENSE](LICENSE).

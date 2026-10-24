@@ -203,13 +203,15 @@
           "production_entity_id": "Solproduktion",
           "forecast_entity_id": "Solprognose (Solcast)",
           "inverter_discharging_power_limit": "Inverterens maks. effekt",
-          "enable_selling_during_expensive_hours": "Sælg sol i dyre timer"
+          "enable_selling_during_expensive_hours": "Sælg sol i dyre timer",
+          "solar_sell_fixed_price": "Solcelle fast salgspris"
         },
         "data_description": {
           "production_entity_id": "Solproduktion (watt)",
           "forecast_entity_id": "Solprognose (watt) (Understøttet integration: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "Inverterens afladnings-effektgrænse (watt)",
-          "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. number.PREFIX_solar_sell_fixed_price skal være -1,0 for at bruge timesalgspris"
+          "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. “Solcelle fast salgspris” skal være -1,0 for at bruge timesalgspris",
+          "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris"
         }
       },
       "solar_charging": {
@@ -271,7 +273,7 @@
         },
         "data_description": {
           "cron_interval": "Minutter mellem hver kontrol af planen og ladningen.",
-          "dashboard": "Tilføjer et færdigt Cable Juice Planner dashboard til sidepanelet for denne instans. Kræver HACS-kortene mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card og ultra-vehicle-card.",
+          "dashboard": "Tilføjer et færdigt Cable Juice Planner dashboard til sidepanelet for denne instans. Kræver HACS-kortene mushroom, apexcharts-card, config-template-card og card-mod.",
           "enable_diagnostic_file_log": "Skriver en detaljeret log til cable_juice_planner_PREFIX.log i konfigurationsmappen (2 MB pr. fil, 3 rotationer).",
           "testing_mode": "Markerer ladereglen med 🧪, og kontrollen af om bilen lader, forvarmning og andre handlinger springes over."
         }
@@ -357,6 +359,13 @@
         "data": {
           "import_source": "Importer fra"
         }
+      },
+      "restore_backup": {
+        "title": "Gendan fra en backup",
+        "description": "Cable Juice Planner-backups fundet i **cable_juice_planner_backups** (gemt med Eksportér data og når en Cable Juice Planner-enhed slettes).\n\nVælg en for at gendanne den som **{prefix}**: dens konfiguration bruges som standard på de næste sider, og databaserne og indstillingerne gendannes ved første start.",
+        "data": {
+          "backup": "Gendan"
+        }
       }
     },
     "error": {
@@ -385,7 +394,8 @@
           "menu_prices": "Elpriser",
           "menu_solar": "Solceller og vejr",
           "menu_notifications": "Notifikationer",
-          "menu_advanced": "Avanceret og databaser"
+          "menu_advanced": "Avanceret og databaser",
+          "backup": "Backup (eksportér / importér)"
         }
       },
       "general": {
@@ -589,13 +599,15 @@
           "production_entity_id": "Solproduktion",
           "forecast_entity_id": "Solprognose (Solcast)",
           "inverter_discharging_power_limit": "Inverterens maks. effekt",
-          "enable_selling_during_expensive_hours": "Sælg sol i dyre timer"
+          "enable_selling_during_expensive_hours": "Sælg sol i dyre timer",
+          "solar_sell_fixed_price": "Solcelle fast salgspris"
         },
         "data_description": {
           "production_entity_id": "Solproduktion (watt)",
           "forecast_entity_id": "Solprognose (watt) (Understøttet integration: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "Inverterens afladnings-effektgrænse (watt)",
-          "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. number.PREFIX_solar_sell_fixed_price skal være -1,0 for at bruge timesalgspris"
+          "enable_selling_during_expensive_hours": "Aktivér salg i dyre timer; hvis deaktiveret bruges sol til bilopladning. “Solcelle fast salgspris” skal være -1,0 for at bruge timesalgspris",
+          "solar_sell_fixed_price": "Fast salgspris for solceller, bruges til at beregne solcelleoverskud, sæt til -1.0 for at bruge timepris"
         }
       },
       "solar_charging": {
@@ -657,7 +669,7 @@
         },
         "data_description": {
           "cron_interval": "Minutter mellem hver kontrol af planen og ladningen.",
-          "dashboard": "Tilføjer et færdigt Cable Juice Planner dashboard til sidepanelet for denne instans. Kræver HACS-kortene mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card og ultra-vehicle-card.",
+          "dashboard": "Tilføjer et færdigt Cable Juice Planner dashboard til sidepanelet for denne instans. Kræver HACS-kortene mushroom, apexcharts-card, config-template-card og card-mod.",
           "enable_diagnostic_file_log": "Skriver en detaljeret log til cable_juice_planner_PREFIX.log i konfigurationsmappen (2 MB pr. fil, 3 rotationer).",
           "testing_mode": "Markerer ladereglen med 🧪, og kontrollen af om bilen lader, forvarmning og andre handlinger springes over."
         }
@@ -714,6 +726,17 @@
           "phase_l3_entity_id": "Valgfri: målt strøm (A) eller effekt (W) pr. fase for hele huset (f.eks. HAN/P1-måler). Med alle tre trækkes husets forbrug fra, og en overbelastet fase begrænser straks den sidste bil. Uden bruges sikringen som fast budget til bilerne.",
           "urgent_trip_hours": "En planlagt tur inden for så mange timer giver bilen forrang."
         }
+      },
+      "backup": {
+        "title": "Backup",
+        "description": "Eksportér gemmer databaserne, indstillingerne og konfigurationen i en fil i **cable_juice_planner_backups**.\n\nImport af en fil erstatter databaserne og indstillingerne for **{prefix}** med backuppen (de nuværende data eksporteres først som en *_before_import*-fil) og genindlæser integrationen.",
+        "data": {
+          "backup": "Handling",
+          "restore_configuration": "Gendan også konfigurationen"
+        },
+        "data_description": {
+          "restore_configuration": "Brug også backuppens entiteter og indstillinger. Lad den være slået fra, når backuppen kommer fra en anden Home Assistant."
+        }
       }
     },
     "error": {
@@ -724,6 +747,11 @@
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
       "min_above_max": "Minimum må ikke være større end maksimum."
+    },
+    "abort": {
+      "backup_exported": "Backuppen blev gemt som **{file}**.",
+      "backup_imported": "**{file}** blev importeret, og integrationen er genindlæst.",
+      "backup_failed": "Importen mislykkedes: {error}"
     }
   },
   "selector": {
@@ -737,13 +765,20 @@
         "energidataservice": "Energi Data Service",
         "stromligning": "Strømligning"
       }
+    },
+    "restore_backup": {
+      "options": {
+        "none": "Gendan ikke (start forfra)"
+      }
+    },
+    "backup_action": {
+      "options": {
+        "export": "Eksportér nu"
+      }
     }
   },
   "entity": {
     "switch": {
-      "deactivate_script": {
-        "name": "Deaktiver scriptet"
-      },
       "forced_charging_daily_battery_level": {
         "name": "Tvangsladning under daglig batteri niveau"
       },
@@ -812,12 +847,18 @@
       },
       "powerwall_discharge_above_needed": {
         "name": "Husbatteri afladning over behov til elbil"
+      },
+      "cheap_grid_charging": {
+        "name": "Lad ved billig strøm"
+      },
+      "learn_driving_distance": {
+        "name": "Lær kørselsafstand"
+      },
+      "use_measured_charging_loss": {
+        "name": "Brug målt ladetab"
       }
     },
     "number": {
-      "solar_sell_fixed_price": {
-        "name": "Solcelle fast salgspris"
-      },
       "preheat_minutes_before": {
         "name": "Forvarm bilen X min før"
       },
@@ -943,9 +984,6 @@
       },
       "trip_homecoming_date_time": {
         "name": "Elbil Tur hjemkomst"
-      },
-      "last_full_charge": {
-        "name": "Sidste fulde opladning"
       }
     },
     "button": {
@@ -955,8 +993,11 @@
       "trip_reset": {
         "name": "Nulstil tur ladning"
       },
-      "restart_script": {
-        "name": "Genindlæs integrationen"
+      "export_data": {
+        "name": "Eksportér data"
+      },
+      "recalculate_charging_loss": {
+        "name": "Genberegn ladetab"
       }
     },
     "sensor": {
@@ -1047,6 +1088,18 @@
       },
       "site_house_l3": {
         "name": "Husets strøm L3"
+      },
+      "last_full_charge": {
+        "name": "Sidste fulde opladning"
+      },
+      "charging_loss_model": {
+        "name": "Målt ladetab"
+      },
+      "economy": {
+        "name": "Ladeøkonomi"
+      },
+      "analysis": {
+        "name": "Klar til afgang"
       }
     },
     "binary_sensor": {
@@ -1129,6 +1182,34 @@
         "add_to_history": {
           "name": "Tilføj til historik",
           "description": "Fra = returner kun beregningen."
+        }
+      }
+    },
+    "export_data": {
+      "name": "Eksportér data",
+      "description": "Gemmer databaserne, indstillingerne og konfigurationen som en backup-fil i konfigurationsmappen (cable_juice_planner_backups).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instans",
+          "description": "Eksportér kun denne instans (standard: alle)."
+        }
+      }
+    },
+    "import_data": {
+      "name": "Importér data",
+      "description": "Erstatter databaserne og indstillingerne for en instans med en backup-fil fra cable_juice_planner_backups. De nuværende data eksporteres først.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instans",
+          "description": "Instansen der skal gendannes i."
+        },
+        "file": {
+          "name": "Backup-fil",
+          "description": "Filnavn i cable_juice_planner_backups (som returneret af Eksportér data)."
+        },
+        "restore_configuration": {
+          "name": "Gendan konfiguration",
+          "description": "Erstat også konfigurationen (entiteter og indstillinger) med backuppen."
         }
       }
     }

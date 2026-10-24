@@ -1,12 +1,15 @@
 """Cable Juice Planner output sensors (incl. the action sensors for the user's automations)."""
 from __future__ import annotations
 
+import datetime
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import MATCH_ALL, UnitOfElectricCurrent
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import CHARGER_ACTION_STATES, DOMAIN, MANUFACTURER, SENSOR_DEFS, SIGNAL_SITE_UPDATE, SITE_SENSORS, SITE_TITLE
 from .coordinator import CJPCoordinator
@@ -15,7 +18,7 @@ from .site import CJPSite
 
 MAX_STATE_LENGTH = 255
 # markdown / plan attributes are large; keep them out of the recorder database
-UNRECORDED = ("current_charging_rule", "overview", "charging_history", "emoji_description", "drive_efficiency", "km_per_kwh", "kwh_cost_price")
+UNRECORDED = ("analysis", "charging_loss_model", "economy", "current_charging_rule", "overview", "charging_history", "emoji_description", "drive_efficiency", "km_per_kwh", "kwh_cost_price")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
@@ -51,6 +54,11 @@ class CJPSensor(CJPUpdatingEntity, SensorEntity):
         value = self.coordinator.data.get(self._key)
         if self._key == "charger_action" and value not in CHARGER_ACTION_STATES:
             return None
+        if self.device_class == SensorDeviceClass.TIMESTAMP:
+            # the engine works in naive local time
+            if not isinstance(value, datetime.datetime):
+                return None
+            return value if value.tzinfo else value.replace(tzinfo=dt_util.get_default_time_zone())
         if isinstance(value, str) and len(value) > MAX_STATE_LENGTH:
             return value[: MAX_STATE_LENGTH - 1] + "…"
         if self.state_class and isinstance(value, str):

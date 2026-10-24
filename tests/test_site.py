@@ -1,6 +1,7 @@
 """Load balancing: several cars behind one main fuse (site config entry)."""
 from __future__ import annotations
 
+import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -182,3 +183,31 @@ async def test_unchanged_result_recalculates_nobody(fake_site) -> None:
     site._pending.clear()
     site.update_from_result(cars["a"], dict(result))
     assert site._pending == {}
+
+
+@pytest.mark.parametrize(("meta_unit", "expected"), [("W", 1150 / 230), ("kW", 1150 * 1000 / 230), ("A", 1150), (None, None)])
+async def test_house_forecast_uses_the_recorded_unit(hass: HomeAssistant, meta_unit, expected) -> None:
+    """Right after a restart the phase sensors have no state yet: the unit comes from the statistics.
+    Watts read as amps (the bug) left no current for the cars."""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    phases = {f"phase_l{i}_entity_id": f"sensor.grid_l{i}" for i in (1, 2, 3)}
+    site = CJPSite(hass, make_site_entry(fuse_l1=25, fuse_l2=25, fuse_l3=25, margin=1, **phases))
+    site.house_forecast = {3: [1.0, 1.0, 1.0]}
+    hass.config.components.add("recorder")
+    start = dt_util.utcnow().replace(hour=3, minute=0, second=0, microsecond=0) - datetime.timedelta(days=1)
+    stats = {entity_id: [{"start": start, "mean": 1150.0}] for entity_id in phases.values()}
+    metadata = {entity_id: (1, {"unit_of_measurement": meta_unit}) for entity_id in phases.values()} if meta_unit else {}
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", return_value=stats),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value=metadata),
+    ):
+        await site._async_refresh_forecast()
+    hour = dt_util.as_local(start).hour
+    if expected is None:
+        # unknown unit: the previous forecast is kept
+        assert site.house_forecast == {3: [1.0, 1.0, 1.0]}
+    else:
+        assert site.house_forecast[hour] == [round(expected, 2)] * 3

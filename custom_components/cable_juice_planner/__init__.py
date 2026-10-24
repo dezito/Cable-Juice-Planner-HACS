@@ -6,16 +6,30 @@ import logging
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.restore_state import async_get as async_get_restore_data
 from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, PLATFORMS, SERVICE_ADD_PUBLIC_CHARGING, SERVICE_DEBUG_INFO, SERVICE_ENFORCE_PLANNING
+from .backup import BACKUP_DIR, async_export, async_import
+from .const import (
+    CONF_ENTITY_PREFIX,
+    CONF_SITE,
+    DOMAIN,
+    PLATFORMS,
+    SERVICE_ADD_PUBLIC_CHARGING,
+    SERVICE_DEBUG_INFO,
+    SERVICE_ENFORCE_PLANNING,
+    SERVICE_EXPORT_DATA,
+    SERVICE_IMPORT_DATA,
+)
 from .coordinator import CJPCoordinator
-from .const import normalize_prefix
+from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix
 from .blueprint_install import async_install_blueprints
 from .dashboard import async_remove_dashboard_file, async_setup_dashboard
+from .helpers import float_or_none
 from .site import CJPSite
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,8 +38,16 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 CJPConfigEntry = ConfigEntry[CJPCoordinator]
 SITE_PLATFORMS = ["sensor"]
+REMOVED_ENTITIES = (("number", "solar_sell_fixed_price"), ("switch", "deactivate_script"), ("button", "restart_script"))
 
 SERVICE_SCHEMA = vol.Schema({vol.Optional("config_entry_id"): cv.string})
+IMPORT_SCHEMA = vol.Schema(
+    {
+        vol.Required("config_entry_id"): cv.string,
+        vol.Required("file"): cv.string,
+        vol.Optional("restore_configuration", default=False): cv.boolean,
+    }
+)
 PUBLIC_CHARGING_SCHEMA = vol.Schema(
     {
         vol.Optional("config_entry_id"): cv.string,
@@ -71,6 +93,23 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         data = {key: value for key, value in call.data.items() if key != "config_entry_id"}
         return await coordinators[0].async_add_public_charging_session(**data)
 
+    async def _export_data(call: ServiceCall) -> ServiceResponse:
+        files = {}
+        for coordinator in _coordinators(hass, call):
+            files[coordinator.object_prefix] = f"{BACKUP_DIR}/{await async_export(hass, coordinator.entry)}"
+        return {"files": files} if call.return_response else None
+
+    async def _import_data(call: ServiceCall) -> None:
+        entry = hass.config_entries.async_get_entry(call.data["config_entry_id"])
+        if entry is None or entry.domain != DOMAIN or entry.data.get(CONF_SITE):
+            raise ServiceValidationError(f"{call.data['config_entry_id']} is not a Cable Juice Planner instance")
+        try:
+            await async_import(hass, entry, call.data["file"].split("/")[-1], call.data["restore_configuration"])
+        except HomeAssistantError as err:
+            raise ServiceValidationError(str(err)) from err
+
+    hass.services.async_register(DOMAIN, SERVICE_EXPORT_DATA, _export_data, schema=SERVICE_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_IMPORT_DATA, _import_data, schema=IMPORT_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_DEBUG_INFO, _debug_info, schema=SERVICE_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_ENFORCE_PLANNING, _enforce_planning, schema=SERVICE_SCHEMA)
     hass.services.async_register(
@@ -102,7 +141,43 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             data[CONF_ENTITY_PREFIX] = normalize_prefix(data[CONF_ENTITY_PREFIX])
         hass.config_entries.async_update_entry(entry, data=data, version=2)
         _LOGGER.info("Migrated Cable Juice Planner entry %s to version 2 (prefix %r)", entry.title, data.get(CONF_ENTITY_PREFIX))
+    if entry.version == 2 and entry.minor_version < 2:
+        _async_migrate_removed_entities(hass, entry)
+    if entry.version == 2 and entry.minor_version < 3:
+        _async_migrate_last_full_charge(hass, entry)
     return True
+
+
+@callback
+def _async_migrate_last_full_charge(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Version 2.3: last_full_charge is a sensor set by the integration, no longer a datetime entity."""
+    data = dict(entry.data)
+    ent_reg = er.async_get(hass)
+    if entity_id := ent_reg.async_get_entity_id("datetime", DOMAIN, f"{entry.entry_id}_last_full_charge"):
+        stored = async_get_restore_data(hass).last_states.get(entity_id)
+        if stored and stored.state.state not in ("unknown", "unavailable"):
+            data[MIGRATED_LAST_FULL_CHARGE] = stored.state.state
+        ent_reg.async_remove(entity_id)
+    hass.config_entries.async_update_entry(entry, data=data, minor_version=3)
+    _LOGGER.info("Migrated Cable Juice Planner entry %s to version 2.3 (last full charge %s)", entry.title, data.get(MIGRATED_LAST_FULL_CHARGE))
+
+
+@callback
+def _async_migrate_removed_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Version 2.2: solar_sell_fixed_price moved from a number entity into the options,
+    deactivate_script and restart_script are gone."""
+    options = dict(entry.options)
+    ent_reg = er.async_get(hass)
+    for platform, key in REMOVED_ENTITIES:
+        entity_id = ent_reg.async_get_entity_id(platform, DOMAIN, f"{entry.entry_id}_{key}")
+        if entity_id is None:
+            continue
+        if key == "solar_sell_fixed_price" and (stored := async_get_restore_data(hass).last_states.get(entity_id)):
+            if (value := float_or_none(stored.state.state)) is not None:
+                options[key] = value
+        ent_reg.async_remove(entity_id)
+    hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
+    _LOGGER.info("Migrated Cable Juice Planner entry %s to version 2.2 (solar sell price %s)", entry.title, options.get("solar_sell_fixed_price"))
 
 
 async def _async_setup_site(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -141,6 +216,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> None
         return
     from .storage import CJPStorage  # noqa: PLC0415
 
+    # the data can be imported again (config flow of a new instance, or import_data)
+    try:
+        await async_export(hass, entry, "deleted")
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Could not back up %s, its databases are kept in .storage", entry.title)
+        return
     await CJPStorage(hass, entry.entry_id).async_remove()
     await async_remove_dashboard_file(hass, entry.entry_id)
 

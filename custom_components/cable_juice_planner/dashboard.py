@@ -1,15 +1,16 @@
 """Generated sidebar dashboard: the bundled template mapped onto one instance.
 
-The templates (dashboard/cable_juice_planner_ev.yaml with a car integration and
-cable_juice_planner_without_ev.yaml without) are the author's dashboards converted to
-the entities of the integration with the prefix ``cjp``. At setup the template is
-rewritten for this config entry:
+The template (dashboard/cable_juice_planner.yaml) is written for the entities of the
+integration with the prefix ``cjp`` and the author's car, charger, price and solar
+entities. At setup it is rewritten for this config entry:
 
 * own entities ``<platform>.cjp_*`` -> ``<platform>.cjp_<prefix>_*``
 * external entities (charger, car, Energi Data Service, Strømligning, Solcast) -> the
   configured ones; extra car entities (frunk, sentry mode, ...) are derived from the
   name of the car's battery level entity
-* cards bound to an entity that does not exist are removed
+* cards bound to an entity that does not exist are removed, and a heading left
+  without settings below it
+* ``@@key@@`` placeholders -> ``dashboard.key`` of texts/<language>.json
 
 The result is written to .storage and served as a YAML mode Lovelace dashboard.
 """
@@ -29,7 +30,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
-from .const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, instance_title, is_ev_configured, normalize_prefix, object_prefix
+from .const import CONF_CAR_NAME, DOMAIN, ENTITY_ID_PREFIX, WEEKDAYS, is_ev_configured, normalize_language, normalize_prefix, object_prefix, sidebar_title
+from .formatting import load_texts
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ ICON = "mdi:ev-station"
 
 _OWN_ENTITY = re.compile(r"\b(sensor|binary_sensor|switch|number|select|text|button|time|datetime|event)\.cjp_")
 _ENTITY_ID = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
+_PLACEHOLDER = re.compile(r"@@(\w+)@@")
 _SOLCAST_DAYS = ("tomorrow", "day_3", "day_4", "day_5", "day_6", "day_7")
 _CAR = "mcqueen"
 _CAR_EXTRAS = (
@@ -50,6 +53,7 @@ _CAR_EXTRAS = (
     "switch.mcqueen_sentry_mode",
 )
 _DROP = object()
+PREHEAT_ENTITIES = (("switch", "trip_preheat"), ("number", "preheat_minutes_before"), *(("switch", f"preheat_{day}") for day in WEEKDAYS))
 
 
 def dashboard_url(prefix: str) -> str:
@@ -63,8 +67,8 @@ def dashboard_file(hass: HomeAssistant, entry_id: str) -> Path:
 
 
 def template_file(config: dict[str, Any]) -> Path:
-    name = "cable_juice_planner_ev.yaml" if is_ev_configured(config) else "cable_juice_planner_without_ev.yaml"
-    return TEMPLATE_DIR / name
+    """One template for every configuration: the cards of a missing car/solar/... are removed."""
+    return TEMPLATE_DIR / "cable_juice_planner.yaml"
 
 
 def _derive(entity_id: str, old: str, new: str) -> str:
@@ -111,6 +115,10 @@ def external_entities(config: dict[str, Any]) -> dict[str, str]:
         "sensor.stromligning_15min_forecasts_ex_vat": prices["stromligning_sell_forecasts"],
         "binary_sensor.stromligning_15min_tomorrow_available_ex_vat": prices["stromligning_sell_tomorrow_available"],
     }
+    if sl_buy:
+        # one price chart: Strømligning is preferred, the Energi Data Service chart is removed
+        mapping["sensor.energi_data_service"] = ""
+        mapping["sensor.energi_data_service_salg"] = ""
     base = _car_base(config)
     for entity_id in _CAR_EXTRAS:
         mapping[entity_id] = entity_id.replace(_CAR, base, 1) if base else ""
@@ -121,6 +129,11 @@ def external_entities(config: dict[str, Any]) -> dict[str, str]:
     for day in _SOLCAST_DAYS:
         mapping[f"sensor.solcast_pv_forecast_forecast_{day}"] = f"{solcast_base}{day}" if solcast_base else ""
     return mapping
+
+
+def _own_missing(missing: set[str]) -> set[str]:
+    """The missing entities of the integration (markdown texts are checked for these)."""
+    return {entity_id for entity_id in missing if ".cjp_" in entity_id}
 
 
 def _prune(node: Any, missing: set[str]) -> Any:
@@ -137,17 +150,62 @@ def _prune(node: Any, missing: set[str]) -> Any:
     if isinstance(node, dict):
         if node.get("entity") in missing:
             return _DROP
-        if any(isinstance(cond, dict) and cond.get("entity") in missing for cond in node.get("conditions") or ()):
+        # a text that shows an entity that does not exist (e.g. the car's analysis without a car)
+        # (read more texts look for the help of several entities and show nothing when they are missing)
+        content = str(node.get("content", ""))
+        if node.get("type") == "markdown" and "@@read_more@@" not in content and any(entity_id in content for entity_id in _own_missing(missing)):
+            return _DROP
+        # (also visibility: without its entity the card must not end up always visible)
+        if any(isinstance(cond, dict) and cond.get("entity") in missing for key in ("conditions", "visibility") for cond in node.get(key) or ()):
             return _DROP
         result = {}
         for key, value in node.items():
             pruned = _prune(value, missing)
             if pruned is _DROP:  # e.g. the single `card:` of a conditional
                 return _DROP
-            if isinstance(value, list) and value and not pruned and key in ("cards", "series", "entities", "sections", "badges", "chips"):
+            # "conditions": an and/or left without conditions would always be true
+            if isinstance(value, list) and value and not pruned and key in ("cards", "series", "entities", "sections", "badges", "chips", "conditions"):
                 return _DROP
             result[key] = pruned
         return result
+    return node
+
+
+def _drop_empty_headings(node: Any) -> Any:
+    """In a section: a heading with nothing but read more texts or fixed explanations left below it is removed with them."""
+    if isinstance(node, list):
+        return [_drop_empty_headings(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    node = {key: _drop_empty_headings(value) for key, value in node.items()}
+    cards = node.get("cards")
+    if node.get("type") == "grid" and isinstance(cards, list) and any(card.get("type") == "heading" for card in cards):
+        kept: list = []
+        block: list = []
+        for card in [*cards, {"type": "heading"}]:
+            if card.get("type") == "heading":
+                # only read more or fixed explanations left: nothing to show under the heading
+                read_more_only = all(
+                    c.get("type") == "markdown" and ("@@read_more@@" in str(c.get("content", "")) or "{" not in str(c.get("content", "")))
+                    for c in block[1:]
+                )
+                if not block or block[0].get("type") != "heading" or not read_more_only:
+                    kept.extend(block)
+                block = [card]
+            else:
+                block.append(card)
+        node["cards"] = kept
+    return node
+
+
+def _translate(node: Any, texts: dict[str, str]) -> Any:
+    """Replace @@key@@ in every string with the dashboard text of the language (the key if missing)."""
+    if isinstance(node, list):
+        return [_translate(item, texts) for item in node]
+    if isinstance(node, dict):
+        return {key: _translate(value, texts) for key, value in node.items()}
+    if isinstance(node, str) and "@@" in node:
+        return _PLACEHOLDER.sub(lambda match: texts.get(f"dashboard.{match.group(1)}", match.group(1)), node)
     return node
 
 
@@ -203,7 +261,12 @@ def render_dashboard(config: dict[str, Any], prefix: str, entry_id: str, existin
     template = yaml.safe_load(text)
     unconfigured = {source for source, target in mapping.items() if not target}
     missing = {entity_id for entity_id in _referenced_entities(template, set()) if entity_id not in existing} | unconfigured
-    return yaml.dump(_prune(template, missing), Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
+    if not (is_ev_configured(config) and config["ev_car"]["entity_ids"]["climate_entity_id"]):
+        # preheating needs the car integration and its climate entity
+        missing |= {f"{platform}.{own}_{key}" for platform, key in PREHEAT_ENTITIES}
+    texts = load_texts(normalize_language(config.get("language")))
+    template = _translate(_drop_empty_headings(_prune(template, missing)), texts)
+    return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 
 
 def _write_if_changed(path: Path, content: str) -> bool:
@@ -238,7 +301,7 @@ async def async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry, config:
         _LOGGER.error("Could not create the Cable Juice Planner dashboard: %s", err)
         return
 
-    title = instance_title(prefix, entry.data.get(CONF_CAR_NAME))
+    title = sidebar_title(prefix, entry.data.get(CONF_CAR_NAME))
     yaml_dashboard = lovelace_dashboard.LovelaceYAML(
         hass,
         url_path,

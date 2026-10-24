@@ -40,6 +40,11 @@ def instance_title(prefix: str | None, name: str | None = None) -> str:
     return f"Cable Juice Planner ({label})" if label else "Cable Juice Planner"
 
 
+def sidebar_title(prefix: str | None, name: str | None = None) -> str:
+    """Dashboard sidebar title: just the car name, else the prefix."""
+    return (name or "").strip() or normalize_prefix(prefix) or "Cable Juice Planner"
+
+
 def device_name(prefix: str | None, name: str | None = None) -> str:
     """Device of an instance: the car name (entities show as '<name> Overview')."""
     return (name or "").strip() or instance_title(prefix)
@@ -55,7 +60,10 @@ LEGACY_DB_FILES = {
     "km_kwh_efficiency": "{prefix}_km_kwh_efficiency_db.yaml",
 }
 # "runtime" holds state the PyScript version kept in sensor attributes (last odometer, ...)
-DB_NAMES = (*LEGACY_DB_FILES, "runtime")
+# "charging_loss": the measured charging loss per power (engine_loss.py)
+# "economy": the connection windows and their prices compared (engine_economy.py)
+# "analysis": drives, departures and planned days (engine_analysis.py)
+DB_NAMES = (*LEGACY_DB_FILES, "runtime", "charging_loss", "economy", "analysis")
 
 STORAGE_VERSION = 1
 
@@ -69,6 +77,12 @@ CHARGING_ALLOWED_AFTER_GOTO_TIME = -120  # minutes
 SOLAR_PRODUCTION_TRIGGER = 500.0
 POWERWALL_CHARGING_TRIGGER = 500.0
 POWERWALL_DISCHARGING_TRIGGER = 500.0
+
+# Charging loss measurement: battery level that must be charged for a precise result
+# (1% is ~0.75 kWh), the largest loss accepted, and how long to wait for a slow kWh meter
+CHARGING_LOSS_MIN_BATTERY_LEVEL = 30.0
+CHARGING_LOSS_MAX = -0.30
+CHARGING_LOSS_METER_TIMEOUT = 30 * 60  # seconds
 
 # Rolling history buffers (hours). Charger status and battery level are needed for 7
 # days (peak battery level after the last plug in), power values for the 50 hour
@@ -161,6 +175,7 @@ CHARGING_TYPES = {
     "goto": {"priority": 98, "emoji": "🚗"},
     "homecoming": {"priority": 99, "emoji": "🏠"},
     "battery_usage": {"priority": 100, "emoji": "📉"},
+    "distance": {"priority": 100.1, "emoji": "🛣️"},
     "charging_problem": {"priority": 999, "emoji": "❗"},
     "charging_error": {"priority": 1000, "emoji": "❌"},
 }
@@ -363,6 +378,7 @@ OPTION_PATHS: dict[str, str] = {
     "forecast_entity_id": "solar.entity_ids.forecast_entity_id",
     "inverter_discharging_power_limit": "solar.inverter_discharging_power_limit",
     "enable_selling_during_expensive_hours": "solar.enable_selling_during_expensive_hours",
+    "solar_sell_fixed_price": "solar.production_price",
     "solarpower_use_before_minutes": "solar.solarpower_use_before_minutes",
     "max_to_current_hour": "solar.max_to_current_hour",
     "allow_grid_charging_above_solar_available": "solar.allow_grid_charging_above_solar_available",
@@ -449,7 +465,7 @@ FLOW_STEPS: dict[str, list[str]] = {
         "stromligning_sell_surcharge",
     ],
     "price_fees": ["refund", "sell_fee"],
-    "solar": ["production_entity_id", "forecast_entity_id", "inverter_discharging_power_limit", "enable_selling_during_expensive_hours"],
+    "solar": ["production_entity_id", "forecast_entity_id", "inverter_discharging_power_limit", "enable_selling_during_expensive_hours", "solar_sell_fixed_price"],
     "solar_charging": [
         "solarpower_use_before_minutes",
         "max_to_current_hour",
@@ -538,17 +554,20 @@ def is_ev_configured(config: dict) -> bool:
 # Values are restored on restart and migrated once from input_*.<legacy prefix>_<key>.
 
 SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
-    "deactivate_script": {"default": False},
     "forced_charging_daily_battery_level": {"default": False},
     "allow_manual_charging_now": {"default": False},
     "allow_manual_charging_solar": {"default": False},
     "solar_charging": {"default": False, "requires": "solar"},
     "fill_up": {"default": False},
+    "cheap_grid_charging": {"default": False},
+    "learn_driving_distance": {"default": False, "requires": "ev"},
     "workplan_charging": {"default": False},
     "trip_preheat": {"default": False},
     **{f"workday_{day}": {"default": False} for day in WEEKDAYS},
     **{f"preheat_{day}": {"default": False} for day in WEEKDAYS},
     "calculate_charging_loss": {"default": False},
+    # the plan uses the continuously measured charging loss instead of the configured one
+    "use_measured_charging_loss": {"default": False, "requires": "ev"},
     "powerwall_discharge_above_needed": {"default": False, "requires": "powerwall_level"},
 }
 
@@ -562,7 +581,6 @@ def _distance(config: str) -> dict[str, Any]:
 
 
 NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
-    "solar_sell_fixed_price": {"min": -1, "max": 2, "step": 0.01, "mode": "slider", "unit": "kr/kWh", "default": -1.0, "config": "solar.production_price", "requires": "solar"},
     "preheat_minutes_before": {"min": 0, "max": 60, "step": 5, "mode": "slider", "unit": "min", "default": 0.0},
     "typical_daily_distance": _distance("ev_car.typical_daily_distance_non_working_day"),
     **{f"workday_distance_needed_{day}": _distance(f"ev_car.workday_distance_needed_{day}") for day in WEEKDAYS},
@@ -596,10 +614,11 @@ TIME_SETTINGS: dict[str, dict[str, Any]] = {
 DATETIME_SETTINGS: dict[str, dict[str, Any]] = {
     "trip_date_time": {},
     "trip_homecoming_date_time": {},
-    "last_full_charge": {},
 }
 
-BUTTON_KEYS = ("enforce_planning", "trip_reset", "restart_script")
+BUTTON_KEYS = ("enforce_planning", "trip_reset")
+# only with a car integration (the charging loss is measured with its battery level)
+EV_BUTTON_KEYS = ("recalculate_charging_loss",)
 
 # Output sensors: key -> (unit, device_class, state_class, requires)
 SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = {
@@ -625,14 +644,26 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "drive_efficiency_last_odometer": ("km", "distance", None, "ev"),
     "co2_emitted": ("kg", "weight", "total_increasing", None),
     "kwh_charged_by_solar": ("kWh", "energy", "total_increasing", "solar"),
+    # set by the integration when the battery was full (was a settable datetime / input_datetime)
+    "last_full_charge": (None, "timestamp", None, None),
+    # the measured charging loss at the max charging power, the model in the attributes
+    "charging_loss_model": ("%", None, None, "ev"),
+    # this month's saving compared with daily charging, the months in the attributes
+    "economy": ("kr", None, None, None),
+    # the share of the last 30 departures with the required battery level, the analysis in the attributes
+    "analysis": ("%", None, None, "ev"),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
 # template sensors that kept their state while PyScript reloaded)
+# entry.data: the last full charge of the removed datetime entity, read once at startup
+MIGRATED_LAST_FULL_CHARGE = "migrated_last_full_charge"
+
 PERSISTENT_SENSOR_KEYS = (
     "co2_emitted",
     "kwh_charged_by_solar",
     "drive_efficiency_last_battery_level",
     "drive_efficiency_last_odometer",
+    "last_full_charge",
 )
 
 SIGNAL_UPDATE = "cable_juice_planner_update_{entry_id}"
@@ -640,6 +671,8 @@ SIGNAL_UPDATE = "cable_juice_planner_update_{entry_id}"
 SERVICE_DEBUG_INFO = "debug_info"
 SERVICE_ENFORCE_PLANNING = "enforce_planning"
 SERVICE_ADD_PUBLIC_CHARGING = "manual_add_public_charging_session"
+SERVICE_EXPORT_DATA = "export_data"
+SERVICE_IMPORT_DATA = "import_data"
 
 
 # --------------------------------------------------------------------------- #
@@ -688,7 +721,7 @@ ENTITY_HELP_GROUPS: dict[str, str] = {
     "solar_charging": "solar_charging",
     "fill_up": "fill_up",
     "typical_daily_distance": "fill_up",
-    "deactivate_script": "deactivate_script",
+    "learn_driving_distance": "workplan",
     "workplan_charging": "workplan",
     "workday_monday": "workplan",
     "workday_tuesday": "workplan",
@@ -721,6 +754,10 @@ ENTITY_HELP_GROUPS: dict[str, str] = {
     "full_charge_recommended": "full_charge",
     "last_full_charge": "full_charge",
     "calculate_charging_loss": "charging_loss",
+    "use_measured_charging_loss": "charging_loss",
+    "charging_loss_model": "charging_loss",
+    "recalculate_charging_loss": "charging_loss",
+    "cheap_grid_charging": "cheap_limits",
     "very_cheap_grid_charging_max_battery_level": "cheap_limits",
     "ultra_cheap_grid_charging_max_battery_level": "cheap_limits",
     "min_daily_battery_level": "battery_preheat",
@@ -735,7 +772,6 @@ ENTITY_HELP_GROUPS: dict[str, str] = {
     "preheat_friday": "battery_preheat",
     "preheat_saturday": "battery_preheat",
     "preheat_sunday": "battery_preheat",
-    "solar_sell_fixed_price": "solar_sell_price",
     "ev_charge_after_powerwall_battery_level": "powerwall",
     "powerwall_discharge_above_needed": "powerwall",
     "battery_level": "virtual_ev",

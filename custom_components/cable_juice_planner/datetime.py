@@ -42,7 +42,7 @@ class CJPDateTime(CJPUpdatingEntity, DateTimeEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         value = None
-        if (last := await self.async_get_last_state()) is not None and last.state not in ("unknown", "unavailable"):
+        if (last := await self.async_get_restored_state()) is not None and last.state not in ("unknown", "unavailable"):
             value = _parse_local(last.state)
         elif (legacy := self.legacy_state()) is not None:
             value = _parse_local(legacy.state)

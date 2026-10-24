@@ -21,6 +21,8 @@ from .const import (
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_ALLOWED_AFTER_GOTO_TIME,
+    CHARGING_LOSS_MAX,
+    CHARGING_LOSS_MIN_BATTERY_LEVEL,
     ENTITY_UNAVAILABLE_STATES,
     EV_PLUGGED_STATES,
     POWERWALL_DISCHARGING_TRIGGER,
@@ -198,17 +200,21 @@ class ControlMixin:
             self.charger_action = "stop"
         self._publish_charger_action()
 
-    def ev_send_command(self, key: str, value) -> None:
-        """Publish a car setting (only charging_limit) when the car can be charged."""
+    def publish_charging_limit(self, value) -> None:
+        """Publish the wanted charging limit of the car when it can be charged.
+
+        Nothing is sent to the car integration: the user's automation (the charger
+        blueprint) sets the limit from sensor.<prefix>_charging_limit.
+        """
         if not self.is_ev_configured():
             return
         if not self.ready_to_charge():
             return
-        if self.sensor_states.get(key) != value:
-            _LOGGER.info("Car %s: %s", key, value)
-        self.set_state(key, value)
+        if self.sensor_states.get("charging_limit") != value:
+            _LOGGER.info("Car charging limit: %s", value)
+        self.set_state("charging_limit", value)
         # also on the action sensor, so the charger automation only needs that entity
-        self.set_attr("charger_action", key, value)
+        self.set_attr("charger_action", "charging_limit", value)
 
     def wake_up_ev(self) -> None:
         if not self.is_ev_configured():
@@ -244,8 +250,6 @@ class ControlMixin:
             return True if self.is_entity_configured(entity_id) and not self.is_entity_available(entity_id) else None
 
         if entity_unavailable(charger["status_entity_id"]) or entity_unavailable(charger["enabled_entity_id"]):
-            return None
-        if self.deactivate_script_enabled():
             return None
 
         charger_status = self.get_state(charger["status_entity_id"], error_state="connected")
@@ -301,8 +305,6 @@ class ControlMixin:
 
         if self.testing:
             _LOGGER.debug("Not checking if is charging TESTMODE")
-            return None
-        if self.deactivate_script_enabled():
             return None
 
         charger_enabled = self.get_state(charger["enabled_entity_id"], error_state="off")
@@ -389,8 +391,6 @@ class ControlMixin:
         return None
 
     def charging_without_rule(self) -> bool | None:
-        if self.deactivate_script_enabled():
-            return None
         minutes = max(5, int(round_up(self.config["cron_interval"] / 2)))
         if self.now().minute < minutes or self.testing:
             return False
@@ -495,7 +495,7 @@ class ControlMixin:
         """Plan and set the action entities, then publish the mode and the heartbeat.
 
         Attributes of sensor.<prefix>_charger_action for the user's automations:
-        mode    normal / deactivated / error (error: charge with max amps, like ev.py)
+        mode    normal / error (error: charge with max amps, like ev.py)
         updated time of the last calculation; an automation can fall back to charging
                 when it gets old (the integration stopped or hangs)
         """
@@ -512,12 +512,6 @@ class ControlMixin:
         config = self.config
         max_amps = self._max_amps
         try:
-            if self.deactivate_script_enabled():
-                _LOGGER.debug("Script deactivated")
-                self.charger_mode = "deactivated"
-                self.set_charging_rule(f"⛔{t('ui.charge_if_needed.script_deactivated')}")
-                return None
-
             charging_rule = None
             trip_date_time = self.get_trip_date_time() if self.get_trip_date_time() != reset_datetime() else reset_datetime()
             if self.is_trip_planned():
@@ -557,7 +551,7 @@ class ControlMixin:
             if sum(inverter_amps) != 0.0:
                 charging_limit = self.get_max_recommended_charge_limit_battery_level()
                 if self.is_solar_configured():
-                    solar_using_grid_price = float(self.number_state("solar_sell_fixed_price", error_state=config["solar"]["production_price"])) == -1.0
+                    solar_using_grid_price = float(config["solar"]["production_price"]) == -1.0
                 if charge_hour:
                     hour_data = self.charge_hours[charge_hour]
                     circuit_amps = max_amps()
@@ -594,7 +588,8 @@ class ControlMixin:
                 _LOGGER.info("Calculating charging loss %s%%", completed_battery_level)
                 if completed_battery_level < self.get_max_recommended_charge_limit_battery_level():
                     completed_battery_level = self.get_max_recommended_charge_limit_battery_level()
-                    charging_limit = self.get_max_recommended_charge_limit_battery_level()
+                # the car must charge to the limit the measurement expects
+                charging_limit = completed_battery_level
                 charging_rule = f"{emoji_parse({'charging_loss': True})}{t('ui.charge_if_needed.charging_loss', percentage=completed_battery_level)}"
                 circuit_amps = max_amps()
                 charger_amps = max_amps()
@@ -687,7 +682,7 @@ class ControlMixin:
                 charging_limit = max(charging_limit, self.get_max_recommended_charge_limit_battery_level())
 
             if sum(charger_amps) > 0.0:
-                self.ev_send_command("charging_limit", self.verify_charge_limit(charging_limit))
+                self.publish_charging_limit(self.verify_charge_limit(charging_limit))
                 self.start_charging()
             else:
                 self.stop_charging()
@@ -709,7 +704,7 @@ class ControlMixin:
                 if self._out is not None:
                     self._out.request_reload = True
             self.error_count += 1
-            self.ev_send_command("charging_limit", self.verify_charge_limit(self.get_max_recommended_charge_limit_battery_level()))
+            self.publish_charging_limit(self.verify_charge_limit(self.get_max_recommended_charge_limit_battery_level()))
             self.start_charging()
             self.charging_history({"Price": 0.0, "Cost": 0.0, "kWh": 0.0, "battery_level": 0.0, "error": True}, "error")
             self.set_charging_rule(f"{emoji_parse({'error': True})}{t('ui.charge_if_needed.error_charging_max')}")
@@ -829,10 +824,25 @@ class ControlMixin:
     # Charging loss
     # ------------------------------------------------------------------ #
 
-    def calculate_charging_loss(self, source: str, value=None, old_value=None) -> None:
-        """source: 'switch' (calculate_charging_loss changed), 'status' or 'kwh_meter'."""
-        if self.deactivate_script_enabled():
-            return
+    def charging_loss_completed_battery_level(self) -> float:
+        """Battery level at the end of the measurement: the car's own level when it has
+        one, else the charging limit (car) or the completed level (no car integration)."""
+        if self.is_ev_configured():
+            battery_level = self.battery_level()
+            if battery_level > 0.0:
+                return battery_level
+            limit_entity = self.config["ev_car"]["entity_ids"]["charging_limit_entity_id"]
+            if self.is_entity_configured(limit_entity):
+                return float(self.get_state(limit_entity, float_type=True, error_state=100.0))
+        return self.get_completed_battery_level()
+
+    def calculate_charging_loss(self, source: str, value=None, old_value=None) -> str | None:
+        """source: 'switch' (calculate_charging_loss changed), 'status', 'kwh_meter' or 'timeout'.
+
+        Returns 'wait_for_meter' when charging has completed: some chargers are slow to
+        update the kWh meter, so the loss is calculated at the next meter update, or by the
+        coordinator's 'timeout' call (CHARGING_LOSS_METER_TIMEOUT) with the value then.
+        """
         charger = self.config["charger"]["entity_ids"]
         t = self.t
         if not self.is_entity_available(charger["kwh_meter_entity_id"]) or not self.is_entity_available(charger["status_entity_id"]):
@@ -846,64 +856,84 @@ class ControlMixin:
                     persistent_notification_id=f"{self.name}_calculate_charging_loss_not_available",
                 )
                 self.set_setting("calculate_charging_loss", False)
-            return
+            return None
 
         def reset():
             self.charging_loss_car_begin_battery_level = 0.0
             self.charging_loss_car_begin_kwh = 0.0
             self.charging_loss_charger_begin_kwh = 0.0
             self.charging_loss_charging_completed = False
+            self.mark_dirty("runtime")
 
         try:
             battery_size = self.config["ev_car"]["battery_size"]
             charger_current_kwh = float(self.get_state(charger["kwh_meter_entity_id"], float_type=True, error_state=None))
-            limit_entity = self.config["ev_car"]["entity_ids"]["charging_limit_entity_id"]
-            if self.is_ev_configured() and limit_entity:
-                completed_battery_level = float(self.get_state(limit_entity, float_type=True, error_state=100.0))
-            else:
-                completed_battery_level = self.get_completed_battery_level()
-            completed_battery_size = battery_size * (completed_battery_level / 100.0)
 
             if source == "switch":
                 if not value:
                     reset()
-                    return
+                    return None
                 if not self.is_ev_configured() and self.battery_level() == 0.0:
                     raise ValueError("Battery level is 0.0, make sure battery level is set or car is connected")
                 self.charging_loss_car_begin_battery_level = self.battery_level()
                 self.charging_loss_car_begin_kwh = battery_size * (self.charging_loss_car_begin_battery_level / 100.0)
                 self.charging_loss_charger_begin_kwh = charger_current_kwh
+                self.charging_loss_charging_completed = False
+                self.mark_dirty("runtime")
+                _LOGGER.debug("Charging loss: begin %s%% (%skWh), charger begin %skWh", self.charging_loss_car_begin_battery_level, self.charging_loss_car_begin_kwh, charger_current_kwh)
+                return None
 
             if not self.is_calculating_charging_loss():
-                return
-            _LOGGER.debug(
-                "Charging loss: completed %s%% (%skWh), begin %s%% (%skWh), charger begin %skWh",
-                completed_battery_level, completed_battery_size, self.charging_loss_car_begin_battery_level, self.charging_loss_car_begin_kwh, self.charging_loss_charger_begin_kwh,
-            )
-            if source == "switch":
-                return
+                return None
             if source == "status":
                 if value in CHARGER_READY_STATUS + CHARGER_COMPLETED_STATUS and old_value in CHARGER_CHARGING_STATUS:
                     self.charging_loss_charging_completed = True
-            elif source == "kwh_meter":
-                if self.charging_loss_charging_completed:
-                    added_kwh = charger_current_kwh - self.charging_loss_charger_begin_kwh
-                    charging_loss = round(((completed_battery_size - self.charging_loss_car_begin_kwh) / added_kwh) - 1, 4)
-                    if charging_loss >= 0.0:
-                        raise ValueError(f"Charging loss was not negative {charging_loss * 100.0}%, set charging limit in car and let charging complete")
-                    self.config["charger"]["charging_loss"] = charging_loss
-                    if self._out is not None:
-                        self._out.config_updates["charging_loss"] = charging_loss
                     self.mark_dirty("runtime")
-                    self.set_setting("calculate_charging_loss", False)
-                    message = t("ui.calculate_charging_loss.calculated", percentage=round(charging_loss * 100))
-                    _LOGGER.info("Charging loss calculated: %s", charging_loss)
-                    self.my_notify(message, title=f"{self.title} {t('ui.calculate_charging_loss.title')}", always=True)
-                    self.persistent_notification(message, title=f"{self.title} {t('ui.calculate_charging_loss.title')}", notification_id=f"{self.name}_calculate_charging_loss_calculated")
-            else:
+                    return "wait_for_meter"
+                if value in CHARGER_CHARGING_STATUS and self.charging_loss_charging_completed:
+                    # the car started again (e.g. topping up a cold battery), keep measuring
+                    self.charging_loss_charging_completed = False
+                    self.mark_dirty("runtime")
+                elif value in CHARGER_NOT_READY_STATUS and not self.charging_loss_charging_completed:
+                    raise ValueError("The charger was disconnected before charging completed")
+                return None
+            if source not in ("kwh_meter", "timeout"):
                 raise ValueError(f"Unknown error: source={source}, value={value}, old_value={old_value}")
+            if not self.charging_loss_charging_completed:
+                return None
+
+            completed_battery_level = self.charging_loss_completed_battery_level()
+            added_battery_level = completed_battery_level - self.charging_loss_car_begin_battery_level
+            _LOGGER.debug(
+                "Charging loss (%s): completed %s%%, begin %s%% (%skWh), charger begin %skWh, now %skWh",
+                source, completed_battery_level, self.charging_loss_car_begin_battery_level, self.charging_loss_car_begin_kwh, self.charging_loss_charger_begin_kwh, charger_current_kwh,
+            )
+            if added_battery_level < CHARGING_LOSS_MIN_BATTERY_LEVEL:
+                raise ValueError(f"Only {round(added_battery_level, 1)}% was charged, at least {CHARGING_LOSS_MIN_BATTERY_LEVEL}% is needed for a precise result")
+            added_kwh = charger_current_kwh - self.charging_loss_charger_begin_kwh
+            car_kwh = battery_size * (completed_battery_level / 100.0) - self.charging_loss_car_begin_kwh
+            if added_kwh <= 0.0:
+                raise ValueError(f"The kWh meter did not count any energy ({round(added_kwh, 2)}kWh)")
+            # stored negative and used as kWh from the charger = kWh in the car * (1 + |loss|)
+            charging_loss = round(1 - (added_kwh / car_kwh), 4)
+            if not CHARGING_LOSS_MAX <= charging_loss < 0.0:
+                raise ValueError(
+                    f"Charging loss {round(charging_loss * 100.0, 1)}% is not between {CHARGING_LOSS_MAX * 100.0:.0f}% and 0% "
+                    f"({round(added_kwh, 2)}kWh from the charger, {round(car_kwh, 2)}kWh in the car), set charging limit in car and let charging complete"
+                )
+            self.config["charger"]["charging_loss"] = charging_loss
+            if self._out is not None:
+                self._out.config_updates["charging_loss"] = charging_loss
+            reset()
+            self.set_setting("calculate_charging_loss", False)
+            message = t("ui.calculate_charging_loss.calculated", percentage=round(charging_loss * 100))
+            _LOGGER.info("Charging loss calculated: %s", charging_loss)
+            self.my_notify(message, title=f"{self.title} {t('ui.calculate_charging_loss.title')}", always=True)
+            self.persistent_notification(message, title=f"{self.title} {t('ui.calculate_charging_loss.title')}", notification_id=f"{self.name}_calculate_charging_loss_calculated")
+            return None
         except Exception as err:  # noqa: BLE001
             reset()
+            self.set_setting("calculate_charging_loss", False)
             _LOGGER.error("Failed to calculate charging loss: %s %s", err, type(err))
             message = f"{t('ui.calculate_charging_loss.failed')}:\n{err} {type(err)}"
             self.my_notify(message, title=f"{self.title} {t('ui.calculate_charging_loss.failed_title')}", always=True, persistent_notification=True)
@@ -945,10 +975,18 @@ class ControlMixin:
             self.sensor_attrs.setdefault("drive_efficiency_last_battery_level", {}).update(runtime["last_battery_level_attributes"])
         if isinstance(runtime.get("charging_loss"), (int, float)):
             self.config["charger"]["charging_loss"] = runtime["charging_loss"]
+        self.daily_odometer = {str(date): float(value) for date, value in (runtime.get("daily_odometer") or {}).items()}
+        if (measurement := runtime.get("charging_loss_measurement")) and self.is_calculating_charging_loss():
+            # a measurement in progress survives a restart or reload
+            self.charging_loss_car_begin_battery_level = measurement.get("car_begin_battery_level", 0.0)
+            self.charging_loss_car_begin_kwh = measurement.get("car_begin_kwh", 0.0)
+            self.charging_loss_charger_begin_kwh = measurement.get("charger_begin_kwh", 0.0)
+            self.charging_loss_charging_completed = bool(measurement.get("charging_completed"))
         for key in ("co2_emitted", "kwh_charged_by_solar"):
             if self.sensor_states.get(key) is None:
                 self.sensor_states[key] = 0.0
             self._changed_sensors.add(key)
+        self._changed_sensors.add("last_full_charge")
         if self.is_ev_configured():
             # startup_public_charging_session_done
             self.sensor_states["public_charging_session_done"] = runtime.get("public_charging_session_done") or "off"
@@ -979,6 +1017,14 @@ class ControlMixin:
 
         self.update_grid_prices()
         self.load_charging_history(databases.get("charging_history"), odometer_history)
+        self.update_learned_distances()
+        self.load_charging_loss_db(databases.get("charging_loss"))
+        self.load_economy_db(databases.get("economy"))
+        self.publish_economy()
+        self.load_analysis_db(databases.get("analysis"))
+        if self.is_ev_configured():
+            self.publish_analysis()
+        self.publish_charging_loss_model()
 
         self.solar_charged_percentage()
         self.is_battery_fully_charged()
@@ -1023,27 +1069,25 @@ class ControlMixin:
 
     def charge_trigger(self, var_name: str | None = None) -> None:
         """triggers_charge_if_needed for the cron and the enforce/manual/charging loss entities."""
-        if self.deactivate_script_enabled():
-            return
         if self.is_charging() and not self.other_ev_connected():
             self.wake_up_ev()
         force = var_name == "enforce_planning"
         self.charge_if_needed(force_recalculate=force)
         self.is_battery_fully_charged()
+        if self.is_ev_configured():
+            self.analysis_check_departure()
         self.set_estimated_range()
         if var_name == "enforce_planning" and self.testing:
             self.debug_info()
 
     def recalculate(self) -> None:
         """A setting changed: recalculate the plan (forced, the plan hash ignores most settings)."""
-        if self.deactivate_script_enabled():
-            return
         self.charge_if_needed(force_recalculate=True)
         self.set_estimated_range()
+        # use_measured_charging_loss may have changed what the plan uses
+        self.publish_charging_loss_model()
 
     def preheat_cron(self) -> None:
-        if self.deactivate_script_enabled():
-            return
         self.preheat_ev()
 
     def hour_end(self) -> None:
@@ -1055,6 +1099,9 @@ class ControlMixin:
         self.stop_current_charging_session()
         self.kwh_charged_by_solar()
         self.solar_charged_percentage()
+        self.record_daily_odometer()
+        self.analysis_record_planned()
+        self.economy_store_prices()
 
     def price_update(self) -> None:
         self.update_grid_prices()
@@ -1063,7 +1110,7 @@ class ControlMixin:
         self.append_kwh_prices()
 
     def charging_rule_changed(self, key: str, value=None) -> None:
-        """fill_up and workplan_charging exclude each other; deactivate_script stops control."""
+        """fill_up and workplan_charging exclude each other."""
         t = self.t
         conflict_title = f"📟{self.title} {t('ui.charging_rule_changed.charging_rule_conflict')}"
         if key == "startup":
@@ -1090,29 +1137,26 @@ class ControlMixin:
                     title=conflict_title,
                     notification_id=f"{self.name}_charging_rule_changed_conflict",
                 )
-        if key == "deactivate_script":
-            if value:
-                _LOGGER.info("Script deactivated, the charger is no longer controlled")
-                self.stop_current_charging_session()
-                self.set_charger_phase_limits(self._max_amps(), self._max_amps())
-                self.start_charging()
-            self.charge_if_needed()
 
     def charger_status_changed(self, value, old_value) -> str | None:
         """state_trigger_charger_port, first part. Returns 'wait' when the coordinator
         should wait for the car (odometer/battery level) and then call charger_connected."""
         if old_value in ENTITY_UNAVAILABLE_STATES or value in ENTITY_UNAVAILABLE_STATES:
             return None
-        if self.deactivate_script_enabled() or self.other_ev_connected():
+        if self.other_ev_connected():
             return None
         _LOGGER.info("Charger port status changed from %s to %s", old_value, value)
         if value in CHARGER_READY_STATUS and old_value in CHARGER_NOT_READY_STATUS:
+            self.economy_plugged_in()
             self.set_setting("allow_manual_charging_now", False)
             self.set_setting("allow_manual_charging_solar", False)
             self.set_setting("forced_charging_daily_battery_level", False)
             self.wake_up_ev()
             self.notify_set_battery_level()
             return "wait"
+        if value in CHARGER_NOT_READY_STATUS:
+            # the charger is at home: the connection window ends wherever the car says it is
+            self.economy_unplugged()
         if not self.is_ev_home():
             return None
         if value in CHARGER_NOT_READY_STATUS:
@@ -1140,7 +1184,7 @@ class ControlMixin:
         """state_trigger_charger_cable_connected (charger without a status entity)."""
         if not self.is_ev_configured() or old_value in ENTITY_UNAVAILABLE_STATES or value in ENTITY_UNAVAILABLE_STATES:
             return
-        if self.deactivate_script_enabled() or self.other_ev_connected():
+        if self.other_ev_connected():
             return
         _LOGGER.info("Charger cable connected changed from %s to %s", old_value, value)
         self.wake_up_ev()
@@ -1152,15 +1196,11 @@ class ControlMixin:
         """state_trigger_ev_charger_port / _cable."""
         if old_value in ENTITY_UNAVAILABLE_STATES or value in ENTITY_UNAVAILABLE_STATES:
             return
-        if self.deactivate_script_enabled():
-            return
         _LOGGER.info("Ev charge port/cable changed from %s to %s", old_value, value)
         self.power_connected_trigger(value)
         self.public_charging_session(value)
 
     def emulated_battery_level_changed(self, value, old_value) -> None:
-        if self.deactivate_script_enabled():
-            return
         try:
             old_value = float(old_value)
             value = float(value)
@@ -1171,7 +1211,7 @@ class ControlMixin:
 
     def public_charging_cost_changed(self, value) -> str | None:
         """state_trigger_public_charging_session_cost. 'add' = wait 60 s and add to history."""
-        if value is None or value == 0.0 or self.deactivate_script_enabled():
+        if value is None or value == 0.0:
             return None
         if not self.get_public_charging_session_done() or not self.public_charging_sessions or value == -2.0:
             self.set_setting("public_charging_session_cost", 0.0)

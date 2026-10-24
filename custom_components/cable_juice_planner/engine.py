@@ -32,13 +32,18 @@ from dataclasses import dataclass, field
 from pprint import pformat
 from typing import Any, Callable
 
+import astral.sun
+
 from .codec import encode
 from .const import (
     CHARGER_CHARGING_STATUS,
+    CHARGER_COMPLETED_STATUS,
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_TYPES,
     ENTITY_UNAVAILABLE_STATES,
+    EV_PLUGGED_STATES,
+    EV_UNPLUGGED_STATES,
     NUMBER_SETTINGS,
     POWERWALL_CHARGING_TRIGGER,
     POWERWALL_DISCHARGING_TRIGGER,
@@ -50,9 +55,13 @@ from .const import (
     is_powerwall_configured,
     is_solar_configured,
 )
+from .engine_analysis import AnalysisMixin
 from .engine_control import ControlMixin
+from .engine_distance import DistanceMixin
+from .engine_economy import EconomyMixin
 from .engine_energy import EnergyMixin
 from .engine_history import HistoryMixin
+from .engine_loss import LossMixin
 from .engine_planner import PlannerMixin
 from .engine_site import SiteMixin
 from .formatting import format_charging_rule, get_list_values, translate
@@ -98,7 +107,7 @@ class Snapshot:
     price_data: dict | None = None
     forecast_dict: dict | None = None
     solcast: dict[str, list] = field(default_factory=dict)
-    astral: tuple | None = None  # (location, elevation, observer or None)
+    astral: Any = None  # astral.Observer
     site: dict | None = None  # load balancing, see engine_site
 
 
@@ -123,7 +132,7 @@ class JobResult:
     duration: float = 0.0
 
 
-class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin):
+class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMixin, EconomyMixin, AnalysisMixin, EnergyMixin, SiteMixin):
     """Holds the Cable Juice Planner state and implements the algorithm."""
 
     def __init__(self, config: dict, prefix: str, texts: dict[str, str], title: str | None = None) -> None:
@@ -186,6 +195,10 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
         self.charging_loss_car_begin_battery_level = 0.0
         self.charging_loss_charger_begin_kwh = 0.0
         self.charging_loss_charging_completed = False
+        self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
+        self.charging_loss_db: dict = {"segments": [], "backfilled": False}
+        self.economy_db: dict = {"windows": []}
+        self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}}
         self.charging_no_rule_count = 0
         self.error_count = 0
         self.forecast_type = "ema"
@@ -260,6 +273,9 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
             "drive_efficiency": self.drive_efficiency_db,
             "km_kwh_efficiency": self.km_kwh_efficiency_db,
             "runtime": self._runtime_state(),
+            "charging_loss": self.charging_loss_db,
+            "economy": self.economy_db,
+            "analysis": self.analysis_db,
         }
 
     def mark_dirty(self, name: str) -> None:
@@ -267,13 +283,20 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
 
     def _runtime_state(self) -> dict:
         """State the PyScript version kept in helpers and sensor attributes."""
-        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "co2_emitted", "kwh_charged_by_solar")
+        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "co2_emitted", "kwh_charged_by_solar", "last_full_charge")
         return {
             "sensors": {key: self.sensor_states.get(key) for key in keep if self.sensor_states.get(key) is not None},
             "last_battery_level_attributes": dict(self.sensor_attrs.get("drive_efficiency_last_battery_level", {})),
             "public_charging_session": self.public_charging_sessions,
             "public_charging_session_done": self.sensor_states.get("public_charging_session_done"),
             "charging_loss": self.config["charger"]["charging_loss"],
+            "daily_odometer": dict(self.daily_odometer),
+            "charging_loss_measurement": {
+                "car_begin_battery_level": self.charging_loss_car_begin_battery_level,
+                "car_begin_kwh": self.charging_loss_car_begin_kwh,
+                "charger_begin_kwh": self.charging_loss_charger_begin_kwh,
+                "charging_completed": self.charging_loss_charging_completed,
+            },
         }
 
     # ------------------------------------------------------------------ #
@@ -448,17 +471,11 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
             return cache[dt.date()]
         output = {"dawn": None, "sunrise": None, "noon": None, "sunset": None, "midnight": None}
         try:
-            location, _elevation, observer = self._snap.astral
             tz = self._snap.tz
-            if observer is not None:
-                import astral.sun  # noqa: PLC0415 - only with the observer API
-
-                output = {
-                    name: getattr(astral.sun, name)(observer, dt).astimezone(tz).replace(tzinfo=None)
-                    for name in output
-                }
-            else:
-                output = {name: getattr(location, name)(dt).replace(tzinfo=None) for name in output}
+            output = {
+                name: getattr(astral.sun, name)(self._snap.astral, dt).astimezone(tz).replace(tzinfo=None)
+                for name in output
+            }
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Can't get sun events: %s", err)
         cache[dt.date()] = output
@@ -475,11 +492,10 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
         cache = self._job_cache.setdefault("utc_sun", {})
         date = timestamp.date()
         if date not in cache:
-            location, elevation, _observer = self._snap.astral
             events = []
             for name in ("sunrise", "sunset"):
                 try:
-                    value = getattr(location, name)(date=date, local=False, observer_elevation=elevation)
+                    value = getattr(astral.sun, name)(self._snap.astral, date)
                 except ValueError:
                     value = None
                 events.append(value.replace(tzinfo=None) if value else None)
@@ -754,6 +770,9 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
     def fill_up_charging_enabled(self):
         return True if self.switch_state("fill_up") == "on" else None
 
+    def cheap_grid_charging_enabled(self):
+        return True if self.switch_state("cheap_grid_charging") == "on" else None
+
     def workplan_charging_enabled(self):
         return True if self.switch_state("workplan_charging") == "on" else None
 
@@ -766,9 +785,6 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
     def manual_charging_solar_enabled(self):
         return True if self.switch_state("allow_manual_charging_solar") == "on" else None
 
-    def deactivate_script_enabled(self):
-        return True if self.switch_state("deactivate_script") == "on" else None
-
     def is_calculating_charging_loss(self) -> bool:
         return self.switch_state("calculate_charging_loss", error_state="off") == "on"
 
@@ -778,6 +794,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
             or self.solar_charging_enabled()
             or self.workplan_charging_enabled()
             or self.fill_up_charging_enabled()
+            or self.cheap_grid_charging_enabled()
             or self.is_calculating_charging_loss()
             or self.manual_charging_enabled()
             or self.manual_charging_solar_enabled()
@@ -787,17 +804,39 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
     # Battery math
     # ------------------------------------------------------------------ #
 
-    def kwh_to_percentage(self, kwh, include_charging_loss=False):
+    def charging_loss_factor(self, kw: float | None = None) -> float:
+        """kWh from the charger = kWh in the car * (1 + this).
+
+        The configured charging loss, or with use_measured_charging_loss the measured one
+        (engine_loss.py) once there are measurements: at kw when given and the model knows
+        more than one power, else at the max charging power. Calculated once per job and kw.
+        """
+        if self._snap is not None and self.switch_state("use_measured_charging_loss", error_state="off") == "on":
+            cache = self._job_cache.setdefault("charging_loss_factor", {})
+            key = None if kw is None else round(kw, 2)
+            if key not in cache:
+                cache[key] = self.measured_charging_loss_factor(kw)
+            if cache[key] is not None:
+                return cache[key]
+        return abs(self.config["charger"]["charging_loss"])
+
+    def kwh_to_percentage(self, kwh, include_charging_loss=False, kw: float | None = None):
         effective_kwh = kwh
         if include_charging_loss:
-            effective_kwh = kwh / (1 + abs(self.config["charger"]["charging_loss"]))
+            effective_kwh = kwh / (1 + self.charging_loss_factor(kw))
         return effective_kwh / self.config["ev_car"]["battery_size"] * 100
 
-    def percentage_to_kwh(self, percentage, include_charging_loss=False):
+    def percentage_to_kwh(self, percentage, include_charging_loss=False, kw: float | None = None):
         kwh = percentage * self.config["ev_car"]["battery_size"] / 100
         if include_charging_loss:
-            kwh = kwh * (1 + abs(self.config["charger"]["charging_loss"]))
+            kwh = kwh * (1 + self.charging_loss_factor(kw))
         return kwh
+
+    def solar_charging_kw(self) -> float:
+        """A typical solar charging power: the middle of the 1 phase solar charging range."""
+        solar = self.config["solar"]
+        amps = (float(solar["charging_single_phase_min_amp"]) + float(solar["charging_single_phase_max_amp"])) / 2
+        return amps * float(self.config["charger"]["power_voltage"]) / 1000
 
     def km_kwh_to_km_percentage(self, kwh):
         return self.percentage_to_kwh(kwh, include_charging_loss=False)
@@ -893,13 +932,31 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, EnergyMixin, SiteMixin
             if self.is_entity_configured(location_entity):
                 current_location = self.get_state(location_entity, error_state="home")
             else:
+                # no location: home while the charger status or the charger cable shows the car connected,
+                # or did so within the last 15 minutes (just unplugged)
                 now = self.now()
-                status_entity = self.config["charger"]["entity_ids"]["status_entity_id"]
-                charger_status = self.get_state(status_entity, error_state="connected")
-                values = self.history.get_values(status_entity, now - datetime.timedelta(minutes=15), now, include_timestamps=False, error_state=["connected"])
-                charger_was_connected = set(CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS) & set(values)
-                if charger_status in ENTITY_UNAVAILABLE_STATES or (charger_status in CHARGER_NOT_READY_STATUS and not charger_was_connected):
-                    current_location = "away"
+                charger = self.config["charger"]["entity_ids"]
+                sources = (
+                    # completed counts too: a car that finished charging hours ago is unplugged from completed
+                    (charger["status_entity_id"], CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS),
+                    (charger["cable_connected_entity_id"], EV_PLUGGED_STATES, EV_UNPLUGGED_STATES),
+                )
+                configured = False
+                for entity_id, connected_states, disconnected_states in sources:
+                    if not self.is_entity_configured(entity_id):
+                        continue
+                    configured = True
+                    state = self.get_state(entity_id, error_state="unknown")
+                    if state in ENTITY_UNAVAILABLE_STATES:
+                        continue
+                    if state not in disconnected_states:
+                        break
+                    values = self.history.get_values(entity_id, now - datetime.timedelta(minutes=15), now, include_timestamps=False, error_state=[connected_states[0]])
+                    if set(connected_states) & set(values):
+                        break
+                else:
+                    if configured:
+                        current_location = "away"
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Error getting current location: %s", err)
             current_location = "home"
