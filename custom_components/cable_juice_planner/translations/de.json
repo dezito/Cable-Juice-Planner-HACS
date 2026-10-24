@@ -203,13 +203,15 @@
           "production_entity_id": "Solarproduktion",
           "forecast_entity_id": "Solarprognose (Solcast)",
           "inverter_discharging_power_limit": "Max. Leistung des Wechselrichters",
-          "enable_selling_during_expensive_hours": "Solar in teuren Stunden verkaufen"
+          "enable_selling_during_expensive_hours": "Solar in teuren Stunden verkaufen",
+          "solar_sell_fixed_price": "Solar-Festverkaufspreis"
         },
         "data_description": {
           "production_entity_id": "Solarproduktion (Watt)",
           "forecast_entity_id": "Solarprognose (Watt) (Unterstützt: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "WR-Entladeleistungsgrenze (Watt)",
-          "enable_selling_during_expensive_hours": "Verkauf in teuren Stunden aktivieren; deaktiviert = Solar für EV. number.PREFIX_solar_sell_fixed_price muss −1,0 sein, um Spotpreis zu nutzen"
+          "enable_selling_during_expensive_hours": "Verkauf in teuren Stunden aktivieren; deaktiviert = Solar für EV. “Solar-Festverkaufspreis” muss −1,0 sein, um Spotpreis zu nutzen",
+          "solar_sell_fixed_price": "Festpreis für Solarverkauf; −1,0 = Spotpreis nutzen"
         }
       },
       "solar_charging": {
@@ -271,7 +273,7 @@
         },
         "data_description": {
           "cron_interval": "Minuten zwischen den Prüfungen des Plans und des Ladens.",
-          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card und ultra-vehicle-card.",
+          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, apexcharts-card, config-template-card und card-mod.",
           "enable_diagnostic_file_log": "Schreibt ein detailliertes Log nach cable_juice_planner_PREFIX.log im Konfigurationsordner (2 MB pro Datei, 3 Rotationen).",
           "testing_mode": "Markiert die Laderegel mit 🧪 und überspringt die Ladekontrolle, das Vorheizen und andere Aktionen."
         }
@@ -357,6 +359,13 @@
         "data": {
           "import_source": "Importieren von"
         }
+      },
+      "restore_backup": {
+        "title": "Aus einem Backup wiederherstellen",
+        "description": "Cable Juice Planner-Backups in **cable_juice_planner_backups** gefunden (geschrieben von Daten exportieren und beim Löschen eines Cable Juice Planner-Geräts).\n\nWähle eines, um es als **{prefix}** wiederherzustellen: seine Konfiguration wird auf den nächsten Seiten als Vorgabe verwendet, und die Datenbanken und Einstellungen werden beim ersten Start wiederhergestellt.",
+        "data": {
+          "backup": "Wiederherstellen"
+        }
       }
     },
     "error": {
@@ -385,7 +394,8 @@
           "menu_prices": "Strompreise",
           "menu_solar": "Solar und Wetter",
           "menu_notifications": "Benachrichtigungen",
-          "menu_advanced": "Erweitert und Datenbanken"
+          "menu_advanced": "Erweitert und Datenbanken",
+          "backup": "Backup (Export / Import)"
         }
       },
       "general": {
@@ -589,13 +599,15 @@
           "production_entity_id": "Solarproduktion",
           "forecast_entity_id": "Solarprognose (Solcast)",
           "inverter_discharging_power_limit": "Max. Leistung des Wechselrichters",
-          "enable_selling_during_expensive_hours": "Solar in teuren Stunden verkaufen"
+          "enable_selling_during_expensive_hours": "Solar in teuren Stunden verkaufen",
+          "solar_sell_fixed_price": "Solar-Festverkaufspreis"
         },
         "data_description": {
           "production_entity_id": "Solarproduktion (Watt)",
           "forecast_entity_id": "Solarprognose (Watt) (Unterstützt: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "WR-Entladeleistungsgrenze (Watt)",
-          "enable_selling_during_expensive_hours": "Verkauf in teuren Stunden aktivieren; deaktiviert = Solar für EV. number.PREFIX_solar_sell_fixed_price muss −1,0 sein, um Spotpreis zu nutzen"
+          "enable_selling_during_expensive_hours": "Verkauf in teuren Stunden aktivieren; deaktiviert = Solar für EV. “Solar-Festverkaufspreis” muss −1,0 sein, um Spotpreis zu nutzen",
+          "solar_sell_fixed_price": "Festpreis für Solarverkauf; −1,0 = Spotpreis nutzen"
         }
       },
       "solar_charging": {
@@ -657,7 +669,7 @@
         },
         "data_description": {
           "cron_interval": "Minuten zwischen den Prüfungen des Plans und des Ladens.",
-          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card und ultra-vehicle-card.",
+          "dashboard": "Fügt der Seitenleiste ein fertiges Cable Juice Planner Dashboard für diese Instanz hinzu. Benötigt die HACS-Karten mushroom, apexcharts-card, config-template-card und card-mod.",
           "enable_diagnostic_file_log": "Schreibt ein detailliertes Log nach cable_juice_planner_PREFIX.log im Konfigurationsordner (2 MB pro Datei, 3 Rotationen).",
           "testing_mode": "Markiert die Laderegel mit 🧪 und überspringt die Ladekontrolle, das Vorheizen und andere Aktionen."
         }
@@ -714,6 +726,17 @@
           "phase_l3_entity_id": "Optional: gemessener Strom (A) oder Leistung (W) pro Phase des Hauses. Mit allen drei wird der Hausverbrauch abgezogen.",
           "urgent_trip_hours": "Eine geplante Fahrt innerhalb dieser Stunden gibt dem Auto Vorrang."
         }
+      },
+      "backup": {
+        "title": "Sicherung",
+        "description": "Export schreibt die Datenbanken, Einstellungen und Konfiguration in eine Datei in **cable_juice_planner_backups**.\n\nDer Import einer Datei ersetzt die Datenbanken und Einstellungen von **{prefix}** durch das Backup (die aktuellen Daten werden zuerst als *_before_import*-Datei exportiert) und lädt die Integration neu.",
+        "data": {
+          "backup": "Aktion",
+          "restore_configuration": "Auch die Konfiguration wiederherstellen"
+        },
+        "data_description": {
+          "restore_configuration": "Auch die Entitäten und Optionen des Backups verwenden. Ausgeschaltet lassen, wenn das Backup von einem anderen Home Assistant stammt."
+        }
       }
     },
     "error": {
@@ -724,6 +747,11 @@
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
       "min_above_max": "Das Minimum darf nicht über dem Maximum liegen."
+    },
+    "abort": {
+      "backup_exported": "Das Backup wurde als **{file}** gespeichert.",
+      "backup_imported": "**{file}** wurde importiert, die Integration wurde neu geladen.",
+      "backup_failed": "Der Import ist fehlgeschlagen: {error}"
     }
   },
   "selector": {
@@ -737,13 +765,20 @@
         "energidataservice": "Energi Data Service",
         "stromligning": "Strømligning"
       }
+    },
+    "restore_backup": {
+      "options": {
+        "none": "Nicht wiederherstellen (leer beginnen)"
+      }
+    },
+    "backup_action": {
+      "options": {
+        "export": "Jetzt exportieren"
+      }
     }
   },
   "entity": {
     "switch": {
-      "deactivate_script": {
-        "name": "Skript deaktivieren"
-      },
       "forced_charging_daily_battery_level": {
         "name": "Erzwungenes Laden unter täglichem Ziel"
       },
@@ -812,12 +847,18 @@
       },
       "powerwall_discharge_above_needed": {
         "name": "Hausbatterie-Überschuss ins EV"
+      },
+      "cheap_grid_charging": {
+        "name": "Bei günstigem Strom laden"
+      },
+      "learn_driving_distance": {
+        "name": "Fahrstrecke lernen"
+      },
+      "use_measured_charging_loss": {
+        "name": "Gemessenen Ladeverlust nutzen"
       }
     },
     "number": {
-      "solar_sell_fixed_price": {
-        "name": "Solar-Festverkaufspreis"
-      },
       "preheat_minutes_before": {
         "name": "Vorheizen X Min vorher"
       },
@@ -943,9 +984,6 @@
       },
       "trip_homecoming_date_time": {
         "name": "EV Reise-Heimkehr"
-      },
-      "last_full_charge": {
-        "name": "Letzte Vollladung"
       }
     },
     "button": {
@@ -955,8 +993,11 @@
       "trip_reset": {
         "name": "Reiseladung zurücksetzen"
       },
-      "restart_script": {
-        "name": "Integration neu laden"
+      "export_data": {
+        "name": "Daten exportieren"
+      },
+      "recalculate_charging_loss": {
+        "name": "Ladeverlust neu berechnen"
       }
     },
     "sensor": {
@@ -1047,6 +1088,18 @@
       },
       "site_house_l3": {
         "name": "Hausstrom L3"
+      },
+      "last_full_charge": {
+        "name": "Letzte Vollladung"
+      },
+      "charging_loss_model": {
+        "name": "Gemessener Ladeverlust"
+      },
+      "economy": {
+        "name": "Ladekosten"
+      },
+      "analysis": {
+        "name": "Bereit bei Abfahrt"
       }
     },
     "binary_sensor": {
@@ -1071,64 +1124,92 @@
   },
   "services": {
     "debug_info": {
-      "name": "Show debug info",
-      "description": "Shows the state of Cable Juice Planner as a notification (also returned as response).",
+      "name": "Debug-Info anzeigen",
+      "description": "Zeigt den Zustand von Cable Juice Planner als Benachrichtigung (wird auch als Antwort zurückgegeben).",
       "fields": {
         "config_entry_id": {
-          "name": "Instance",
-          "description": "The Cable Juice Planner instance (empty = all)."
+          "name": "Instanz",
+          "description": "Die Cable-Juice-Planner-Instanz (leer = alle)."
         }
       }
     },
     "enforce_planning": {
-      "name": "Enforce planning",
-      "description": "Recalculates the charging plan now.",
+      "name": "Planung erzwingen",
+      "description": "Berechnet den Ladeplan jetzt neu.",
       "fields": {
         "config_entry_id": {
-          "name": "Instance",
-          "description": "The Cable Juice Planner instance (empty = all)."
+          "name": "Instanz",
+          "description": "Die Cable-Juice-Planner-Instanz (leer = alle)."
         }
       }
     },
     "manual_add_public_charging_session": {
-      "name": "Add public charging session",
-      "description": "Manually adds a public charging session to the charging history. Cannot be undone. Use at least begin and end battery level, battery level added or kWh added. Try without Add to history first.",
+      "name": "Öffentliche Ladesitzung hinzufügen",
+      "description": "Fügt eine öffentliche Ladesitzung manuell zum Ladeverlauf hinzu. Kann nicht rückgängig gemacht werden. Nutze mindestens Akkustand bei Beginn und Ende, hinzugefügten Akkustand oder hinzugefügte kWh. Probiere es zuerst ohne Zum Verlauf hinzufügen.",
       "fields": {
         "config_entry_id": {
-          "name": "Instance",
-          "description": "The Cable Juice Planner instance (empty = all)."
+          "name": "Instanz",
+          "description": "Die Cable-Juice-Planner-Instanz (leer = alle)."
         },
         "charging_session_start": {
           "name": "Start",
-          "description": "Start time of the charging session."
+          "description": "Startzeit der Ladesitzung."
         },
         "battery_level_begin": {
-          "name": "Battery level begin",
-          "description": "Battery level in percent at the start."
+          "name": "Akkustand Beginn",
+          "description": "Akkustand in Prozent zu Beginn."
         },
         "battery_level_end": {
-          "name": "Battery level end",
-          "description": "Battery level in percent at the end."
+          "name": "Akkustand Ende",
+          "description": "Akkustand in Prozent am Ende."
         },
         "battery_level_added": {
-          "name": "Battery level added",
-          "description": "Energy added in percent."
+          "name": "Hinzugefügter Akkustand",
+          "description": "Hinzugefügte Energie in Prozent."
         },
         "battery_kwh_added": {
-          "name": "kWh added",
-          "description": "Energy added in kWh."
+          "name": "Hinzugefügte kWh",
+          "description": "Hinzugefügte Energie in kWh."
         },
         "total_charging_cost": {
-          "name": "Total cost",
-          "description": "The total cost of the charging session."
+          "name": "Gesamtkosten",
+          "description": "Die Gesamtkosten der Ladesitzung."
         },
         "include_charging_loss": {
-          "name": "Include charging loss",
-          "description": "Adjust the added energy for charging loss."
+          "name": "Ladeverlust einrechnen",
+          "description": "Die hinzugefügte Energie um den Ladeverlust korrigieren."
         },
         "add_to_history": {
-          "name": "Add to history",
-          "description": "Off = only return the calculation."
+          "name": "Zum Verlauf hinzufügen",
+          "description": "Aus = nur die Berechnung zurückgeben."
+        }
+      }
+    },
+    "export_data": {
+      "name": "Daten exportieren",
+      "description": "Speichert die Datenbanken, Einstellungen und Konfiguration als Backup-Datei im Konfigurationsordner (cable_juice_planner_backups).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instanz",
+          "description": "Nur diesen Eintrag exportieren (Standard: alle)."
+        }
+      }
+    },
+    "import_data": {
+      "name": "Daten importieren",
+      "description": "Ersetzt die Datenbanken und Einstellungen eines Eintrags durch eine Backup-Datei aus cable_juice_planner_backups. Die aktuellen Daten werden zuerst exportiert.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instanz",
+          "description": "Der Eintrag, in den wiederhergestellt wird."
+        },
+        "file": {
+          "name": "Backup-Datei",
+          "description": "Dateiname in cable_juice_planner_backups (wie von Daten exportieren zurückgegeben)."
+        },
+        "restore_configuration": {
+          "name": "Konfiguration wiederherstellen",
+          "description": "Auch die Konfiguration (Entitäten und Optionen) durch das Backup ersetzen."
         }
       }
     }

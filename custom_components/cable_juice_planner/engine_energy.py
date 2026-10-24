@@ -585,7 +585,7 @@ class EnergyMixin:
         expected to charge from solar instead.
         """
         config = self.config
-        sell_price = float(self.number_state("solar_sell_fixed_price", error_state=config["solar"]["production_price"])) if self.is_solar_configured() else 0.0
+        sell_price = float(config["solar"]["production_price"]) if self.is_solar_configured() else 0.0
         stop_prediction_before = 3
         days = 7
         today = self.start_of_day()
@@ -614,7 +614,7 @@ class EnergyMixin:
             end_trip = reset_time_to_hour(end_trip)
             trip_last_charging = start_trip - datetime.timedelta(hours=stop_prediction_before)
 
-        using_grid_price = float(self.number_state("solar_sell_fixed_price", error_state=config["solar"]["production_price"])) == -1.0
+        using_grid_price = float(config["solar"]["production_price"]) == -1.0
 
         solar_prediction_timestamps_dict: dict = {}
         powerwall_charging_timestamps_dict: dict = {}
@@ -909,7 +909,7 @@ class EnergyMixin:
         valuta_kwh = self.t("ui.common.valuta_kwh")
         production_price = self.config["solar"]["production_price"]
         try:
-            sell_price = float(self.number_state("solar_sell_fixed_price", error_state=production_price))
+            sell_price = float(production_price)
             entity_price = sell_price
             if get_avg_offline_sell_price:
                 if sell_price != -1.0:
@@ -987,7 +987,7 @@ class EnergyMixin:
             sell_price = None
             using_text = "default"
             try:
-                sell_price = float(self.number_state("solar_sell_fixed_price", error_state=production_price))
+                sell_price = float(production_price)
                 if sell_price == -1.0:
                     sell_price = self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week])
                     using_text = "database forecast"

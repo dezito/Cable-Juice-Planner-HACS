@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime
 import logging
 import time
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -284,7 +285,7 @@ class CJPSite:
         if "recorder" not in self.hass.config.components or not self.has_phase_sensors:
             return
         from homeassistant.components.recorder import get_instance  # noqa: PLC0415
-        from homeassistant.components.recorder.statistics import statistics_during_period  # noqa: PLC0415
+        from homeassistant.components.recorder.statistics import get_metadata, statistics_during_period  # noqa: PLC0415
 
         end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
         start = end - datetime.timedelta(days=FORECAST_DAYS)
@@ -292,10 +293,12 @@ class CJPSite:
         ids = {*self.phase_entities, *(c for c in chargers.values() if c)}
         try:
             stats = await get_instance(self.hass).async_add_executor_job(statistics_during_period, self.hass, start, end, ids, "hour", None, {"mean"})
+            metadata = await get_instance(self.hass).async_add_executor_job(partial(get_metadata, self.hass, statistic_ids=ids))
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Site: could not load statistics: %s", err)
             return
         voltage = float(self.config.get("voltage") or 230.0)
+        units = {statistic_id: meta.get("unit_of_measurement") for statistic_id, (_, meta) in metadata.items()}
 
         def series(entity_id, to_amps):
             result = {}
@@ -307,13 +310,19 @@ class CJPSite:
             return result
 
         def unit_factor(entity_id):
+            # the unit the statistics were recorded in; the state is not there yet right after a restart
+            if unit := units.get(entity_id):
+                return unit
             state = self.hass.states.get(entity_id)
-            unit = state.attributes.get("unit_of_measurement") if state else None
-            return unit
+            return state.attributes.get("unit_of_measurement") if state else None
 
         phases = []
         for entity_id in self.phase_entities:
             unit = unit_factor(entity_id)
+            if unit is None and stats.get(entity_id):
+                # W read as A would leave no current for the cars: keep the previous forecast
+                _LOGGER.debug("Site: unit of %s unknown, house forecast not updated", entity_id)
+                return
             factor = (POWER_UNITS[unit] / voltage) if unit in POWER_UNITS else (0.001 if unit == "mA" else 1.0)
             phases.append(series(entity_id, lambda v, f=factor: abs(v) * f))
         cars = []

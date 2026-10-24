@@ -12,6 +12,30 @@ enforce_planning:
         config_entry:
           integration: cable_juice_planner
 
+export_data:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: cable_juice_planner
+
+import_data:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: cable_juice_planner
+    file:
+      required: true
+      example: cjp_tesla_20261024_120000.json
+      selector:
+        text:
+    restore_configuration:
+      default: false
+      selector:
+        boolean:
+
 manual_add_public_charging_session:
   fields:
     config_entry_id:

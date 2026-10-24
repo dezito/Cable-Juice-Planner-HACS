@@ -15,7 +15,7 @@ from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
 
 # shown with the charging modes on the dashboard, the rest are configuration
-PRIMARY_SWITCHES = ("deactivate_script", "allow_manual_charging_now", "allow_manual_charging_solar", "solar_charging", "fill_up", "workplan_charging")
+PRIMARY_SWITCHES = ("allow_manual_charging_now", "allow_manual_charging_solar", "solar_charging", "fill_up", "workplan_charging", "cheap_grid_charging")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
@@ -37,7 +37,7 @@ class CJPSwitch(CJPUpdatingEntity, SwitchEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         value = self._default
-        if (last := await self.async_get_last_state()) is not None and last.state in ("on", "off"):
+        if (last := await self.async_get_restored_state()) is not None and last.state in ("on", "off"):
             value = last.state == STATE_ON
         elif (legacy := self.legacy_state()) is not None and legacy.state in ("on", "off"):
             value = legacy.state == STATE_ON

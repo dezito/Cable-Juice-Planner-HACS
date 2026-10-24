@@ -14,9 +14,11 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
+from .backup import BACKUP_DIR, async_export, async_import, async_load_backup, backup_dir, list_backups
 from .const import (
     CONF_ENTITY_PREFIX,
     CONF_SITE,
@@ -49,6 +51,7 @@ from .storage import find_legacy_sources, load_legacy_config
 PREFIX_RE = re.compile(r"^(?:[a-z][a-z0-9_]{0,40})?$")  # optional, entity ids are cjp_<prefix>_*
 RESERVED_PREFIXES = {"site"}  # sensor.cjp_site_* belong to the shared grid connection
 IMPORT_NONE = "none"
+BACKUP_EXPORT = "export"
 CRON_INTERVALS = ["1", "2", "3", "4", "5", "6", "10", "12", "15", "20", "30"]
 PRICE_PROVIDERS = ["energidataservice", "stromligning"]
 ENERGIDATASERVICE_URL = "https://github.com/MTrab/energidataservice"  # {eds_url} in the step descriptions
@@ -162,6 +165,8 @@ SELECTORS: dict[str, Any] = {
     "forecast_entity_id": _entity("sensor", integration="solcast_solar"),
     "inverter_discharging_power_limit": _number(100, 100000, 100, "W"),
     "enable_selling_during_expensive_hours": BOOLEAN,
+    # -1 = use the hourly sell price
+    "solar_sell_fixed_price": _number(-1, 10, 0.01, "kr/kWh"),
     "solarpower_use_before_minutes": _number(0, 180, 1, "min"),
     "max_to_current_hour": BOOLEAN,
     "allow_grid_charging_above_solar_available": _number(-10000, 10000, 10, "W"),
@@ -209,6 +214,7 @@ REQUIRED_KEYS = {
     "refund",
     "sell_fee",
     "inverter_discharging_power_limit",
+    "solar_sell_fixed_price",
     "solarpower_use_before_minutes",
     "allow_grid_charging_above_solar_available",
     "charging_single_phase_min_amp",
@@ -485,6 +491,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
     """Handle the Cable Juice Planner config flow."""
 
     VERSION = 2
+    MINOR_VERSION = 3
 
     def __init__(self) -> None:
         self._prefix = DEFAULT_ENTITY_PREFIX
@@ -493,6 +500,8 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
         self._initial_settings: dict[str, Any] = {}
         self._legacy_sources: dict[str, list[str]] = {}
         self._legacy_prefix: str | None = None
+        self._backups: dict[str, str] = {}
+        self._restore_backup: str | None = None
         self._queue: list[str] = []
         self._providers: list[str] = ["energidataservice"]
 
@@ -546,10 +555,10 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
                 self._car_name = (user_input.get(CONF_CAR_NAME) or "").strip()
                 self._options["language"] = user_input.get("language", self._options["language"])
                 self._queue = list(CONFIG_FLOW_STEPS)
-                self._legacy_sources = await self.hass.async_add_executor_job(find_legacy_sources, self.hass.config.config_dir)
-                if self._legacy_sources:
-                    return await self.async_step_import_legacy()
-                return await self._async_next()
+                self._backups = await self.hass.async_add_executor_job(list_backups, backup_dir(self.hass))
+                if self._backups:
+                    return await self.async_step_restore_backup()
+                return await self._async_legacy_or_next()
 
         schema = vol.Schema(
             {
@@ -559,6 +568,42 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="instance", data_schema=schema, errors=errors)
+
+    async def _async_legacy_or_next(self) -> ConfigFlowResult:
+        self._legacy_sources = await self.hass.async_add_executor_job(find_legacy_sources, self.hass.config.config_dir)
+        if self._legacy_sources:
+            return await self.async_step_import_legacy()
+        return await self._async_next()
+
+    async def async_step_restore_backup(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Ask which exported or deleted instance (if any) should be restored."""
+        if user_input is not None:
+            name = user_input.get("backup", IMPORT_NONE)
+            if name not in self._backups:
+                return await self._async_legacy_or_next()
+            backup = await async_load_backup(self.hass, name)
+            self._restore_backup = name
+            self._car_name = self._car_name or (backup.get(CONF_CAR_NAME) or "").strip()
+            language = self._options["language"]
+            self._options = {**default_options(), **(backup.get("options") or {}), "language": language}
+            self._providers = providers_from_options(self._options)
+            return await self._async_next()
+
+        options = [selector.SelectOptionDict(value=name, label=label) for name, label in self._backups.items()]
+        schema = vol.Schema(
+            {
+                vol.Required("backup", default=next(iter(self._backups))): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[*options, selector.SelectOptionDict(value=IMPORT_NONE, label=IMPORT_NONE)],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="restore_backup",
+                    )
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="restore_backup", data_schema=schema, description_placeholders={"prefix": object_prefix(self._prefix), "folder": BACKUP_DIR}
+        )
 
     async def async_step_import_legacy(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Ask which PyScript installation (if any) should be imported."""
@@ -590,7 +635,13 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
         title = instance_title(self._prefix, self._car_name)
         return self.async_create_entry(
             title=title,
-            data={CONF_ENTITY_PREFIX: self._prefix, CONF_CAR_NAME: self._car_name, "legacy_prefix": self._legacy_prefix, "initial_settings": self._initial_settings},
+            data={
+                CONF_ENTITY_PREFIX: self._prefix,
+                CONF_CAR_NAME: self._car_name,
+                "legacy_prefix": self._legacy_prefix,
+                "initial_settings": self._initial_settings,
+                "restore_backup": self._restore_backup,
+            },
             options=self._options,
         )
 
@@ -610,7 +661,37 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
         self._options = {**default_options(), **self.config_entry.options}
         self._options["language"] = normalize_language(self._options.get("language"))
         self._providers = providers_from_options(self._options)
-        return self.async_show_menu(step_id="init", menu_options=[f"menu_{group}" for group in OPTIONS_MENU])
+        return self.async_show_menu(step_id="init", menu_options=[*(f"menu_{group}" for group in OPTIONS_MENU), "backup"])
+
+    async def async_step_backup(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Export the data now, or replace it with a backup (the entry is reloaded)."""
+        if user_input is not None:
+            choice = user_input.get("backup", BACKUP_EXPORT)
+            if choice == BACKUP_EXPORT:
+                name = await async_export(self.hass, self.config_entry)
+                return self.async_abort(reason="backup_exported", description_placeholders={"file": f"{BACKUP_DIR}/{name}"})
+            try:
+                await async_import(self.hass, self.config_entry, choice, bool(user_input.get("restore_configuration")))
+            except HomeAssistantError as err:
+                return self.async_abort(reason="backup_failed", description_placeholders={"error": str(err)})
+            return self.async_abort(reason="backup_imported", description_placeholders={"file": f"{BACKUP_DIR}/{choice}"})
+
+        backups = await self.hass.async_add_executor_job(list_backups, backup_dir(self.hass))
+        options = [selector.SelectOptionDict(value=name, label=label) for name, label in backups.items()]
+        schema = vol.Schema(
+            {
+                vol.Required("backup", default=BACKUP_EXPORT): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[selector.SelectOptionDict(value=BACKUP_EXPORT, label=BACKUP_EXPORT), *options],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="backup_action",
+                    )
+                ),
+                vol.Required("restore_configuration", default=False): selector.BooleanSelector(),
+            }
+        )
+        prefix = object_prefix(self.config_entry.data.get(CONF_ENTITY_PREFIX))
+        return self.async_show_form(step_id="backup", data_schema=schema, description_placeholders={"prefix": prefix, "folder": BACKUP_DIR})
 
     async def _async_menu(self, group: str) -> ConfigFlowResult:
         self._queue = list(OPTIONS_MENU[group])

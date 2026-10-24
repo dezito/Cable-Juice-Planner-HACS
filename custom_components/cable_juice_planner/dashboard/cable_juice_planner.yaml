@@ -1,0 +1,2551 @@
+# The Cable Juice Planner dashboard, written for the prefix cjp and the author's car,
+# charger, price and solar entities; dashboard.py rewrites it per instance and removes
+# the cards of entities that do not exist (no car, no solar, ...).
+# @@key@@ = dashboard.key of texts/<language>.json. Built by a script, edit with care.
+views:
+- type: sections
+  path: overview
+  title: '@@view_overview@@'
+  max_columns: 4
+  dense_section_placement: true
+  badges:
+  - type: custom:mushroom-template-badge
+    content: '@@debug_info@@'
+    icon: mdi:mushroom
+    color: yellow
+    tap_action:
+      action: perform-action
+      perform_action: cable_juice_planner.debug_info
+      data:
+        config_entry_id: __ENTRY_ID__
+    label: ''
+    visibility:
+    - condition: state
+      entity: input_boolean.dezito_show_debug_button
+      state: 'on'
+  - &id002
+    type: entity
+    entity: button.cjp_enforce_planning
+    name: '@@enforce_planning@@'
+    show_name: false
+    show_state: true
+    show_icon: true
+    state_content: name
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.cjp_enforce_planning
+  sections:
+  - type: grid
+    cards:
+    - type: custom:apexcharts-card
+      graph_span: 7d
+      span:
+        start: hour
+        offset: -6h
+      experimental:
+        brush: true
+      brush:
+        selection_span: 7d
+      header:
+        show: true
+        title: '@@battery_chart_title@@'
+        show_states: false
+      now:
+        show: true
+        label: '@@now@@'
+      yaxis:
+      - id: level
+        min: 0
+        max: 100
+        decimals: 0
+      - id: charge
+        min: 0
+        opposite: true
+        decimals: 1
+      - id: distance
+        min: 0
+        opposite: true
+        decimals: 0
+      apex_config:
+        tooltip:
+          shared: true
+          intersect: false
+          fixed:
+            enabled: true
+            position: topLeft
+          x:
+            show: true
+            format: ddd dd/MM HH:mm
+        dataLabels:
+          enabled: false
+      series:
+      - entity: sensor.cjp_current_charging_rule
+        name: '@@distance_per_day@@'
+        yaxis_id: distance
+        type: area
+        unit: km
+        color: '#FF9800'
+        opacity: 0.15
+        stroke_width: 2
+        curve: straight
+        extend_to: false
+        float_precision: 0
+        data_generator: |
+          // a step per day: the planned km from the start to the end of the day
+          const days = entity.attributes.distance_forecast || [];
+          const data = [];
+          days.forEach(d => {
+            const start = new Date(d.time).getTime();
+            const end = new Date(d.end).getTime();
+            const km = Number(d.km);
+            data.push([start, km], [end - 1, km]);
+          });
+          return data;
+        show:
+          in_brush: true
+          legend_value: false
+      - entity: sensor.cjp_current_charging_rule
+        name: '@@battery_forecast@@'
+        yaxis_id: level
+        type: area
+        color: '#4CAF50'
+        opacity: 0.25
+        stroke_width: 2
+        curve: straight
+        data_generator: |
+          const flow = entity.attributes.battery_forecast || [];
+          return flow.map(p => [new Date(p.time).getTime(), Number(p.battery_level)]);
+        show:
+          in_brush: true
+          legend_value: false
+      - entity: sensor.cjp_current_charging_rule
+        yaxis_id: charge
+        type: area
+        name: '@@planned_charging@@'
+        unit: kWh
+        color: '#2196F3'
+        opacity: 0.6
+        stroke_width: 1
+        curve: straight
+        extend_to: false
+        float_precision: 2
+        data_generator: |
+          // a block from start to end of each planned charging, so it fills the charging period
+          const plan = entity.attributes.charge_plan || [];
+          const data = [];
+          plan.forEach(p => {
+            const start = new Date(p.time).getTime();
+            const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+            const kwh = Number(p.kwh);
+            data.push([start, 0], [start, kwh], [end, kwh], [end, 0]);
+          });
+          return data;
+        show:
+          in_brush: true
+          legend_value: false
+      grid_options:
+        columns: full
+        rows: auto
+    - type: vertical-stack
+      cards:
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: sensor.energi_data_service
+          state: unavailable
+        card:
+          type: horizontal-stack
+          cards:
+          - type: markdown
+            content: '# Energi Data Service @@is_down@@ <font color=red>!!!</font>'
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: sensor.energi_data_service
+            tap_action:
+              action: call-service
+              service: homeassistant.reload_config_entry
+              target:
+                entity_id: sensor.energi_data_service
+            hold_action:
+              action: none
+            icon: mdi:reload
+            name: '@@restart@@ Energi Data Service'
+            show_state: true
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: sensor.energi_data_service
+          state_not: unavailable
+        card:
+          type: custom:config-template-card
+          variables:
+            today_prices: |
+              states['sensor.energi_data_service'].attributes.today || []
+            tomorrow_prices: |
+              states['sensor.energi_data_service'].attributes.tomorrow || []
+            forecast_prices: |
+              if (states['sensor.energi_data_service'].attributes.forecast) {
+                states['sensor.energi_data_service'].attributes.forecast.map(item =>
+                item.price)
+              } else { []}
+            total_hours: |
+              const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.length
+            lowest_price: |
+              let min = 999; const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.forEach(price => {
+                if (price < min) min = price;
+              }); min * 1.05
+            highest_price: |
+              let max = -999; const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.forEach(price => {
+                if (price > max) max = price;
+              }); max * 0.95
+            mean_price: |
+              let sum = 0.0; const allPrices = [...vars.today_prices, ...vars.tomorrow_prices, ...vars.forecast_prices]; allPrices.forEach(price => {
+                sum += price;
+              }); const mean = sum / vars.total_hours; mean
+            step_under_mean: |
+              (vars.mean_price - vars.lowest_price) / 5
+            step_over_mean: |
+              (vars.highest_price - vars.mean_price) / 5
+            price1: vars.lowest_price
+            price2: vars.mean_price - vars.step_under_mean * 4
+            price3: vars.mean_price - vars.step_under_mean * 3
+            price4: vars.mean_price - vars.step_under_mean * 2
+            price5: vars.mean_price - vars.step_under_mean * 1
+            price6: vars.mean_price
+            price7: vars.mean_price + vars.step_over_mean * 1
+            price8: vars.mean_price + vars.step_over_mean * 2
+            price9: vars.mean_price + vars.step_over_mean * 3
+            price10: vars.mean_price + vars.step_over_mean * 4
+            price11: vars.highest_price
+            total_span: 24 * 7 - 1
+          entities: []
+          card:
+            type: custom:apexcharts-card
+            apex_config:
+              chart:
+                height: 300px
+              xaxis:
+                tooltip:
+                  enabled: false
+              tooltip:
+                shared: true
+                intersect: false
+                fixed:
+                  enabled: true
+                  position: topLeft
+                x:
+                  show: true
+                enabledOnSeries:
+                - 0
+                - 1
+                - 2
+                - 4
+              stroke:
+                curve: straight
+              markers:
+                size: 0
+            all_series_config:
+              unit: kWh
+              extend_to: false
+              fill_raw: zero
+              show:
+                legend_value: false
+                offset_in_name: false
+            experimental:
+              color_threshold: true
+              brush: true
+            brush:
+              selection_span: ${total_span + "h"}
+            header:
+              title: ${"@@price_chart_title@@ 🔵" + vars.lowest_price.toFixed(2) + " 🟢" + vars.mean_price.toFixed(2) + " 🟣" + vars.highest_price.toFixed(2)}
+              show: true
+              standard_format: false
+              show_states: false
+              colorize_states: true
+            now:
+              show: true
+              label: '@@now@@'
+            graph_span: ${total_span +"h"}
+            span:
+              start: day
+            yaxis:
+            - id: price
+            - id: solar
+              opposite: true
+              decimals: 1
+              max: ~6.0
+              min: 0
+            - id: charge
+              min: 0
+              opposite: true
+              show: false
+            show:
+              loading: true
+              last_updated: true
+            series:
+            - entity: sensor.energi_data_service
+              yaxis_id: price
+              type: column
+              name: '@@incl_taxes@@'
+              unit: kr.
+              color: green
+              data_generator: |
+                var data = []
+                if (entity.attributes.raw_today) {
+                  var raw_today = entity.attributes.raw_today.map((start, index) => {
+                    return [new Date(start["hour"]), entity.attributes.raw_today[index]["price"]];
+                  });
+                  data = data.concat(raw_today);
+                }
+                if (entity.attributes.forecast) {
+                  var forecast = entity.attributes.forecast.map((start, index) => {
+                    return [new Date(start["hour"]), entity.attributes.forecast[index]["price"]];
+                  });
+                  data = data.concat(forecast);
+                }
+                if (entity.attributes.tomorrow_valid) {
+                  var tomorrow = entity.attributes.raw_tomorrow.map((start, index) => {
+                    return [new Date(start["hour"]), entity.attributes.raw_tomorrow[index]["price"]];
+                  });
+                  data = data.concat(tomorrow);
+                }
+                //console.log('energi_data_service ', data);
+                return data;
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              color_threshold:
+              - value: ${vars.price1}
+                color: '#0064FF'
+              - value: ${vars.price2}
+                color: '#0096FF'
+              - value: ${vars.price3}
+                color: '#00B496'
+              - value: ${vars.price4}
+                color: '#00FA50'
+              - value: ${vars.price5}
+                color: '#00FF32'
+              - value: ${vars.price6}
+                color: '#00FF00'
+              - value: ${vars.price7}
+                color: '#FFFF00'
+              - value: ${vars.price8}
+                color: '#FFA500'
+              - value: ${vars.price9}
+                color: '#FF5000'
+              - value: ${vars.price10}
+                color: '#C81919'
+              - value: ${vars.price11}
+                color: '#C800C8'
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.energi_data_service_salg
+              yaxis_id: price
+              type: area
+              name: '@@sell_price@@'
+              unit: kr.
+              color: white
+              stroke_width: 0
+              data_generator: |
+                var data = []
+                if (entity.attributes.raw_today) {
+                  var raw_today = entity.attributes.raw_today.map((start, index) => {
+                    return [new Date(start["hour"]), entity.attributes.raw_today[index]["price"]];
+                  });
+                  data = data.concat(raw_today);
+                }
+                if (entity.attributes.forecast) {
+                  var forecast = entity.attributes.forecast.map((start, index) => {
+                    return [new Date(start["hour"]), entity.attributes.forecast[index]["price"]];
+                  });
+                  data = data.concat(forecast);
+                }
+                if (entity.attributes.tomorrow_valid) {
+                  var tomorrow = entity.attributes.raw_tomorrow.map((start, index) => {
+                    return [new Date(start["hour"]), entity.attributes.raw_tomorrow[index]["price"]];
+                  });
+                  data = data.concat(tomorrow);
+                }
+                //console.log('energi_data_service ', data);
+                return data;
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.solcast_pv_forecast_forecast_today
+              yaxis_id: solar
+              type: area
+              name: '@@solar_forecast@@'
+              data_generator: |
+                const toUTC00 = (d) => {
+                  const x = new Date(d);
+                  return new Date(Date.UTC(
+                    x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate(), x.getUTCHours(), 0, 0, 0
+                  ));
+                };
+                const map = new Map(); const eds = hass.states['sensor.energi_data_service']?.attributes || {}; const pushZero = (rows) => {
+                  (rows || []).forEach(r => {
+                    const key = toUTC00(r.hour).getTime();
+                    if (!map.has(key)) map.set(key, 0);
+                  });
+                };
+                pushZero(eds.raw_today); pushZero(eds.forecast);
+                if (eds.tomorrow_valid) pushZero(eds.raw_tomorrow);
+                const overlay = (series) => {
+                  (series || []).forEach(row => {
+                    const key = toUTC00(row.period_start).getTime();
+                    map.set(key, row.pv_estimate);
+                  });
+                };
+
+                overlay(entity.attributes.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_tomorrow']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_3']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_4']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_5']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_6']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_7']?.attributes?.detailedHourly || []);
+                const out = Array.from(map.entries())
+                  .sort((a,b) => a[0] - b[0])
+                  .map(([k,v]) => [new Date(Number(k)), v]);
+
+                //console.log('solcast ', out);
+                return out;
+              color: orange
+              stroke_width: 0
+              opacity: 0.5
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: true
+            - entity: sensor.energi_data_service
+              yaxis_id: price
+              type: area
+              name: '@@forecast@@'
+              unit: ''
+              stroke_width: 0
+              opacity: 0.25
+              color: purple
+              data_generator: "try {\n  var eds = (entity && entity.attributes) ? entity.attributes : {};\n  //if (eds.tomorrow_valid) return [];\n\n  // Start: første forecast-hour (mest korrekt)\n  var start = null;\n  if (eds.forecast && eds.forecast.length && eds.forecast[0] && eds.forecast[0].hour) {\n    start = new Date(eds.forecast[0].hour).getTime();\n  }\n  \n  // Fallback: i morgen 00:00 lokal tid\n  if (!start || isNaN(start)) {\n    var now = new Date();\n    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime();\n  }\n  \n  \n  // Brug de samme rækker som du alligevel plotter\n  var rows = [];\n  if (eds.raw_today) rows = rows.concat(eds.raw_today);\n  if (eds.forecast) rows = rows.concat(eds.forecast);\n  if (eds.raw_tomorrow) rows = rows.concat(eds.raw_tomorrow);\n\n  // Max pris til at fylde \"hele højden\"\n  var maxP = 0;\n  for (var i = 0; i < rows.length; i++) {\n    var p = Number(rows[i] && rows[i].price);\n    if (!isNaN(p) &&\
+                \ p > maxP) maxP = p;\n  }\n  if (maxP <= 0) maxP = 10;\n\n  // Unikke tider sorteret\n  var map = {};\n  for (var j = 0; j < rows.length; j++) {\n    var h = rows[j] && rows[j].hour;\n    if (!h) continue;\n    var t = new Date(h).getTime();\n    if (isNaN(t)) continue;\n    map[t] = 1;\n  }\n  var times = Object.keys(map).map(function(x){ return Number(x); }).sort(function(a,b){ return a-b; });\n\n  // Fail-safe: hvis vi ikke fik tider, lav 2 punkter så kortet ikke hænger\n  if (!times.length) {\n    return [\n      [new Date(start), maxP],\n      [new Date(start + 3600000), maxP]\n    ];\n  }\n\n  // 0 før start, max efter start => udfylder resten\n  var out = [];\n  for (var k = 0; k < times.length; k++) {\n    var tt = times[k];\n    out.push([new Date(tt), (tt >= start) ? maxP : 0]);\n  }\n  return out;\n\n} catch (e) {\n  console.log(\"forecast_zone error\", e);\n  return [];\n}\n"
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: false
+                legend_value: false
+            - entity: sensor.cjp_current_charging_rule
+              yaxis_id: charge
+              type: area
+              name: '@@planned_charging@@'
+              unit: kWh
+              color: '#2196F3'
+              opacity: 0.6
+              stroke_width: 1
+              curve: straight
+              extend_to: false
+              float_precision: 2
+              data_generator: |
+                // a block from start to end of each planned charging, so it fills the charging period
+                const plan = entity.attributes.charge_plan || [];
+                const data = [];
+                plan.forEach(p => {
+                  const start = new Date(p.time).getTime();
+                  const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+                  const kwh = Number(p.kwh);
+                  data.push([start, 0], [start, kwh], [end, kwh], [end, 0]);
+                });
+                return data;
+              show:
+                in_brush: true
+                legend_value: false
+      grid_options:
+        columns: full
+        rows: auto
+    - type: vertical-stack
+      cards:
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: sensor.stromligning_current_price_vat
+          state: unavailable
+        card:
+          type: horizontal-stack
+          cards:
+          - type: markdown
+            content: '# Strømligning @@is_down@@ <font color=red>!!!</font>'
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: sensor.stromligning_current_price_vat
+            tap_action:
+              action: call-service
+              service: homeassistant.reload_config_entry
+              target:
+                entity_id: sensor.stromligning_current_price_vat
+            hold_action:
+              action: none
+            icon: mdi:reload
+            name: '@@restart@@ Strømligning'
+            show_state: true
+      - type: conditional
+        conditions:
+        - condition: state
+          entity: sensor.stromligning_current_price_vat
+          state_not: unavailable
+        card:
+          type: custom:config-template-card
+          variables:
+            today_prices: |
+              states['sensor.stromligning_current_price_vat']
+                ?.attributes?.prices || []
+            tomorrow_prices: |
+              (() => {
+                const entity =
+                  states['binary_sensor.stromligning_tomorrow_available_vat'];
+
+                return entity?.attributes?.prices || [];
+              })()
+            forecast_prices: |
+              states['sensor.stromligning_forecasts_vat']
+                ?.attributes?.prices || []
+            all_prices: |
+              (() => {
+                const today =
+                  states['sensor.stromligning_current_price_vat']
+                    ?.attributes?.prices || [];
+
+                const tomorrowEntity =
+                  states['binary_sensor.stromligning_tomorrow_available_vat'];
+
+                const tomorrow =
+                  tomorrowEntity?.attributes?.prices || [];
+
+                const tomorrowIsForecast =
+                  tomorrowEntity?.attributes?.forecast_data === true;
+
+                const officialTomorrow =
+                  tomorrowIsForecast ? [] : tomorrow;
+
+                const official = [
+                  ...today,
+                  ...officialTomorrow
+                ];
+
+                let officialEnd = 0;
+
+                official.forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (!isNaN(end) && end > officialEnd)
+                    officialEnd = end;
+                });
+
+                const forecast =
+                  states['sensor.stromligning_forecasts_vat']
+                    ?.attributes?.prices || [];
+
+                const prices = [
+                  ...today,
+                  ...tomorrow
+                ]
+                  .map(p => Number(p.price))
+                  .filter(Number.isFinite);
+
+                let forecastEnd = 0;
+
+                tomorrow.forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (!isNaN(end) && end > forecastEnd)
+                    forecastEnd = end;
+                });
+
+                const existingEnd =
+                  Math.max(officialEnd, forecastEnd);
+
+                forecast.forEach(p => {
+                  const start = new Date(p.start).getTime();
+                  const price = Number(p.price);
+
+                  if (
+                    start >= existingEnd &&
+                    Number.isFinite(price)
+                  ) {
+                    prices.push(price);
+                  }
+                });
+
+                return prices;
+              })()
+            total_hours: |
+              vars.all_prices.length
+            lowest_price: |
+              (() => {
+                if (!vars.all_prices.length)
+                  return 0;
+
+                return Math.min(...vars.all_prices) * 1.05;
+              })()
+            highest_price: |
+              (() => {
+                if (!vars.all_prices.length)
+                  return 0;
+
+                return Math.max(...vars.all_prices) * 0.95;
+              })()
+            mean_price: |
+              (() => {
+                if (!vars.all_prices.length)
+                  return 0;
+
+                return vars.all_prices.reduce(
+                  (sum, price) => sum + price,
+                  0
+                ) / vars.all_prices.length;
+              })()
+            step_under_mean: |
+              (vars.mean_price - vars.lowest_price) / 5
+            step_over_mean: |
+              (vars.highest_price - vars.mean_price) / 5
+            price1: vars.lowest_price
+            price2: vars.mean_price - vars.step_under_mean * 4
+            price3: vars.mean_price - vars.step_under_mean * 3
+            price4: vars.mean_price - vars.step_under_mean * 2
+            price5: vars.mean_price - vars.step_under_mean
+            price6: vars.mean_price
+            price7: vars.mean_price + vars.step_over_mean
+            price8: vars.mean_price + vars.step_over_mean * 2
+            price9: vars.mean_price + vars.step_over_mean * 3
+            price10: vars.mean_price + vars.step_over_mean * 4
+            price11: vars.highest_price
+            total_span: 24 * 7 - 1
+          entities:
+          - sensor.stromligning_current_price_vat
+          - binary_sensor.stromligning_tomorrow_available_vat
+          - sensor.stromligning_forecasts_vat
+          - sensor.stromligning_15min_spotprice_ex_vat
+          - binary_sensor.stromligning_15min_tomorrow_available_ex_vat
+          - sensor.stromligning_15min_forecasts_ex_vat
+          - sensor.stromligning_nettariff_vat
+          - sensor.stromligning_systemtariff_vat
+          - sensor.solcast_pv_forecast_forecast_today
+          - sensor.solcast_pv_forecast_forecast_tomorrow
+          - sensor.solcast_pv_forecast_forecast_day_3
+          - sensor.solcast_pv_forecast_forecast_day_4
+          - sensor.solcast_pv_forecast_forecast_day_5
+          - sensor.solcast_pv_forecast_forecast_day_6
+          - sensor.solcast_pv_forecast_forecast_day_7
+          card:
+            type: custom:apexcharts-card
+            apex_config:
+              chart:
+                height: 300px
+              xaxis:
+                tooltip:
+                  enabled: false
+              tooltip:
+                shared: true
+                intersect: false
+                fixed:
+                  enabled: true
+                  position: topLeft
+                x:
+                  show: true
+                enabledOnSeries:
+                - 0
+                - 1
+                - 2
+                - 4
+              stroke:
+                curve: straight
+              markers:
+                size: 0
+            all_series_config:
+              unit: kWh
+              extend_to: false
+              fill_raw: zero
+              show:
+                legend_value: false
+                offset_in_name: false
+            experimental:
+              color_threshold: true
+              brush: true
+            brush:
+              selection_span: ${total_span + "h"}
+            header:
+              title: ${"@@price_chart_title@@ 🔵" + vars.lowest_price.toFixed(2) + " 🟢" + vars.mean_price.toFixed(2) + " 🟣" + vars.highest_price.toFixed(2)}
+              show: true
+              standard_format: false
+              show_states: false
+              colorize_states: true
+            now:
+              show: true
+              label: '@@now@@'
+            graph_span: ${total_span + "h"}
+            span:
+              start: day
+            yaxis:
+            - id: price
+            - id: solar
+              opposite: true
+              decimals: 1
+              max: ~6.0
+              min: 0
+            - id: charge
+              min: 0
+              opposite: true
+              show: false
+            show:
+              loading: true
+              last_updated: true
+            series:
+            - entity: sensor.stromligning_current_price_vat
+              yaxis_id: price
+              type: column
+              name: '@@incl_taxes@@'
+              unit: kr.
+              color: green
+              data_generator: |
+                const data = [];
+
+                // ------------------------------------------
+                // I DAG
+                // ------------------------------------------
+
+                const today =
+                  hass.states[
+                    'sensor.stromligning_current_price_vat'
+                  ]?.attributes?.prices || [];
+
+                today.forEach(p => {
+                  const price = Number(p.price);
+
+                  if (Number.isFinite(price)) {
+                    data.push([
+                      new Date(p.start),
+                      price
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // I MORGEN
+                // ------------------------------------------
+
+                const tomorrowEntity =
+                  hass.states[
+                    'binary_sensor.stromligning_tomorrow_available_vat'
+                  ];
+
+                const tomorrowPrices =
+                  tomorrowEntity?.attributes?.prices || [];
+
+                const tomorrowIsForecast =
+                  tomorrowEntity?.attributes?.forecast_data === true;
+
+                const officialTomorrow =
+                  tomorrowIsForecast
+                    ? []
+                    : tomorrowPrices;
+
+                officialTomorrow.forEach(p => {
+                  const price = Number(p.price);
+
+                  if (Number.isFinite(price)) {
+                    data.push([
+                      new Date(p.start),
+                      price
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // SIDSTE OFFICIELLE PRIS
+                // ------------------------------------------
+
+                let officialEnd = 0;
+
+                [...today, ...officialTomorrow].forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (
+                    !isNaN(end) &&
+                    end > officialEnd
+                  ) {
+                    officialEnd = end;
+                  }
+                });
+
+
+                // ------------------------------------------
+                // FORECAST FOR I MORGEN
+                // ------------------------------------------
+
+                if (tomorrowIsForecast) {
+                  tomorrowPrices.forEach(p => {
+                    const price = Number(p.price);
+
+                    if (Number.isFinite(price)) {
+                      data.push([
+                        new Date(p.start),
+                        price
+                      ]);
+                    }
+                  });
+                }
+
+
+                // ------------------------------------------
+                // SIDSTE TOMORROW-TIDSPUNKT
+                // ------------------------------------------
+
+                let tomorrowEnd = officialEnd;
+
+                tomorrowPrices.forEach(p => {
+                  const end = new Date(p.end).getTime();
+
+                  if (
+                    !isNaN(end) &&
+                    end > tomorrowEnd
+                  ) {
+                    tomorrowEnd = end;
+                  }
+                });
+
+
+                // ------------------------------------------
+                // FORECAST
+                // ------------------------------------------
+
+                const forecast =
+                  hass.states[
+                    'sensor.stromligning_forecasts_vat'
+                  ]?.attributes?.prices || [];
+
+                forecast.forEach(p => {
+                  const start =
+                    new Date(p.start).getTime();
+
+                  const price =
+                    Number(p.price);
+
+                  if (
+                    start >= tomorrowEnd &&
+                    Number.isFinite(price)
+                  ) {
+                    data.push([
+                      new Date(p.start),
+                      price
+                    ]);
+                  }
+                });
+
+
+                return data.sort(
+                  (a, b) => a[0] - b[0]
+                );
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              color_threshold:
+              - value: ${vars.price1}
+                color: '#0064FF'
+              - value: ${vars.price2}
+                color: '#0096FF'
+              - value: ${vars.price3}
+                color: '#00B496'
+              - value: ${vars.price4}
+                color: '#00FA50'
+              - value: ${vars.price5}
+                color: '#00FF32'
+              - value: ${vars.price6}
+                color: '#00FF00'
+              - value: ${vars.price7}
+                color: '#FFFF00'
+              - value: ${vars.price8}
+                color: '#FFA500'
+              - value: ${vars.price9}
+                color: '#FF5000'
+              - value: ${vars.price10}
+                color: '#C81919'
+              - value: ${vars.price11}
+                color: '#C800C8'
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.stromligning_15min_spotprice_ex_vat
+              yaxis_id: price
+              type: area
+              name: '@@sell_price@@'
+              unit: kr.
+              color: white
+              stroke_width: 0
+              data_generator: |
+                const data = [];
+
+                const sellFee = 0.025;
+
+                const nettariff = Number(
+                  hass.states[
+                    'sensor.stromligning_nettariff_vat'
+                  ]?.state
+                ) || 0;
+
+                const systemtariff = Number(
+                  hass.states[
+                    'sensor.stromligning_systemtariff_vat'
+                  ]?.state
+                ) || 0;
+
+                const sellCosts =
+                  nettariff +
+                  systemtariff +
+                  sellFee;
+
+
+                // ------------------------------------------
+                // I DAG
+                // ------------------------------------------
+
+                const today =
+                  hass.states[
+                    'sensor.stromligning_15min_spotprice_ex_vat'
+                  ]?.attributes?.prices || [];
+
+                today.forEach(p => {
+                  const spotprice = Number(p.price);
+
+                  if (Number.isFinite(spotprice)) {
+                    data.push([
+                      new Date(p.start),
+                      spotprice - sellCosts
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // I MORGEN
+                // ------------------------------------------
+
+                const tomorrowEntity =
+                  hass.states[
+                    'binary_sensor.stromligning_15min_tomorrow_available_ex_vat'
+                  ];
+
+                const tomorrowPrices =
+                  tomorrowEntity?.attributes?.prices || [];
+
+                tomorrowPrices.forEach(p => {
+                  const spotprice = Number(p.price);
+
+                  if (Number.isFinite(spotprice)) {
+                    data.push([
+                      new Date(p.start),
+                      spotprice - sellCosts
+                    ]);
+                  }
+                });
+
+
+                // ------------------------------------------
+                // SIDSTE PRIS FRA TOMORROW ENTITY
+                // ------------------------------------------
+
+                let availableEnd = 0;
+
+                [...today, ...tomorrowPrices].forEach(p => {
+                  const end =
+                    new Date(p.end).getTime();
+
+                  if (
+                    !isNaN(end) &&
+                    end > availableEnd
+                  ) {
+                    availableEnd = end;
+                  }
+                });
+
+
+                // ------------------------------------------
+                // FORECAST
+                // ------------------------------------------
+
+                const forecast =
+                  hass.states[
+                    'sensor.stromligning_15min_forecasts_ex_vat'
+                  ]?.attributes?.prices || [];
+
+                forecast.forEach(p => {
+                  const start =
+                    new Date(p.start).getTime();
+
+                  const spotprice =
+                    Number(p.price);
+
+                  if (
+                    start >= availableEnd &&
+                    Number.isFinite(spotprice)
+                  ) {
+                    data.push([
+                      new Date(p.start),
+                      spotprice - sellCosts
+                    ]);
+                  }
+                });
+
+
+                return data.sort(
+                  (a, b) => a[0] - b[0]
+                );
+              float_precision: 2
+              group_by:
+                func: avg
+                duration: 15min
+              opacity: 0.75
+              show:
+                in_brush: true
+            - entity: sensor.solcast_pv_forecast_forecast_today
+              yaxis_id: solar
+              type: area
+              name: '@@solar_forecast@@'
+              data_generator: |
+                const toUTC00 = (d) => {
+                  const x = new Date(d);
+
+                  return new Date(Date.UTC(
+                    x.getUTCFullYear(),
+                    x.getUTCMonth(),
+                    x.getUTCDate(),
+                    x.getUTCHours(),
+                    0,
+                    0,
+                    0
+                  ));
+                };
+
+                const map = new Map();
+
+
+                // ------------------------------------------
+                // OPRET ALLE PRISTIMESTAMPS SOM 0
+                // ------------------------------------------
+
+                const addTimes = (rows) => {
+                  (rows || []).forEach(row => {
+                    if (!row.start)
+                      return;
+
+                    const key =
+                      toUTC00(row.start).getTime();
+
+                    if (!map.has(key))
+                      map.set(key, 0);
+                  });
+                };
+
+
+                // I dag
+                addTimes(
+                  hass.states[
+                    'sensor.stromligning_current_price_vat'
+                  ]?.attributes?.prices || []
+                );
+
+
+                // I morgen - både forecast og officielle
+                const tomorrowEntity =
+                  hass.states[
+                    'binary_sensor.stromligning_tomorrow_available_vat'
+                  ];
+
+                addTimes(
+                  tomorrowEntity?.attributes?.prices || []
+                );
+
+
+                // Forecast
+                addTimes(
+                  hass.states[
+                    'sensor.stromligning_forecasts_vat'
+                  ]?.attributes?.prices || []
+                );
+
+
+                // ------------------------------------------
+                // SOLCAST DATA
+                // ------------------------------------------
+
+                const overlay = (series) => {
+                  (series || []).forEach(row => {
+                    if (!row.period_start)
+                      return;
+
+                    const key =
+                      toUTC00(
+                        row.period_start
+                      ).getTime();
+
+                    map.set(
+                      key,
+                      Number(row.pv_estimate) || 0
+                    );
+                  });
+                };
+
+
+                overlay(
+                  entity.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_tomorrow'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_3'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_4'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_5'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_6'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+                overlay(
+                  hass.states[
+                    'sensor.solcast_pv_forecast_forecast_day_7'
+                  ]?.attributes?.detailedHourly || []
+                );
+
+
+                return Array.from(
+                  map.entries()
+                )
+                  .sort((a, b) => a[0] - b[0])
+                  .map(([time, value]) => [
+                    new Date(Number(time)),
+                    value
+                  ]);
+              color: orange
+              stroke_width: 0
+              opacity: 0.5
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: true
+            - entity: sensor.stromligning_forecasts_vat
+              yaxis_id: price
+              type: area
+              name: '@@forecast@@'
+              unit: ''
+              stroke_width: 0
+              opacity: 0.25
+              color: purple
+              data_generator: |
+                try {
+
+                  // ------------------------------------------
+                  // I DAG
+                  // ------------------------------------------
+
+                  const today =
+                    hass.states[
+                      'sensor.stromligning_current_price_vat'
+                    ]?.attributes?.prices || [];
+
+
+                  // ------------------------------------------
+                  // I MORGEN
+                  // ------------------------------------------
+
+                  const tomorrowEntity =
+                    hass.states[
+                      'binary_sensor.stromligning_tomorrow_available_vat'
+                    ];
+
+                  const tomorrowPrices =
+                    tomorrowEntity?.attributes?.prices || [];
+
+                  const tomorrowIsForecast =
+                    tomorrowEntity?.attributes?.forecast_data === true;
+
+                  const officialTomorrow =
+                    tomorrowIsForecast
+                      ? []
+                      : tomorrowPrices;
+
+                  const tomorrowForecast =
+                    tomorrowIsForecast
+                      ? tomorrowPrices
+                      : [];
+
+
+                  // ------------------------------------------
+                  // OFFICIELLE PRISER
+                  // ------------------------------------------
+
+                  const official = [
+                    ...today,
+                    ...officialTomorrow
+                  ];
+
+
+                  // ------------------------------------------
+                  // FIND STARTEN PÅ FORECAST
+                  // ------------------------------------------
+
+                  let forecastStart = 0;
+
+                  if (tomorrowForecast.length) {
+                    forecastStart =
+                      Math.min(
+                        ...tomorrowForecast
+                          .map(p =>
+                            new Date(p.start).getTime()
+                          )
+                          .filter(t =>
+                            !isNaN(t)
+                          )
+                      );
+                  }
+
+
+                  const normalForecast =
+                    entity.attributes?.prices || [];
+
+
+                  if (
+                    !forecastStart &&
+                    normalForecast.length
+                  ) {
+                    const times =
+                      normalForecast
+                        .map(p =>
+                          new Date(p.start).getTime()
+                        )
+                        .filter(t =>
+                          !isNaN(t)
+                        );
+
+                    if (times.length)
+                      forecastStart = Math.min(...times);
+                  }
+
+
+                  if (!forecastStart)
+                    return [];
+
+
+                  // ------------------------------------------
+                  // ALLE RÆKKER
+                  // ------------------------------------------
+
+                  const rows = [
+                    ...official,
+                    ...tomorrowForecast,
+                    ...normalForecast
+                  ];
+
+
+                  // ------------------------------------------
+                  // FIND MAX PRIS
+                  // ------------------------------------------
+
+                  let maxP = 0;
+
+                  rows.forEach(row => {
+                    const price =
+                      Number(row.price);
+
+                    if (
+                      Number.isFinite(price) &&
+                      price > maxP
+                    ) {
+                      maxP = price;
+                    }
+                  });
+
+
+                  if (maxP <= 0)
+                    maxP = 10;
+
+
+                  // ------------------------------------------
+                  // ALLE TIMESTAMPS
+                  // ------------------------------------------
+
+                  const times = [
+                    ...new Set(
+                      rows
+                        .map(row =>
+                          new Date(
+                            row.start
+                          ).getTime()
+                        )
+                        .filter(time =>
+                          !isNaN(time)
+                        )
+                    )
+                  ].sort(
+                    (a, b) => a - b
+                  );
+
+
+                  if (!times.length) {
+                    return [
+                      [
+                        new Date(forecastStart),
+                        maxP
+                      ],
+                      [
+                        new Date(
+                          forecastStart +
+                          3600000
+                        ),
+                        maxP
+                      ]
+                    ];
+                  }
+
+
+                  // ------------------------------------------
+                  // 0 FØR FORECAST
+                  // MAX EFTER FORECAST
+                  // ------------------------------------------
+
+                  return times.map(time => [
+                    new Date(time),
+                    time >= forecastStart
+                      ? maxP
+                      : 0
+                  ]);
+
+
+                } catch (e) {
+
+                  console.log(
+                    'stromligning forecast_zone error',
+                    e
+                  );
+
+                  return [];
+                }
+              group_by:
+                func: avg
+                duration: 15min
+              show:
+                in_brush: false
+                legend_value: false
+            - entity: sensor.cjp_current_charging_rule
+              yaxis_id: charge
+              type: area
+              name: '@@planned_charging@@'
+              unit: kWh
+              color: '#2196F3'
+              opacity: 0.6
+              stroke_width: 1
+              curve: straight
+              extend_to: false
+              float_precision: 2
+              data_generator: |
+                // a block from start to end of each planned charging, so it fills the charging period
+                const plan = entity.attributes.charge_plan || [];
+                const data = [];
+                plan.forEach(p => {
+                  const start = new Date(p.time).getTime();
+                  const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+                  const kwh = Number(p.kwh);
+                  data.push([start, 0], [start, kwh], [end, kwh], [end, 0]);
+                });
+                return data;
+              show:
+                in_brush: true
+                legend_value: false
+      grid_options:
+        columns: full
+        rows: auto
+    column_span: 2
+  - type: grid
+    cards:
+    - type: custom:mushroom-entity-card
+      entity: sensor.cjp_current_charging_rule
+      primary_info: state
+      secondary_info: none
+      icon_type: none
+      card_mod:
+        style:
+          mushroom-state-info$: |
+            .container {
+             --card-primary-font-size: 20px;
+             align-items: center;
+            padding-bottom: 10px !important;
+            padding-top: 10px !important;
+            }
+            .primary {
+              text-align: center !important;
+              white-space: pre-wrap !important;
+            }
+      grid_options: &id001
+        columns: full
+    - type: heading
+      heading: '@@section_status@@'
+      icon: mdi:car-electric
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: sensor.mcqueen_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_battery_level
+        name:
+          type: entity
+      - entity: sensor.cjp_charging_limit
+        name:
+          type: entity
+      - entity: sensor.cjp_charging_watts
+        name:
+          type: entity
+      - entity: sensor.bil_lader_status
+        name:
+          type: entity
+      - entity: sensor.cjp_estimated_range
+        name:
+          type: entity
+      - entity: sensor.cjp_kwh_cost_price
+        name:
+          type: entity
+      grid_options: *id001
+    # forced charging: only while the battery is under the daily minimum
+    - type: conditional
+      conditions:
+      - condition: or
+        conditions:
+        - condition: and
+          conditions:
+          - condition: numeric_state
+            entity: sensor.mcqueen_battery_level
+            below: number.cjp_min_daily_battery_level
+          - condition: state
+            entity: sensor.mcqueen_battery_level
+            state_not: '0.0'
+        - condition: and
+          conditions:
+          - condition: numeric_state
+            entity: number.cjp_battery_level
+            below: number.cjp_min_daily_battery_level
+          - condition: state
+            entity: number.cjp_battery_level
+            state_not: '0.0'
+      card:
+        type: vertical-stack
+        cards:
+        - type: heading
+          heading: '@@section_forced_charging@@'
+          icon: mdi:battery-alert-variant-outline
+        - type: entities
+          state_color: true
+          show_header_toggle: false
+          entities:
+          - entity: switch.cjp_forced_charging_daily_battery_level
+            name:
+              type: entity
+        - type: markdown
+          content: |-
+            @@forced_charging_off@@
+
+            {% set ns = namespace(help=none) %}
+            {% set ns.help = ns.help or state_attr('switch.cjp_forced_charging_daily_battery_level', 'help') %}
+            {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+            {{ ns.help }}
+
+            </details>{% endif %}
+      grid_options: *id001
+    - type: markdown
+      card_mod: &id003
+        style: |
+          ha-card {
+            --markdown-table-border-color: transparent
+          }
+      content: '{{ state_attr(''sensor.cjp_charging_history'', ''history'') }}'
+      grid_options: *id001
+    - type: markdown
+      card_mod: *id003
+      content: '{{ state_attr(''sensor.cjp_overview'', ''overview'') }}'
+      grid_options: *id001
+  - type: grid
+    cards:
+    - type: heading
+      heading: '@@section_trip@@'
+      icon: mdi:bag-suitcase
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('number.cjp_trip_charge_procent', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_trip_charge_procent
+        name:
+          type: entity
+      - entity: number.cjp_trip_range_needed
+        name:
+          type: entity
+      - entity: datetime.cjp_trip_date_time
+        name:
+          type: entity
+      - entity: datetime.cjp_trip_homecoming_date_time
+        name:
+          type: entity
+      - entity: switch.cjp_trip_preheat
+        name:
+          type: entity
+      - entity: button.cjp_trip_reset
+        name:
+          type: entity
+      grid_options: *id001
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: binary_sensor.cjp_public_charging_session_done
+        state: 'on'
+      card:
+        type: vertical-stack
+        cards:
+        - type: heading
+          heading: '@@section_public_charging@@'
+          icon: mdi:ev-plug-type2
+        - type: markdown
+          content: |-
+            {% set ns = namespace(help=none) %}
+            {% set ns.help = ns.help or state_attr('number.cjp_public_charging_session_cost', 'help') %}
+            {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+            {{ ns.help }}
+
+            </details>{% endif %}
+          grid_options: *id001
+        - type: markdown
+          content: |-
+            {% set sessions = state_attr('binary_sensor.cjp_public_charging_session_done', 'public_charging_session') or [] %}
+            {% if sessions | length > 1 %}<ha-alert alert-type="info">@@pc_queue@@: <b>{{ sessions | length }}</b></ha-alert>
+
+            | @@pc_sessions@@ | |
+            |:---|:---|
+            {% for s in sessions %}| {{ '➡️ ' if loop.first else '' }}**{{ as_timestamp(s.timestamp) | timestamp_custom('%d/%m %H:%M') }}** | {{ s.start_battery_level | int }}% ➪ {{ s.end_battery_level | int }}% (+{{ s.added_percentage | int }}%) |
+            {% endfor %}
+            {% endif %}
+            {% if sessions %}
+            | | |
+            |---:|:---|
+            | 🕓 **@@pc_time@@** | {{ as_timestamp(sessions[0].timestamp) | timestamp_custom('%d/%m %H:%M') }} |
+            | ⛽ **@@pc_charging@@** | {{ sessions[0].start_battery_level | int }}% ➪ {{ sessions[0].end_battery_level | int }}% |
+            | 🔋 **@@pc_added@@** | {{ sessions[0].added_percentage | int }}% |
+
+            **@@pc_enter@@**
+
+            *@@pc_auto_added@@*
+
+            <font color=grey>@@pc_ignore@@</font>
+            {% endif %}
+          grid_options:
+            columns: full
+        - type: entities
+          state_color: true
+          show_header_toggle: false
+          entities:
+          - entity: number.cjp_public_charging_session_cost
+            name:
+              type: entity
+          grid_options: *id001
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_manual_charging@@'
+      icon: mdi:hand-back-right
+    - type: markdown
+      content: |-
+        @@manual_charging_intro@@
+
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('switch.cjp_allow_manual_charging_now', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_allow_manual_charging_now
+        name:
+          type: entity
+      - entity: switch.cjp_allow_manual_charging_solar
+        name:
+          type: entity
+      grid_options: *id001
+    - type: markdown
+      content: '{{ state_attr(''sensor.cjp_emoji_description'', ''description'') }}'
+      grid_options: *id001
+- type: sections
+  path: settings
+  title: '@@view_settings@@'
+  max_columns: 4
+  dense_section_placement: true
+  badges:
+  - *id002
+  sections:
+  - type: grid
+    cards:
+    - type: heading
+      heading: '@@section_workplan@@'
+      icon: mdi:briefcase-clock
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('switch.cjp_workplan_charging', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_workplan_charging
+        name:
+          type: entity
+      - entity: switch.cjp_learn_driving_distance
+        name:
+          type: entity
+      - type: section
+        label: '@@monday@@'
+      - entity: switch.cjp_workday_monday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_monday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_monday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_monday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_monday
+        name:
+          type: entity
+      - type: section
+        label: '@@tuesday@@'
+      - entity: switch.cjp_workday_tuesday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_tuesday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_tuesday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_tuesday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_tuesday
+        name:
+          type: entity
+      - type: section
+        label: '@@wednesday@@'
+      - entity: switch.cjp_workday_wednesday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_wednesday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_wednesday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_wednesday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_wednesday
+        name:
+          type: entity
+      - type: section
+        label: '@@thursday@@'
+      - entity: switch.cjp_workday_thursday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_thursday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_thursday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_thursday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_thursday
+        name:
+          type: entity
+      - type: section
+        label: '@@friday@@'
+      - entity: switch.cjp_workday_friday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_friday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_friday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_friday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_friday
+        name:
+          type: entity
+      - type: section
+        label: '@@saturday@@'
+      - entity: switch.cjp_workday_saturday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_saturday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_saturday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_saturday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_saturday
+        name:
+          type: entity
+      - type: section
+        label: '@@sunday@@'
+      - entity: switch.cjp_workday_sunday
+        name:
+          type: entity
+      - entity: time.cjp_workday_departure_sunday
+        name:
+          type: entity
+      - entity: time.cjp_workday_homecoming_sunday
+        name:
+          type: entity
+      - entity: number.cjp_workday_distance_needed_sunday
+        name:
+          type: entity
+      - entity: switch.cjp_preheat_sunday
+        name:
+          type: entity
+      grid_options: *id001
+  - type: grid
+    cards:
+    - type: heading
+      heading: '@@section_fill_up@@'
+      icon: mdi:brain
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('switch.cjp_fill_up', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_fill_up
+        name:
+          type: entity
+      - entity: number.cjp_typical_daily_distance
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_battery_levels@@'
+      icon: mdi:battery-heart-variant
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('number.cjp_max_recommended_charge_limit_battery_level', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_min_daily_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_min_trip_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_min_charge_limit_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_max_recommended_charge_limit_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_preheat_minutes_before
+        name:
+          type: entity
+      grid_options: *id001
+  - type: grid
+    cards:
+    - type: heading
+      heading: '@@section_cheap@@'
+      icon: mdi:cash-clock
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('switch.cjp_cheap_grid_charging', 'help') %}
+        {% set ns.help = ns.help or state_attr('sensor.cjp_charge_very_cheap_battery_level', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_cheap_grid_charging
+        name:
+          type: entity
+      - entity: number.cjp_very_cheap_grid_charging_max_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_ultra_cheap_grid_charging_max_battery_level
+        name:
+          type: entity
+      - entity: sensor.cjp_charge_very_cheap_battery_level
+        name:
+          type: entity
+      - entity: sensor.cjp_charge_ultra_cheap_battery_level
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_full_charge@@'
+      icon: mdi:battery-check
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('number.cjp_full_charge_recommended', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_full_charge_recommended
+        name:
+          type: entity
+      - entity: sensor.cjp_last_full_charge
+        name:
+          type: entity
+      grid_options: *id001
+  - type: grid
+    cards:
+    - type: heading
+      heading: '@@section_solar@@'
+      icon: mdi:solar-power-variant
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('switch.cjp_solar_charging', 'help') %}
+        {% set ns.help = ns.help or state_attr('number.cjp_ev_charge_after_powerwall_battery_level', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_solar_charging
+        name:
+          type: entity
+      - entity: sensor.cjp_solar_over_production_current_hour
+        name:
+          type: entity
+      - entity: number.cjp_ev_charge_after_powerwall_battery_level
+        name:
+          type: entity
+      - entity: switch.cjp_powerwall_discharge_above_needed
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_charging_loss@@'
+      icon: mdi:robot
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('switch.cjp_calculate_charging_loss', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_calculate_charging_loss
+        name:
+          type: entity
+      - entity: switch.cjp_use_measured_charging_loss
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_virtual_ev@@'
+      icon: mdi:car-cog
+    - type: markdown
+      content: |-
+        {% set ns = namespace(help=none) %}
+        {% set ns.help = ns.help or state_attr('number.cjp_battery_level', 'help') %}
+        {% if ns.help %}<details><summary>@@read_more@@</summary>
+
+        {{ ns.help }}
+
+        </details>{% endif %}
+      grid_options: *id001
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: number.cjp_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_completed_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_estimated_total_range
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_advanced@@'
+      icon: mdi:cog
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: select.cjp_forecast_type
+        name:
+          type: entity
+      grid_options: *id001
+- type: sections
+  path: analysis
+  title: '@@view_analysis@@'
+  max_columns: 4
+  dense_section_placement: true
+  sections:
+  # charging economy per month (engine_economy.py)
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_economy@@'
+      icon: mdi:cash-multiple
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@economy_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod:
+        style: |
+          ha-card {
+            --markdown-table-border-color: transparent
+          }
+      content: |-
+        {% set e = states.sensor.cjp_economy.attributes %}
+        @@economy_intro@@
+
+        {% if e.months -%}
+        | @@economy_month@@ | kWh | @@economy_paid@@ | kr/kWh | @@economy_average@@ | @@economy_daily@@ | @@economy_lowest@@ | @@economy_saved@@ | Score | kr/km |
+        |:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+        {% for m in e.months | reverse -%}
+        | **{{ m.month }}** | {{ m.kwh | round(0) }} | {{ m.cost | round(0) }} kr | {{ m.unit_price | round(2) if m.unit_price else '–' }} | {{ m.average_unit | round(2) if m.average_unit else '–' }} | {{ m.daily_unit | round(2) if m.daily_unit else '–' }} | {{ m.lowest_unit | round(2) if m.lowest_unit else '–' }} | {{ (m.saving_daily | round(0) | string + ' kr') if m.saving_daily is not none else '–' }} | {{ ((m.score * 100) | round(0) | string + ' %') if m.score is not none else '–' }} | {{ m.price_per_km | round(2) if m.price_per_km else '–' }} |
+        {% endfor %}
+
+        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ e.total.cost | round(0) }} kr{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} kr @@economy_vs_daily@@{% if e.total.score is not none %} · Score {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
+        {%- else -%}
+        <ha-alert alert-type="info">@@economy_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@economy_sources_title@@'
+        show_states: false
+      graph_span: 400d
+      span:
+        end: month
+      stacked: true
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 0
+      all_series_config:
+        type: column
+        unit: ' kWh'
+        float_precision: 0
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 280px
+        dataLabels:
+          enabled: false
+        xaxis:
+          labels:
+            format: MMM yy
+      series:
+      - entity: sensor.cjp_economy
+        name: '@@economy_grid@@'
+        color: '#2a78d6'
+        data_generator: |
+          return (entity.attributes.months || []).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.grid]; });
+      - entity: sensor.cjp_economy
+        name: '@@economy_solar@@'
+        color: '#eda100'
+        data_generator: |
+          return (entity.attributes.months || []).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.solar]; });
+      - entity: sensor.cjp_economy
+        name: '@@economy_powerwall@@'
+        color: '#1baf7a'
+        data_generator: |
+          return (entity.attributes.months || []).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.powerwall]; });
+      - entity: sensor.cjp_economy
+        name: '@@economy_public@@'
+        color: '#6250d6'
+        data_generator: |
+          return (entity.attributes.months || []).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.public]; });
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@economy_prices_title@@'
+        show_states: false
+      graph_span: 400d
+      span:
+        end: month
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 2
+      all_series_config:
+        type: line
+        unit: ' kr/kWh'
+        float_precision: 2
+        stroke_width: 2
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 280px
+        markers:
+          size: 4
+        xaxis:
+          labels:
+            format: MMM yy
+      series:
+      - entity: sensor.cjp_economy
+        name: '@@economy_paid@@'
+        color: '#008300'
+        data_generator: |
+          return (entity.attributes.months || []).filter(m => m.achieved_unit !== null).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.achieved_unit]; });
+      - entity: sensor.cjp_economy
+        name: '@@economy_average@@'
+        color: '#e34948'
+        data_generator: |
+          return (entity.attributes.months || []).filter(m => m.average_unit !== null).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.average_unit]; });
+      - entity: sensor.cjp_economy
+        name: '@@economy_daily@@'
+        color: '#eb6834'
+        data_generator: |
+          return (entity.attributes.months || []).filter(m => m.daily_unit !== null).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.daily_unit]; });
+      - entity: sensor.cjp_economy
+        name: '@@economy_lowest@@'
+        color: '#2a78d6'
+        data_generator: |
+          return (entity.attributes.months || []).filter(m => m.lowest_unit !== null).map(m => { const d = new Date(m.month + '-15T12:00:00');  return [d.getTime(), m.lowest_unit]; });
+      grid_options:
+        columns: full
+  # driving against the outdoor temperature: apexcharts only has a time axis, so -30 °C is drawn at midnight and 1 °C as 1 hour
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_drive_temperature@@'
+      icon: mdi:thermometer-car
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@drive_temperature_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% set f = a.temperature_fit %}
+        {% if f -%}
+        @@drive_temperature_fit_1@@ **{{ (f.per_degree | abs) | round(2) }} km/kWh** @@drive_temperature_fit_2@@
+
+        | -10 °C | 0 °C | 10 °C | 20 °C |
+        |---:|---:|---:|---:|
+        | {{ f.at_minus_10 }} | {{ f.at_0 }} | {{ f.at_10 }} | {{ f.at_20 }} |
+
+        @@drive_temperature_cold_1@@ **{{ ((f.cold_cost or 0) * 100) | round(0) }} %** @@drive_temperature_cold_2@@
+        {%- else -%}
+        <ha-alert alert-type="info">@@drive_temperature_no_data@@ ({{ a.drives | length if a.drives else 0 }})</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@drive_temperature_title@@'
+        show_states: false
+      graph_span: 70h
+      span:
+        start: day
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 1
+      all_series_config:
+        unit: ' km/kWh'
+        float_precision: 2
+        extend_to: false
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 300px
+        markers:
+          size:
+          - 4
+          - 0
+        stroke:
+          curve: straight
+        dataLabels:
+          enabled: false
+        xaxis:
+          labels:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((value - b.getTime()) / 3600000 - 30) + ' °C'; }
+          tooltip:
+            enabled: false
+        tooltip:
+          x:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000 - 30).toFixed(1).replace('.', ',') + ' °C'; }
+      series:
+      - entity: sensor.cjp_analysis
+        name: '@@drive_temperature_drives@@'
+        type: line
+        color: '#2a78d6'
+        stroke_width: 0
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.drives || []).map(d => [b.getTime() + (d.temp + 30) * 3600000, d.km_per_kwh]).sort((x, y) => x[0] - y[0]);
+      - entity: sensor.cjp_analysis
+        name: '@@drive_temperature_bins@@'
+        type: line
+        color: '#eb6834'
+        stroke_width: 2
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.temperature_bins || []).map(x => [b.getTime() + ((x.from + x.to) / 2 + 30) * 3600000, x.km_per_kwh]);
+      grid_options:
+        columns: full
+  # ready at departure
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_departures@@'
+      icon: mdi:car-clock
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@departures_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% if a.departures -%}
+        @@departures_met_1@@ **{{ (a.departures_met * 100) | round(0) }} %** @@departures_met_2@@ {{ a.departures_count }} @@departures_met_3@@
+
+        | @@departures_day@@ | @@departures_level@@ | @@departures_target@@ | @@departures_required@@ | |
+        |:---|---:|---:|---:|:---:|
+        {% for d in a.departures | reverse -%}
+        | {{ d.date[8:10] }}/{{ d.date[5:7] }} {{ d.time }} | {{ d.level | round(0) }} % | {{ d.target | round(0) }} % | {{ d.required | round(0) }} % | {{ '✅' if d.met else '❌' }} |
+        {% endfor %}
+        {%- else -%}
+        <ha-alert alert-type="info">@@departures_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+  # planned against actually charged
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_planned@@'
+      icon: mdi:calendar-check
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@planned_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      content: |-
+        {% set a = states.sensor.cjp_analysis.attributes %}
+        {% if a.planned_days -%}
+        @@planned_summary_1@@ **{{ a.planned_total }} kWh**, @@planned_summary_2@@ **{{ a.actual_total }} kWh**, @@planned_summary_3@@ **{{ a.unplanned_total }} kWh** @@planned_summary_4@@
+        {%- else -%}
+        <ha-alert alert-type="info">@@planned_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@planned_title@@'
+        show_states: false
+      graph_span: 31d
+      span:
+        end: day
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 0
+      all_series_config:
+        type: column
+        unit: ' kWh'
+        float_precision: 1
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 260px
+        dataLabels:
+          enabled: false
+      series:
+      - entity: sensor.cjp_analysis
+        name: '@@planned_plan@@'
+        color: '#6250d6'
+        data_generator: |
+          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.plan]);
+      - entity: sensor.cjp_analysis
+        name: '@@planned_actual@@'
+        color: '#1baf7a'
+        data_generator: |
+          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.actual]);
+      - entity: sensor.cjp_analysis
+        name: '@@planned_unplanned@@'
+        color: '#e34948'
+        data_generator: |
+          return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.manual + d.low_battery + d.other]);
+      grid_options:
+        columns: full
+  # battery capacity over time: kWh from the charger per % and month
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_capacity@@'
+      icon: mdi:battery-clock
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@capacity_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@capacity_title@@'
+        show_states: false
+      graph_span: 1095d
+      span:
+        end: month
+      now:
+        show: false
+      yaxis:
+      - decimals: 3
+      all_series_config:
+        type: line
+        unit: ' kWh/%'
+        float_precision: 3
+        stroke_width: 2
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 260px
+        markers:
+          size: 4
+        xaxis:
+          labels:
+            format: MMM yy
+      series:
+      - entity: sensor.cjp_charging_loss_model
+        name: '> 7 kW'
+        color: '#eb6834'
+        data_generator: |
+          return (entity.attributes.capacity_months || []).filter(m => m.group === '> 7 kW').map(m => [new Date(m.month + '-15T12:00:00').getTime(), m.kwh_per_percent]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '4-7 kW'
+        color: '#1baf7a'
+        data_generator: |
+          return (entity.attributes.capacity_months || []).filter(m => m.group === '4-7 kW').map(m => [new Date(m.month + '-15T12:00:00').getTime(), m.kwh_per_percent]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '< 4 kW'
+        color: '#2a78d6'
+        data_generator: |
+          return (entity.attributes.capacity_months || []).filter(m => m.group === '< 2,5 kW' || m.group === '2,5-4 kW').map(m => [new Date(m.month + '-15T12:00:00').getTime(), m.kwh_per_percent]);
+      grid_options:
+        columns: full
+  # charging loss per power: apexcharts only has a time axis, so 1 kW is drawn as 1 hour after midnight
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_loss@@'
+      icon: mdi:chart-bell-curve-cumulative
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@loss_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod: *id003
+      content: |-
+        {% set a = states.sensor.cjp_charging_loss_model.attributes %}
+        @@loss_intro@@
+
+        {% if a.kwh_per_percent -%}
+        | | |
+        |:---|---:|
+        | **@@loss_kwh_per_percent@@** | **{{ a.kwh_per_percent | round(3) }} kWh** |
+        | @@loss_kwh_per_percent_configured@@ ({{ a.battery_size }} kWh, {{ (a.configured_loss * 100) | round(1) }} %) | {{ a.kwh_per_percent_configured | round(3) }} kWh |
+        | @@loss_difference@@ | {{ ((a.kwh_per_percent_configured / a.kwh_per_percent - 1) * 100) | round(1) }} % |
+        | **@@loss_plan@@** ({{ '@@loss_plan_measured@@' if a.plan_uses_measured else '@@loss_plan_configured@@' }}) | **{{ a.kwh_per_percent_plan | round(3) }} kWh** |
+
+        {% endif -%}
+        {% if a.status == 'no_data' -%}
+        <ha-alert alert-type="info">@@loss_no_data@@ ({{ (a.configured_loss * 100) | round(1) }} %)</ha-alert>
+        {%- elif a.status == 'one_group' -%}
+        <ha-alert alert-type="info">@@loss_one_group@@ ({{ ((a.loss_high.loss if a.loss_high else 0) * 100) | round(1) }} % @@loss_with_battery@@ {{ a.battery_size }} kWh)</ha-alert>
+        {%- else -%}
+        | | |
+        |:---|---:|
+        | @@loss_fixed@@ (P₀) | **{{ (a.fixed_kw * 1000) | round(0) }} W** |
+        {% if a.charger_loss_1_phase is not none %}| @@loss_charger@@ 1 @@loss_phase@@ | **{{ (a.charger_loss_1_phase * 100) | round(1) }} %** |
+        {% endif %}{% if a.charger_loss_3_phases is not none %}| @@loss_charger@@ 3 @@loss_phases@@ | **{{ (a.charger_loss_3_phases * 100) | round(1) }} %** |
+        {% endif %}| {{ a.loss_low.phases }}×{{ a.loss_low.amps }} A ({{ a.loss_low.kw | round(1) }} kW) | **{{ (a.loss_low.loss * 100) | round(1) }} %** · {{ a.loss_low.kwh_per_percent | round(3) }} kWh/% |
+        | {{ a.loss_high.phases }}×{{ a.loss_high.amps }} A ({{ a.loss_high.kw | round(1) }} kW) | **{{ (a.loss_high.loss * 100) | round(1) }} %** · {{ a.loss_high.kwh_per_percent | round(3) }} kWh/% |
+
+        @@loss_low_high_1@@ **{{ (((1 - a.loss_high.loss) / (1 - a.loss_low.loss) - 1) * 100) | round(0) }} %** @@loss_low_high_2@@
+        {%- endif %}
+
+        | @@loss_groups@@ | | kWh/% | @@loss_back_to@@ |
+        |:---|---:|---:|---:|
+        {% for name, count in a.groups.items() -%}
+        | {{ name }} | **{{ count }}** | {{ (a.groups_kwh_per_percent[name] | round(3)) if a.groups_kwh_per_percent and a.groups_kwh_per_percent[name] else '–' }} | {{ (as_timestamp(a.group_oldest[name]) | timestamp_custom('%d/%m-%Y')) if a.group_oldest and a.group_oldest[name] else '–' }} |
+        {% endfor %}
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_use_measured_charging_loss
+        name:
+          type: entity
+      - entity: button.cjp_recalculate_charging_loss
+        name:
+          type: entity
+      grid_options: *id001
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@loss_chart_title@@'
+        show_states: false
+      graph_span: 12h
+      span:
+        start: day
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 0
+        apex_config:
+          tickAmount: 5
+      all_series_config:
+        unit: ' %'
+        float_precision: 1
+        extend_to: false
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 320px
+        stroke:
+          curve: straight
+        markers:
+          size:
+          - 0
+          - 0
+          - 5
+          - 5
+        dataLabels:
+          enabled: false
+        xaxis:
+          labels:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((value - b.getTime()) / 3600000) + ' kW'; }
+          tooltip:
+            enabled: false
+        tooltip:
+          shared: false
+          x:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000).toFixed(1).replace('.', ',') + ' kW'; }
+      series:
+      - entity: sensor.cjp_charging_loss_model
+        name: '@@loss_curve_1@@'
+        type: line
+        color: '#2a78d6'
+        stroke_width: 2
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.curve?.['1'] || []).map(p => [b.getTime() + p.kw * 3600000, p.loss * 100]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '@@loss_curve_3@@'
+        type: line
+        color: '#eb6834'
+        stroke_width: 2
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.curve?.['3'] || []).map(p => [b.getTime() + p.kw * 3600000, p.loss * 100]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '@@loss_points_1@@'
+        type: line
+        color: '#2a78d6'
+        stroke_width: 0
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.segments || []).filter(s => s.phases === 1).map(s => [b.getTime() + s.kw * 3600000, s.loss * 100]).sort((x, y) => x[0] - y[0]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '@@loss_points_3@@'
+        type: line
+        color: '#eb6834'
+        stroke_width: 0
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return (entity.attributes.segments || []).filter(s => s.phases !== 1).map(s => [b.getTime() + s.kw * 3600000, s.loss * 100]).sort((x, y) => x[0] - y[0]);
+      grid_options: *id001
+  - type: grid
+    cards:
+    - type: heading
+      heading: '@@section_history@@'
+      icon: mdi:chart-line
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@history_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    column_span: 4
+  - type: grid
+    cards:
+    - type: history-graph
+      title: '@@history_battery@@'
+      hours_to_show: 48
+      min_y_axis: 0
+      max_y_axis: 100
+      entities:
+      - entity: sensor.mcqueen_battery_level
+      - entity: number.cjp_battery_level
+      - entity: sensor.cjp_charging_limit
+      grid_options: *id001
+    column_span: 1
+  - type: grid
+    cards:
+    - type: history-graph
+      title: '@@history_efficiency@@'
+      hours_to_show: 720
+      entities:
+      - entity: sensor.cjp_km_per_kwh
+      - entity: sensor.cjp_drive_efficiency
+      grid_options: *id001
+    column_span: 1
+  - type: grid
+    cards:
+    - type: history-graph
+      title: '@@history_solar@@'
+      hours_to_show: 168
+      entities:
+      - entity: sensor.cjp_kwh_charged_by_solar
+      - entity: sensor.cjp_solar_charged_percentage
+      grid_options: *id001
+    column_span: 1

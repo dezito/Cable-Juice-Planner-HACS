@@ -1,15 +1,17 @@
 """Setup, entities, triggers, services and unload of a Cable Juice Planner entry."""
 from __future__ import annotations
 
+import datetime
 from unittest.mock import patch
 
 import pytest
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from custom_components.cable_juice_planner.const import (
     BUTTON_KEYS,
@@ -22,6 +24,8 @@ from custom_components.cable_juice_planner.const import (
 
 from .conftest import (
     CHARGER_KWH,
+    CHARGER_POWER,
+    EV_LEVEL as EV_LEVEL_ID,
     CHARGER_STATUS,
     CONSUMPTION,
     EV_PORT,
@@ -199,8 +203,13 @@ async def test_charger_only_instance(hass: HomeAssistant) -> None:
     jobs: list[str] = []
     original = coordinator.async_run_job
 
+    # the clock is real: advancing it can pass a cron time (every 5 minutes, hour end, ...),
+    # only the jobs of plugging in count here
+    timed = {"cron", "hour_end", "price_update", "append_prices", "preheat_cron", "charging_loss_update", "economy_update", "analysis_update"}
+
     async def _record(job_name, *args, **kwargs):
-        jobs.append(job_name)
+        if job_name not in timed:
+            jobs.append(job_name)
         return await original(job_name, *args, **kwargs)
 
     async def _tick(times: int) -> None:
@@ -243,3 +252,227 @@ async def test_unload(hass: HomeAssistant, loaded_entry) -> None:
     assert loaded_entry.state is ConfigEntryState.NOT_LOADED
     assert not coordinator._unsubs
     assert _state(hass, "sensor", "charger_action") == "unavailable"
+
+
+async def test_migration_moves_solar_sell_price_to_options(hass: HomeAssistant, mock_entry) -> None:
+    """2.1 -> 2.2: the number value becomes an option, the removed entities leave the registry."""
+    ent_reg = er.async_get(hass)
+    mock_entry.add_to_hass(hass)
+    removed = {}
+    for platform, key in (("number", "solar_sell_fixed_price"), ("switch", "deactivate_script"), ("button", "restart_script")):
+        removed[key] = ent_reg.async_get_or_create(platform, DOMAIN, f"{mock_entry.entry_id}_{key}", suggested_object_id=f"{OBJECT_PREFIX}_{key}").entity_id
+    mock_restore_cache(hass, [State(removed["solar_sell_fixed_price"], "0.85")])
+    set_source_states(hass)
+    assert await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert mock_entry.minor_version == 3  # and on through the later migrations
+    assert mock_entry.options["solar_sell_fixed_price"] == 0.85
+    assert mock_entry.runtime_data.config["solar"]["production_price"] == 0.85
+    assert all(ent_reg.async_get(entity_id) is None for entity_id in removed.values())
+    await async_unload_and_join(hass, mock_entry)
+
+
+async def test_migration_moves_last_full_charge_to_the_sensor(hass: HomeAssistant, mock_entry) -> None:
+    """2.2 -> 2.3: the datetime entity becomes a sensor the user cannot change, its value is kept."""
+    ent_reg = er.async_get(hass)
+    mock_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(mock_entry, minor_version=2)
+    old = ent_reg.async_get_or_create("datetime", DOMAIN, f"{mock_entry.entry_id}_last_full_charge", suggested_object_id=f"{OBJECT_PREFIX}_last_full_charge").entity_id
+    mock_restore_cache(hass, [State(old, "2026-10-14T08:00:00+00:00")])
+    set_source_states(hass)
+    assert await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert mock_entry.minor_version == 3
+    assert ent_reg.async_get(old) is None
+    sensor = hass.states.get(f"sensor.{OBJECT_PREFIX}_last_full_charge")
+    assert sensor is not None and dt_util.parse_datetime(sensor.state) == dt_util.parse_datetime("2026-10-14T08:00:00+00:00")
+    await async_unload_and_join(hass, mock_entry)
+
+
+async def test_charging_loss_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> None:
+    """The first time: raw history and hourly statistics, kW and Wh converted, the sensor published."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    from .test_charging_loss_model import _session  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    start = dt_util.utcnow().timestamp() - 2 * 86400
+    sessions = [_session(start, 11.04, 3, 3), _session(start + 43200, 4.14, 3, 4)]
+
+    def state(entity_id, ts, value):
+        moment = dt_util.utc_from_timestamp(ts)
+        return State(entity_id, str(value), last_changed=moment, last_updated=moment)
+
+    states = {
+        EV_LEVEL_ID: [state(EV_LEVEL_ID, ts, v) for soc, _, _ in sessions for ts, v in soc],
+        CHARGER_KWH: [state(CHARGER_KWH, ts, v * 1000) for _, meter, _ in sessions for ts, v in meter],  # in Wh
+    }
+    power = {CHARGER_POWER: [{"start": ts, "mean": m / 1000, "min": lo / 1000, "max": hi / 1000} for _, _, rows in sessions for ts, m, lo, hi in rows]}  # in kW
+    metadata = {CHARGER_POWER: (1, {"unit_of_measurement": "kW"}), CHARGER_KWH: (2, {"unit_of_measurement": "Wh"})}
+
+    def statistics(_hass, _start, _end, _ids, period, *_args):
+        return power if period == "5minute" else {}
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value=states),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value=metadata),
+    ):
+        await coordinator._async_charging_loss_refresh(backfill=True)
+        await hass.async_block_till_done()
+    sensor = hass.states.get(f"sensor.{OBJECT_PREFIX}_charging_loss_model")
+    assert sensor.attributes["status"] == "model"
+    assert sensor.attributes["backfilled"] is True
+    assert {s["phases"] for s in sensor.attributes["segments"]} == {3}
+    assert 0.15 <= sensor.attributes["fixed_kw"] <= 0.25
+    assert coordinator.engine.charging_loss_backfilled()
+
+
+
+async def test_charging_loss_statistics_only_as_far_back_as_needed(hass: HomeAssistant, loaded_entry) -> None:
+    """30 days at a time: it stops when every group is full or the statistics end."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    calls: list[str] = []
+
+    def statistics(_hass, start, _end, _ids, period, *_args):
+        if period == "5minute":
+            return {}
+        calls.append(start.date().isoformat())
+        # the statistics of the power sensor began 3 chunks back
+        return {CHARGER_POWER: [{"start": start.timestamp(), "mean": 0.0, "min": 0.0, "max": 0.0}]} if len(calls) <= 3 else {}
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value={}),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value={}),
+    ):
+        await coordinator.async_recalculate_charging_loss()
+        await hass.async_block_till_done()
+    assert len(calls) == 4  # three chunks with data, the fourth is empty
+    assert coordinator.engine.charging_loss_backfilled()
+    assert hass.states.get(f"button.{OBJECT_PREFIX}_recalculate_charging_loss") is not None
+
+
+async def test_economy_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> None:
+    """Hourly prices, the odometer per month and (the first time) the connection windows."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    now = dt_util.utcnow()
+    plugged, unplugged = now - datetime.timedelta(hours=30), now - datetime.timedelta(hours=10)
+    states = {CHARGER_STATUS: [
+        State(CHARGER_STATUS, "disconnected", last_changed=plugged - datetime.timedelta(hours=1)),
+        State(CHARGER_STATUS, "awaiting_start", last_changed=plugged),
+        State(CHARGER_STATUS, "disconnected", last_changed=unplugged),
+    ]}
+    hour = now.replace(minute=0, second=0, microsecond=0)
+
+    def statistics(_hass, _start, _end, ids, period, *_args):
+        if period == "hour":
+            return {next(iter(ids)): [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": 1.0 + h / 100} for h in range(48)]}
+        return {next(iter(ids)): [{"start": hour.replace(day=1).timestamp(), "change": 812.0}]}
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value=states),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
+    ):
+        await coordinator._async_economy_refresh()
+        await hass.async_block_till_done()
+    windows = coordinator.engine.economy_db["windows"]
+    assert (windows[0]["start"], windows[0]["end"]) == (plugged.timestamp(), unplugged.timestamp())
+    assert coordinator.engine.economy_db["backfilled"]
+    months = hass.states.get(f"sensor.{OBJECT_PREFIX}_economy").attributes["months"]
+    assert months and 812.0 in coordinator.engine.economy_db["odometer_months"].values()
+
+
+async def test_analysis_reads_the_recorder(hass: HomeAssistant, loaded_entry) -> None:
+    """The first time the drives of the raw history, every time the hourly outdoor temperature."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    from .conftest import EV_ODOMETER  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    coordinator.config["forecast"]["entity_ids"]["outdoor_temp_entity_id"] = "sensor.outdoor"
+    hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    away, home = hour - datetime.timedelta(hours=10), hour - datetime.timedelta(hours=2)
+
+    def state(entity_id, moment, value):
+        return State(entity_id, str(value), last_changed=moment, last_updated=moment)
+
+    states = {
+        CHARGER_STATUS: [state(CHARGER_STATUS, away - datetime.timedelta(hours=8), "completed"), state(CHARGER_STATUS, away, "disconnected"), state(CHARGER_STATUS, home, "awaiting_start")],
+        EV_ODOMETER: [state(EV_ODOMETER, away - datetime.timedelta(hours=9), 20000), state(EV_ODOMETER, home - datetime.timedelta(minutes=5), 20090)],
+        EV_LEVEL_ID: [state(EV_LEVEL_ID, away - datetime.timedelta(hours=9), 80), state(EV_LEVEL_ID, home - datetime.timedelta(minutes=5), 62)],
+    }
+
+    def statistics(_hass, _start, _end, ids, *_args):
+        return {next(iter(ids)): [{"start": (hour - datetime.timedelta(hours=h)).timestamp(), "mean": -2.0} for h in range(30)]}
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", return_value=states),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=statistics),
+    ):
+        await coordinator._async_analysis_refresh()
+        await hass.async_block_till_done()
+    drives = hass.states.get(f"sensor.{OBJECT_PREFIX}_analysis").attributes["drives"]
+    assert len(drives) == 1 and drives[0]["km"] == 90.0 and drives[0]["temp"] == -2.0
+    assert coordinator.engine.analysis_backfilled()
+
+
+async def test_economy_uses_the_raw_price_history_without_statistics(hass: HomeAssistant, loaded_entry) -> None:
+    """A price sensor without state_class has no statistics: its raw history gives the hourly prices."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    from .conftest import PRICE  # noqa: PLC0415
+
+    coordinator = loaded_entry.runtime_data
+    hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    raw = {PRICE: [State(PRICE, str(1.0 + h / 10), last_changed=hour - datetime.timedelta(hours=h), last_updated=hour - datetime.timedelta(hours=h)) for h in range(5, 0, -1)]}
+    calls = []
+
+    def history_states(_hass, _start, _end, ids, *_args, **_kwargs):
+        calls.append(list(ids))
+        return raw if PRICE in ids else {}
+
+    hass.config.components.add("recorder")
+    recorder = SimpleNamespace(async_add_executor_job=hass.async_add_executor_job, keep_days=30)
+    captured = {}
+    original = coordinator.async_run_job
+
+    async def run_job(name, *args, **kwargs):
+        if name == "economy_update":
+            captured.update(args[0])
+        return await original(name, *args, **kwargs)
+
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch("homeassistant.components.recorder.history.get_significant_states", side_effect=history_states),
+        patch("homeassistant.components.recorder.statistics.statistics_during_period", return_value={}),
+        patch.object(coordinator, "async_run_job", side_effect=run_job),
+    ):
+        await coordinator._async_economy_refresh()
+    assert [PRICE] in calls
+    prices = captured["prices"]
+    assert prices[(hour - datetime.timedelta(hours=3)).timestamp()] == pytest.approx(1.3)

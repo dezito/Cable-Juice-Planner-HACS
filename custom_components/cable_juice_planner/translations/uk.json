@@ -203,13 +203,15 @@
           "production_entity_id": "Сонячне виробництво",
           "forecast_entity_id": "Сонячний прогноз (Solcast)",
           "inverter_discharging_power_limit": "Макс. потужність інвертора",
-          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години"
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
         },
         "data_description": {
           "production_entity_id": "Виробіток сонця (Вт)",
           "forecast_entity_id": "Прогноз сонця (Вт) (Підтримка: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
-          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. number.PREFIX_solar_sell_fixed_price = -1.0"
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
         }
       },
       "solar_charging": {
@@ -271,7 +273,7 @@
         },
         "data_description": {
           "cron_interval": "Хвилини між перевірками плану та заряджання.",
-          "dashboard": "Додає готову панель Cable Juice Planner на бічну панель для цього екземпляра. Потрібні картки HACS mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card та ultra-vehicle-card.",
+          "dashboard": "Додає готову панель Cable Juice Planner на бічну панель для цього екземпляра. Потрібні картки HACS mushroom, apexcharts-card, config-template-card та card-mod.",
           "enable_diagnostic_file_log": "Записує детальний лог у cable_juice_planner_PREFIX.log у папці конфігурації (2 МБ на файл, 3 ротації).",
           "testing_mode": "Позначає правило заряджання 🧪 і пропускає перевірку заряджання, підігрів та інші дії."
         }
@@ -357,6 +359,13 @@
         "data": {
           "import_source": "Імпортувати з"
         }
+      },
+      "restore_backup": {
+        "title": "Відновити з резервної копії",
+        "description": "Резервні копії Cable Juice Planner знайдено в **cable_juice_planner_backups** (створені командою Експортувати дані та під час видалення пристрою Cable Juice Planner).\n\nВиберіть одну, щоб відновити її як **{prefix}**: її конфігурація буде використана за замовчуванням на наступних сторінках, а бази даних і налаштування буде відновлено під час першого запуску.",
+        "data": {
+          "backup": "Відновити"
+        }
       }
     },
     "error": {
@@ -385,7 +394,8 @@
           "menu_prices": "Ціни",
           "menu_solar": "Сонце і погода",
           "menu_notifications": "Сповіщення",
-          "menu_advanced": "Розширені та бази даних"
+          "menu_advanced": "Розширені та бази даних",
+          "backup": "Резервна копія (експорт / імпорт)"
         }
       },
       "general": {
@@ -589,13 +599,15 @@
           "production_entity_id": "Сонячне виробництво",
           "forecast_entity_id": "Сонячний прогноз (Solcast)",
           "inverter_discharging_power_limit": "Макс. потужність інвертора",
-          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години"
+          "enable_selling_during_expensive_hours": "Продавати сонячну енергію в дорогі години",
+          "solar_sell_fixed_price": "Фіксована ціна продажу сонця"
         },
         "data_description": {
           "production_entity_id": "Виробіток сонця (Вт)",
           "forecast_entity_id": "Прогноз сонця (Вт) (Підтримка: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "Ліміт потужності розряду інвертора (Вт)",
-          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. number.PREFIX_solar_sell_fixed_price = -1.0"
+          "enable_selling_during_expensive_hours": "Увімкнути продаж у дорогі години; якщо вимкнено, сонце йде на EV. “Фіксована ціна продажу сонця” = -1.0",
+          "solar_sell_fixed_price": "Фіксована ціна продажу, для розрахунку надлишку. -1.0 — використовувати погодинну спотову ціну."
         }
       },
       "solar_charging": {
@@ -657,7 +669,7 @@
         },
         "data_description": {
           "cron_interval": "Хвилини між перевірками плану та заряджання.",
-          "dashboard": "Додає готову панель Cable Juice Planner на бічну панель для цього екземпляра. Потрібні картки HACS mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card та ultra-vehicle-card.",
+          "dashboard": "Додає готову панель Cable Juice Planner на бічну панель для цього екземпляра. Потрібні картки HACS mushroom, apexcharts-card, config-template-card та card-mod.",
           "enable_diagnostic_file_log": "Записує детальний лог у cable_juice_planner_PREFIX.log у папці конфігурації (2 МБ на файл, 3 ротації).",
           "testing_mode": "Позначає правило заряджання 🧪 і пропускає перевірку заряджання, підігрів та інші дії."
         }
@@ -714,6 +726,17 @@
           "phase_l3_entity_id": "Необов’язково: виміряний струм (A) або потужність (W) на фазу всього будинку. З усіма трьома споживання будинку віднімається.",
           "urgent_trip_hours": "Запланована поїздка протягом стількох годин дає авто перевагу."
         }
+      },
+      "backup": {
+        "title": "Резервна копія",
+        "description": "Експорт записує бази даних, налаштування й конфігурацію у файл у **cable_juice_planner_backups**.\n\nІмпорт файлу замінює бази даних і налаштування **{prefix}** резервною копією (поточні дані спочатку експортуються як файл *_before_import*) і перезавантажує інтеграцію.",
+        "data": {
+          "backup": "Дія",
+          "restore_configuration": "Також відновити конфігурацію"
+        },
+        "data_description": {
+          "restore_configuration": "Також використати сутності й параметри з резервної копії. Залиште вимкненим, якщо копія з іншого Home Assistant."
+        }
       }
     },
     "error": {
@@ -724,6 +747,11 @@
       "production_required": "Сонячний прогноз потребує сенсора виробництва.",
       "ev_incomplete": "Рівень батареї, запас ходу та одометр мають бути всі задані (або всі порожні).",
       "min_above_max": "Мінімум не може перевищувати максимум."
+    },
+    "abort": {
+      "backup_exported": "Резервну копію збережено як **{file}**.",
+      "backup_imported": "**{file}** імпортовано, інтеграцію перезавантажено.",
+      "backup_failed": "Імпорт не вдався: {error}"
     }
   },
   "selector": {
@@ -737,13 +765,20 @@
         "energidataservice": "Energi Data Service",
         "stromligning": "Strømligning"
       }
+    },
+    "restore_backup": {
+      "options": {
+        "none": "Не відновлювати (почати з нуля)"
+      }
+    },
+    "backup_action": {
+      "options": {
+        "export": "Експортувати зараз"
+      }
     }
   },
   "entity": {
     "switch": {
-      "deactivate_script": {
-        "name": "Деактивувати скрипт"
-      },
       "forced_charging_daily_battery_level": {
         "name": "Примусове заряджання нижче денного рівня"
       },
@@ -812,12 +847,18 @@
       },
       "powerwall_discharge_above_needed": {
         "name": "Надлишок домашньої батареї в EV"
+      },
+      "cheap_grid_charging": {
+        "name": "Заряджати при дешевій електроенергії"
+      },
+      "learn_driving_distance": {
+        "name": "Вивчати відстань поїздок"
+      },
+      "use_measured_charging_loss": {
+        "name": "Використовувати виміряні втрати"
       }
     },
     "number": {
-      "solar_sell_fixed_price": {
-        "name": "Фіксована ціна продажу сонця"
-      },
       "preheat_minutes_before": {
         "name": "Прогрів за X хвилин"
       },
@@ -943,9 +984,6 @@
       },
       "trip_homecoming_date_time": {
         "name": "Повернення EV"
-      },
-      "last_full_charge": {
-        "name": "Остання повна зарядка"
       }
     },
     "button": {
@@ -955,8 +993,11 @@
       "trip_reset": {
         "name": "Скинути заряд подорожі"
       },
-      "restart_script": {
-        "name": "Перезавантажити інтеграцію"
+      "export_data": {
+        "name": "Експортувати дані"
+      },
+      "recalculate_charging_loss": {
+        "name": "Перерахувати втрати заряджання"
       }
     },
     "sensor": {
@@ -1047,6 +1088,18 @@
       },
       "site_house_l3": {
         "name": "Струм будинку L3"
+      },
+      "last_full_charge": {
+        "name": "Остання повна зарядка"
+      },
+      "charging_loss_model": {
+        "name": "Виміряні втрати заряджання"
+      },
+      "economy": {
+        "name": "Економіка заряджання"
+      },
+      "analysis": {
+        "name": "Готовий до виїзду"
       }
     },
     "binary_sensor": {
@@ -1071,64 +1124,92 @@
   },
   "services": {
     "debug_info": {
-      "name": "Show debug info",
-      "description": "Shows the state of Cable Juice Planner as a notification (also returned as response).",
+      "name": "Показати налагоджувальну інформацію",
+      "description": "Показує стан Cable Juice Planner як сповіщення (також повертається як відповідь).",
       "fields": {
         "config_entry_id": {
-          "name": "Instance",
-          "description": "The Cable Juice Planner instance (empty = all)."
+          "name": "Екземпляр",
+          "description": "Екземпляр Cable Juice Planner (порожньо = усі)."
         }
       }
     },
     "enforce_planning": {
-      "name": "Enforce planning",
-      "description": "Recalculates the charging plan now.",
+      "name": "Примусове планування",
+      "description": "Перераховує план заряджання зараз.",
       "fields": {
         "config_entry_id": {
-          "name": "Instance",
-          "description": "The Cable Juice Planner instance (empty = all)."
+          "name": "Екземпляр",
+          "description": "Екземпляр Cable Juice Planner (порожньо = усі)."
         }
       }
     },
     "manual_add_public_charging_session": {
-      "name": "Add public charging session",
-      "description": "Manually adds a public charging session to the charging history. Cannot be undone. Use at least begin and end battery level, battery level added or kWh added. Try without Add to history first.",
+      "name": "Додати публічну сесію заряджання",
+      "description": "Вручну додає публічну сесію заряджання до історії заряджання. Не можна скасувати. Використовуйте щонайменше рівень батареї на початку і в кінці, доданий рівень батареї або додані кВт·год. Спершу спробуйте без Додати до історії.",
       "fields": {
         "config_entry_id": {
-          "name": "Instance",
-          "description": "The Cable Juice Planner instance (empty = all)."
+          "name": "Екземпляр",
+          "description": "Екземпляр Cable Juice Planner (порожньо = усі)."
         },
         "charging_session_start": {
-          "name": "Start",
-          "description": "Start time of the charging session."
+          "name": "Початок",
+          "description": "Час початку сесії заряджання."
         },
         "battery_level_begin": {
-          "name": "Battery level begin",
-          "description": "Battery level in percent at the start."
+          "name": "Рівень батареї на початку",
+          "description": "Рівень батареї у відсотках на початку."
         },
         "battery_level_end": {
-          "name": "Battery level end",
-          "description": "Battery level in percent at the end."
+          "name": "Рівень батареї в кінці",
+          "description": "Рівень батареї у відсотках у кінці."
         },
         "battery_level_added": {
-          "name": "Battery level added",
-          "description": "Energy added in percent."
+          "name": "Доданий рівень батареї",
+          "description": "Додана енергія у відсотках."
         },
         "battery_kwh_added": {
-          "name": "kWh added",
-          "description": "Energy added in kWh."
+          "name": "Додані кВт·год",
+          "description": "Додана енергія в кВт·год."
         },
         "total_charging_cost": {
-          "name": "Total cost",
-          "description": "The total cost of the charging session."
+          "name": "Загальна вартість",
+          "description": "Загальна вартість сесії заряджання."
         },
         "include_charging_loss": {
-          "name": "Include charging loss",
-          "description": "Adjust the added energy for charging loss."
+          "name": "Враховувати втрати заряджання",
+          "description": "Скоригувати додану енергію на втрати заряджання."
         },
         "add_to_history": {
-          "name": "Add to history",
-          "description": "Off = only return the calculation."
+          "name": "Додати до історії",
+          "description": "Вимк. = лише повернути розрахунок."
+        }
+      }
+    },
+    "export_data": {
+      "name": "Експортувати дані",
+      "description": "Зберігає бази даних, налаштування й конфігурацію як файл резервної копії в теці конфігурації (cable_juice_planner_backups).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Екземпляр",
+          "description": "Експортувати лише цей запис (за замовчуванням: усі)."
+        }
+      }
+    },
+    "import_data": {
+      "name": "Імпортувати дані",
+      "description": "Замінює бази даних і налаштування запису файлом резервної копії з cable_juice_planner_backups. Поточні дані спочатку експортуються.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Екземпляр",
+          "description": "Запис, у який відновити дані."
+        },
+        "file": {
+          "name": "Файл резервної копії",
+          "description": "Ім'я файлу в cable_juice_planner_backups (яке повертає Експортувати дані)."
+        },
+        "restore_configuration": {
+          "name": "Відновити конфігурацію",
+          "description": "Також замінити конфігурацію (сутності й параметри) резервною копією."
         }
       }
     }

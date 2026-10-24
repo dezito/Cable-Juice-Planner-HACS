@@ -203,13 +203,15 @@
           "production_entity_id": "Solar production",
           "forecast_entity_id": "Solar forecast (Solcast)",
           "inverter_discharging_power_limit": "Inverter max power",
-          "enable_selling_during_expensive_hours": "Sell solar in expensive hours"
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
           "forecast_entity_id": "Solar forecast (watts) (Supported: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
-          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. number.PREFIX_solar_sell_fixed_price must be -1.0 to use spot price"
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
         }
       },
       "solar_charging": {
@@ -271,7 +273,7 @@
         },
         "data_description": {
           "cron_interval": "Minutes between each check of the plan and the charging.",
-          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card and ultra-vehicle-card.",
+          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, apexcharts-card, config-template-card and card-mod.",
           "enable_diagnostic_file_log": "Writes a detailed log to cable_juice_planner_PREFIX.log in the config folder (2 MB per file, 3 rotations).",
           "testing_mode": "Marks the charging rule with 🧪 and skips the check that the car charges, preheating and other actions."
         }
@@ -357,6 +359,13 @@
         "data": {
           "import_source": "Import from"
         }
+      },
+      "restore_backup": {
+        "title": "Restore from a backup",
+        "description": "Cable Juice Planner backups found in **cable_juice_planner_backups** (written by Export data and when a Cable Juice Planner device is deleted).\n\nChoose one to restore it as **{prefix}**: its configuration is used as defaults on the next pages, and the databases and settings are restored on first start.",
+        "data": {
+          "backup": "Restore"
+        }
       }
     },
     "error": {
@@ -385,7 +394,8 @@
           "menu_prices": "Electricity prices",
           "menu_solar": "Solar panels and weather",
           "menu_notifications": "Notifications",
-          "menu_advanced": "Advanced and databases"
+          "menu_advanced": "Advanced and databases",
+          "backup": "Backup (export / import)"
         }
       },
       "general": {
@@ -589,13 +599,15 @@
           "production_entity_id": "Solar production",
           "forecast_entity_id": "Solar forecast (Solcast)",
           "inverter_discharging_power_limit": "Inverter max power",
-          "enable_selling_during_expensive_hours": "Sell solar in expensive hours"
+          "enable_selling_during_expensive_hours": "Sell solar in expensive hours",
+          "solar_sell_fixed_price": "Solar fixed sell price"
         },
         "data_description": {
           "production_entity_id": "Solar production (watts)",
           "forecast_entity_id": "Solar forecast (watts) (Supported: Solcast PV Forecast)",
           "inverter_discharging_power_limit": "Inverter discharging power limit (watts)",
-          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. number.PREFIX_solar_sell_fixed_price must be -1.0 to use spot price"
+          "enable_selling_during_expensive_hours": "Enable selling during expensive hours; if disabled, solar used for EV. “Solar fixed sell price” must be -1.0 to use spot price",
+          "solar_sell_fixed_price": "Fixed solar sell price, used for surplus calculations; set -1.0 to use spot price"
         }
       },
       "solar_charging": {
@@ -657,7 +669,7 @@
         },
         "data_description": {
           "cron_interval": "Minutes between each check of the plan and the charging.",
-          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, stack-in-card, numberbox-card, apexcharts-card, config-template-card and ultra-vehicle-card.",
+          "dashboard": "Adds a ready-made Cable Juice Planner dashboard to the sidebar for this instance. Needs the HACS cards mushroom, apexcharts-card, config-template-card and card-mod.",
           "enable_diagnostic_file_log": "Writes a detailed log to cable_juice_planner_PREFIX.log in the config folder (2 MB per file, 3 rotations).",
           "testing_mode": "Marks the charging rule with 🧪 and skips the check that the car charges, preheating and other actions."
         }
@@ -714,6 +726,17 @@
           "phase_l3_entity_id": "Optional: measured current (A) or power (W) per phase of the whole house (e.g. a HAN/P1 meter). With all three the house consumption is subtracted and an overloaded phase limits the last car at once. Without them the fuse is a fixed budget for the cars.",
           "urgent_trip_hours": "A planned trip within this many hours gives the car precedence."
         }
+      },
+      "backup": {
+        "title": "Backup",
+        "description": "Export writes the databases, settings and configuration to a file in **cable_juice_planner_backups**.\n\nImporting a file replaces the databases and settings of **{prefix}** with the backup (the current data is exported first, as a *_before_import* file) and reloads the integration.",
+        "data": {
+          "backup": "Action",
+          "restore_configuration": "Also restore the configuration"
+        },
+        "data_description": {
+          "restore_configuration": "Use the entities and options of the backup as well. Leave off when the backup comes from another Home Assistant."
+        }
       }
     },
     "error": {
@@ -724,6 +747,11 @@
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
       "min_above_max": "The minimum cannot be above the maximum."
+    },
+    "abort": {
+      "backup_exported": "The backup was saved as **{file}**.",
+      "backup_imported": "**{file}** was imported, the integration has been reloaded.",
+      "backup_failed": "The import failed: {error}"
     }
   },
   "selector": {
@@ -737,13 +765,20 @@
         "energidataservice": "Energi Data Service",
         "stromligning": "Strømligning"
       }
+    },
+    "restore_backup": {
+      "options": {
+        "none": "Do not restore (start empty)"
+      }
+    },
+    "backup_action": {
+      "options": {
+        "export": "Export now"
+      }
     }
   },
   "entity": {
     "switch": {
-      "deactivate_script": {
-        "name": "Deactivate script"
-      },
       "forced_charging_daily_battery_level": {
         "name": "Forced charging below daily target"
       },
@@ -812,12 +847,18 @@
       },
       "powerwall_discharge_above_needed": {
         "name": "Home battery discharge surplus to EV"
+      },
+      "cheap_grid_charging": {
+        "name": "Charge on cheap power"
+      },
+      "learn_driving_distance": {
+        "name": "Learn driving distance"
+      },
+      "use_measured_charging_loss": {
+        "name": "Use measured charging loss"
       }
     },
     "number": {
-      "solar_sell_fixed_price": {
-        "name": "Solar fixed sell price"
-      },
       "preheat_minutes_before": {
         "name": "Preheat X minutes before"
       },
@@ -943,9 +984,6 @@
       },
       "trip_homecoming_date_time": {
         "name": "EV trip return"
-      },
-      "last_full_charge": {
-        "name": "Last full charge"
       }
     },
     "button": {
@@ -955,8 +993,11 @@
       "trip_reset": {
         "name": "Reset trip charging"
       },
-      "restart_script": {
-        "name": "Reload the integration"
+      "export_data": {
+        "name": "Export data"
+      },
+      "recalculate_charging_loss": {
+        "name": "Recalculate charging loss"
       }
     },
     "sensor": {
@@ -1047,6 +1088,18 @@
       },
       "site_house_l3": {
         "name": "House current L3"
+      },
+      "last_full_charge": {
+        "name": "Last full charge"
+      },
+      "charging_loss_model": {
+        "name": "Measured charging loss"
+      },
+      "economy": {
+        "name": "Charging economy"
+      },
+      "analysis": {
+        "name": "Ready at departure"
       }
     },
     "binary_sensor": {
@@ -1129,6 +1182,34 @@
         "add_to_history": {
           "name": "Add to history",
           "description": "Off = only return the calculation."
+        }
+      }
+    },
+    "export_data": {
+      "name": "Export data",
+      "description": "Saves the databases, settings and configuration as a backup file in the config folder (cable_juice_planner_backups).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instance",
+          "description": "Only export this entry (default: all)."
+        }
+      }
+    },
+    "import_data": {
+      "name": "Import data",
+      "description": "Replaces the databases and settings of an entry with a backup file from cable_juice_planner_backups. The current data is exported first.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instance",
+          "description": "The entry to restore into."
+        },
+        "file": {
+          "name": "Backup file",
+          "description": "File name in cable_juice_planner_backups (as returned by Export data)."
+        },
+        "restore_configuration": {
+          "name": "Restore configuration",
+          "description": "Also replace the configuration (entities and options) with the backup."
         }
       }
     }

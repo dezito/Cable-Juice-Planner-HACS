@@ -48,6 +48,7 @@ EFFICIENCY_FACTORS = {
     for month, factor in {1: 0.85, 2: 0.87, 3: 0.90, 4: 0.95, 5: 1.00, 6: 1.02, 7: 1.03, 8: 1.02, 9: 1.00, 10: 0.95, 11: 0.90, 12: 0.87}.items()
 }
 HEATING_STATES = ("preheat_start", "preheat_cancel")
+FULL_CHARGE_BATTERY_LEVEL = 99.0  # sets last_full_charge (full_charge_recommended)
 
 
 class HistoryMixin:
@@ -983,9 +984,11 @@ class HistoryMixin:
         return max_battery_level
 
     def is_battery_fully_charged(self) -> None:
-        if self.battery_level() < 100.0:
+        # a cold battery stops at 99%, that counts as the full charge too
+        if self.battery_level() < FULL_CHARGE_BATTERY_LEVEL:
             return
-        self.set_setting("last_full_charge", self.now())
+        self.set_state("last_full_charge", self.now())
+        self.mark_dirty("runtime")
 
     def drive_efficiency_save_car_stats(self, bootup=False) -> None:
         def set_last_odometer():
@@ -1071,6 +1074,8 @@ class HistoryMixin:
                     return
                 if not self.preheating:
                     self.drive_efficiency_save_car_stats()
+                    if self.is_ev_configured():
+                        self.analysis_unplugged()
                 self.preheating = False
                 return
             if state not in EV_PLUGGED_STATES + CHARGER_READY_STATUS:
@@ -1089,8 +1094,9 @@ class HistoryMixin:
                 used_battery = last_battery_level - self.battery_level()
                 used_kwh = self.percentage_to_kwh(used_battery)
                 kilometers = round(self.get_estimated_total_range() * (used_battery / 100.0), 1)
-                if used_kwh == 0.0 or used_battery == 0.0:
-                    _LOGGER.warning("Used kWh or Used Battery is 0.0, ignoring drive")
+                # entered level above the saved one (charged elsewhere or no unplug seen): no drive to report
+                if used_kwh <= 0.0 or used_battery <= 0.0:
+                    _LOGGER.warning("Used kWh (%s) or Used Battery (%s) is 0.0 or less, ignoring drive", used_kwh, used_battery)
                     return
             else:
                 odometer_entity = self.config["ev_car"]["entity_ids"]["odometer_entity_id"]
@@ -1122,6 +1128,7 @@ class HistoryMixin:
                 self.drive_efficiency_db.insert(0, [self.now(), efficiency])
                 self.drive_efficiency_db = self.drive_efficiency_db[: self.config["database"]["drive_efficiency_db_data_to_save"]]
                 self.save_drive_efficiency()
+                self.analysis_drive(kilometers, used_battery)
                 self.km_kwh_efficiency_db.insert(0, [self.now(), distance_per_kwh])
                 self.km_kwh_efficiency_db = self.km_kwh_efficiency_db[: self.config["database"]["km_kwh_efficiency_db_data_to_save"]]
                 self.save_km_kwh_efficiency()
