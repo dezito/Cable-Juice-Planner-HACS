@@ -14,8 +14,9 @@ blueprint:
 
 
     **Order on start:** enable the charger → charging current in the charger → charging
-    current in the car → start the charger → start the car. On stop, both the charger and the
-    car are stopped.
+    current in the car → start the charger → (optional wait) → start the car. On stop, both the
+    charger and the car are stopped. If one action fails (e.g. the charger's cloud does not
+    answer), the error is logged and the rest still run, so the car is still told to charge.
 
 
     **Fail-safe:** if `charger_action` is unavailable, or no new plan has been calculated for
@@ -124,6 +125,20 @@ blueprint:
           default: []
           selector:
             action: {}
+        car_start_delay:
+          name: Wait before starting the car
+          description: >
+            Seconds between the charger's actions (enable, charging current, start) and
+            "Start charging in the car", so the charger is ready before the car is told to
+            charge. 0 = no wait. Only used when the car is started.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 300
+              step: 5
+              unit_of_measurement: s
+              mode: box
         car_stop_actions:
           name: Stop charging in the car
           description: The opposite of start – the switch turned off or the stop service.
@@ -351,6 +366,7 @@ variables:
   restart_max: !input restart_max
   fail_safe_minutes: !input fail_safe_minutes
   fail_safe_amps: !input fail_safe_amps
+  car_start_delay: !input car_start_delay
   fail_safe_phases: !input fail_safe_phases
   action: "{{ states(action_sensor) }}"
   charger_mode: "{{ state_attr(action_sensor, 'mode') or 'normal' }}"
@@ -385,101 +401,191 @@ variables:
 actions:
   - choose:
       # ---- fail-safe: the planner is gone or does not calculate any more ----
-      - conditions: "{{ fail_safe }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ fail_safe }}"
         sequence:
           # not while it charges, and not when the charger says the car is done
-          - if: "{{ not already_charging and not charger_done }}"
+          - if:
+              - condition: template
+                value_template: "{{ not already_charging and not charger_done }}"
             then:
               - variables:
                   message: >
                     Cable Juice Planner has not updated {{ action_sensor }} for over
                     {{ fail_safe_minutes }} min (action: {{ action }}). Charging with fail-safe
                     {{ fail_safe_amps }} A on {{ fail_safe_phases }} phase(s).
-              - sequence: !input enable_actions
-              - sequence: !input amps_actions
-              - sequence: !input car_amps_actions
-              - sequence: !input start_actions
-              - sequence: !input car_start_actions
-              # notify when the fail-safe starts and at most once an hour while it lasts
-              - if: "{{ trigger.id != 'watchdog' or now().minute < 5 }}"
+              - continue_on_error: true
+                sequence: !input enable_actions
+              - continue_on_error: true
+                sequence: !input amps_actions
+              - continue_on_error: true
+                sequence: !input car_amps_actions
+              - continue_on_error: true
+                sequence: !input start_actions
+              - if:
+                  - condition: template
+                    value_template: "{{ car_start_delay > 0 }}"
                 then:
-                  - sequence: !input notify_actions
+                  - delay: "{{ car_start_delay }}"
+              - continue_on_error: true
+                sequence: !input car_start_actions
+              # notify when the fail-safe starts and at most once an hour while it lasts
+              - if:
+                  - condition: template
+                    value_template: "{{ trigger.id != 'watchdog' or now().minute < 5 }}"
+                then:
+                  - continue_on_error: true
+                    sequence: !input notify_actions
       # ---- charging was asked for but does not happen: restart the integrations ----
-      - conditions: >
-          {{ trigger.id == 'watchdog' and has_charging_state and action == 'charge' and charger_enabled
-             and not already_charging and not charger_done
-             and 1 <= restart_attempt <= restart_max
-             and (charge_minutes - restart_minutes) % restart_minutes < 5 }}
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'watchdog' and has_charging_state and action == 'charge' and charger_enabled
+                 and not already_charging and not charger_done
+                 and 1 <= restart_attempt <= restart_max
+                 and (charge_minutes - restart_minutes) % restart_minutes < 5 }}
         sequence:
           - variables:
               message: >
                 Not charging, although Cable Juice Planner has asked for it for
                 {{ charge_minutes }} min. Restarting (attempt {{ restart_attempt }} of
                 {{ restart_max }}).
-          - sequence: !input restart_actions
-          - sequence: !input notify_actions
+          - continue_on_error: true
+            sequence: !input restart_actions
+          - continue_on_error: true
+            sequence: !input notify_actions
           # after the restart: send the current decision again
           - delay: 60
-          - sequence: !input enable_actions
-          - sequence: !input amps_actions
-          - if: "{{ max_phase > 0 }}"
+          - continue_on_error: true
+            sequence: !input enable_actions
+          - continue_on_error: true
+            sequence: !input amps_actions
+          - if:
+              - condition: template
+                value_template: "{{ max_phase > 0 }}"
             then:
-              - sequence: !input car_amps_actions
-          - sequence: !input start_actions
-          - sequence: !input car_start_actions
+              - continue_on_error: true
+                sequence: !input car_amps_actions
+          - continue_on_error: true
+            sequence: !input start_actions
+          - if:
+              - condition: template
+                value_template: "{{ car_start_delay > 0 }}"
+            then:
+              - delay: "{{ car_start_delay }}"
+          - continue_on_error: true
+            sequence: !input car_start_actions
       # ---- the integration reports an error (it already asks for max amps) ----
-      - conditions: "{{ trigger.id == 'mode' and charger_mode == 'error' }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'mode' and charger_mode == 'error' }}"
         sequence:
           - variables:
               message: >
                 Cable Juice Planner could not calculate the charging plan and is charging
                 with max current. See the notifications in Home Assistant.
-          - sequence: !input notify_actions
-          - sequence: !input amps_actions
-          - if: "{{ max_phase > 0 }}"
+          - continue_on_error: true
+            sequence: !input notify_actions
+          - continue_on_error: true
+            sequence: !input amps_actions
+          - if:
+              - condition: template
+                value_template: "{{ max_phase > 0 }}"
             then:
-              - sequence: !input car_amps_actions
-          - if: "{{ not charger_done }}"
+              - continue_on_error: true
+                sequence: !input car_amps_actions
+          - if:
+              - condition: template
+                value_template: "{{ not charger_done }}"
             then:
-              - sequence: !input start_actions
-              - sequence: !input car_start_actions
+              - continue_on_error: true
+                sequence: !input start_actions
+              - if:
+                  - condition: template
+                    value_template: "{{ car_start_delay > 0 }}"
+                then:
+                  - delay: "{{ car_start_delay }}"
+              - continue_on_error: true
+                sequence: !input car_start_actions
       # ---- normal operation ----
-      - conditions: "{{ trigger.id == 'enabled' }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'enabled' }}"
         sequence:
-          - if: "{{ charger_enabled }}"
+          - if:
+              - condition: template
+                value_template: "{{ charger_enabled }}"
             then:
-              - sequence: !input enable_actions
+              - continue_on_error: true
+                sequence: !input enable_actions
             else:
-              - sequence: !input disable_actions
-      - conditions: "{{ trigger.id == 'limit' and charging_limit > 0 }}"
+              - continue_on_error: true
+                sequence: !input disable_actions
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'limit' and charging_limit > 0 }}"
         sequence:
-          - sequence: !input car_limit_actions
-      - conditions: "{{ trigger.id == 'amps' and action in ['charge', 'stop'] }}"
+          - continue_on_error: true
+            sequence: !input car_limit_actions
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'amps' and action in ['charge', 'stop'] }}"
         sequence:
-          - sequence: !input amps_actions
-          - if: "{{ max_phase > 0 }}"
+          - continue_on_error: true
+            sequence: !input amps_actions
+          - if:
+              - condition: template
+                value_template: "{{ max_phase > 0 }}"
             then:
-              - sequence: !input car_amps_actions
-      - conditions: "{{ trigger.id in ['action', 'start', 'fail_safe'] and action in ['charge', 'stop'] }}"
+              - continue_on_error: true
+                sequence: !input car_amps_actions
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id in ['action', 'start', 'fail_safe'] and action in ['charge', 'stop'] }}"
         sequence:
-          - if: "{{ charger_enabled }}"
+          - if:
+              - condition: template
+                value_template: "{{ charger_enabled }}"
             then:
-              - sequence: !input enable_actions
-          - if: "{{ action == 'charge' }}"
+              - continue_on_error: true
+                sequence: !input enable_actions
+          - if:
+              - condition: template
+                value_template: "{{ action == 'charge' }}"
             then:
-              - if: "{{ charging_limit > 0 }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ charging_limit > 0 }}"
                 then:
-                  - sequence: !input car_limit_actions
-              - sequence: !input amps_actions
-              - if: "{{ max_phase > 0 }}"
+                  - continue_on_error: true
+                    sequence: !input car_limit_actions
+              - continue_on_error: true
+                sequence: !input amps_actions
+              - if:
+                  - condition: template
+                    value_template: "{{ max_phase > 0 }}"
                 then:
-                  - sequence: !input car_amps_actions
+                  - continue_on_error: true
+                    sequence: !input car_amps_actions
               # a new charge decision always starts; after a restart only when not charging/done
-              - if: "{{ trigger.id == 'action' or not (already_charging or charger_done) }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'action' or not (already_charging or charger_done) }}"
                 then:
-                  - sequence: !input start_actions
-                  - sequence: !input car_start_actions
+                  - continue_on_error: true
+                    sequence: !input start_actions
+                  - if:
+                      - condition: template
+                        value_template: "{{ car_start_delay > 0 }}"
+                    then:
+                      - delay: "{{ car_start_delay }}"
+                  - continue_on_error: true
+                    sequence: !input car_start_actions
             else:
-              - sequence: !input stop_actions
-              - sequence: !input car_stop_actions
-              - sequence: !input amps_actions
+              - continue_on_error: true
+                sequence: !input stop_actions
+              - continue_on_error: true
+                sequence: !input car_stop_actions
+              - continue_on_error: true
+                sequence: !input amps_actions
