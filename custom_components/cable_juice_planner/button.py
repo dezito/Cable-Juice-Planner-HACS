@@ -34,7 +34,7 @@ class CJPButton(CJPEntity, ButtonEntity):
 class CJPExportButton(CJPEntity, ButtonEntity):
     """Write a backup of the databases and settings to cable_juice_planner_backups."""
 
-    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_press(self) -> None:
         name = await async_export(self.hass, self.coordinator.entry)
@@ -49,7 +49,7 @@ class CJPExportButton(CJPEntity, ButtonEntity):
 class CJPResetDashboardButton(CJPEntity, ButtonEntity):
     """Throw away the edits made to the sidebar dashboard in the UI."""
 
-    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_press(self) -> None:
         await async_reset_dashboard(self.hass, self.coordinator.prefix)
