@@ -301,7 +301,9 @@ def _replace(text: str, replace: dict[str, str]) -> str:
     return pattern.sub(lambda match: replace[match.group(1)], text)
 
 
-def render_dashboard(config: dict[str, Any], prefix: str, entry_id: str, existing: set[str]) -> str:
+def render_dashboard(
+    config: dict[str, Any], prefix: str, entry_id: str, existing: set[str], currency: str | None = None, distance: str | None = None
+) -> str:
     """Build the dashboard YAML for one instance (blocking file I/O).
 
     prefix: the user's prefix (entity ids cjp_<prefix>_*)
@@ -320,7 +322,7 @@ def render_dashboard(config: dict[str, Any], prefix: str, entry_id: str, existin
     if not (is_ev_configured(config) and config["ev_car"]["entity_ids"]["climate_entity_id"]):
         # preheating needs the car integration and its climate entity
         missing |= {f"{platform}.{own}_{key}" for platform, key in PREHEAT_ENTITIES}
-    texts = load_texts(normalize_language(config.get("language")))
+    texts = load_texts(normalize_language(config.get("language")), currency, distance)
     template = _translate(_drop_empty_headings(_prune(template, missing)), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)
 
@@ -350,7 +352,8 @@ async def async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry, config:
     existing.update(entity.entity_id for entity in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id))
 
     def _render() -> bool:
-        return _write_if_changed(path, render_dashboard(config, prefix, entry.entry_id, existing))
+        return _write_if_changed(path, render_dashboard(config, prefix, entry.entry_id, existing, hass.config.currency, str(hass.config.units.length_unit))
+        )
 
     try:
         changed = await hass.async_add_executor_job(_render)

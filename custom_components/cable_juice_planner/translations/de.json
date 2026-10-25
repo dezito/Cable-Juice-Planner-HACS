@@ -920,7 +920,7 @@
         "name": "Reiseladung bis"
       },
       "trip_range_needed": {
-        "name": "Reise-km Bedarf"
+        "name": "Reise-{distance} Bedarf"
       },
       "full_charge_recommended": {
         "name": "Empfohlene Vollladung alle"
@@ -1063,7 +1063,7 @@
         "name": "Fahr­effizienz"
       },
       "km_per_kwh": {
-        "name": "km/kWh"
+        "name": "{distance_kwh}"
       },
       "estimated_range": {
         "name": "Geschätzte Reichweite"

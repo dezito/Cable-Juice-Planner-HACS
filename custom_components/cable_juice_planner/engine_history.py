@@ -674,7 +674,7 @@ class HistoryMixin:
             if charging_ended:
                 ended = self.now().strftime("%H:%M")
                 _LOGGER.info(
-                    "Charging session ended %s: %s%% %skWh %skr (%skr/kWh) %s %s",
+                    "Charging session ended %s: %s%% %skWh %s (%s/kWh) %s %s",
                     ended, added_percentage, kwh, cost, price, session["charging_type"], session["emoji"],
                 )
                 entry["ended"] = ended
@@ -957,7 +957,7 @@ class HistoryMixin:
         for key in ("drive_efficiency", "km_per_kwh", "estimated_range"):
             self.set_attr(key, "last_drive_distance", f"{round(kilometers, 1)}{distance_type}")
             self.set_attr(key, "last_drive_used", f"{round(used_kwh, 2)}kWh ({round(used_battery, 1)}%)")
-            self.set_attr(key, "last_drive_cost", f"{round(cost, 2)}kr")
+            self.set_attr(key, "last_drive_cost", f"{round(cost, 2)}{self.t('ui.common.valuta')}")
             self.set_attr(key, "last_drive_efficiency", f"{round(efficiency, 1)}% {round(distance_per_kwh, 2)} {self.t('ui.common.distance_kwh')} ({wh_km} {self.t('ui.common.wh_distance')})")
 
     def peak_battery_level_after_last_plug(self) -> float:
@@ -1135,10 +1135,10 @@ class HistoryMixin:
                 self.save_km_kwh_efficiency()
 
             cost = 0.0
-            kr_km = 0.0
+            cost_per_distance = 0.0
             if self.battery_level_expenses.get("battery_level_expenses_unit") is not None:
                 cost = round(self.battery_level_expenses["battery_level_expenses_unit"] * used_kwh, 2)
-                kr_km = round(cost / kilometers, 2) if kilometers > 0 else 0.0
+                cost_per_distance = round(cost / kilometers, 2) if kilometers > 0 else 0.0
             wh_km = round(1000 / distance_per_kwh, 2)
             self.last_drive_efficiency_data = {
                 "timestamp": self.now(),
@@ -1160,7 +1160,7 @@ class HistoryMixin:
                 lines = [
                     f"{t('ui.drive_efficiency.distance')}: {round(kilometers, 1)}{distance_type}",
                     f"{t('ui.drive_efficiency.used')}: {round(used_kwh, 2)}kWh ({round(used_battery, 1)}%)",
-                    f"{t('ui.common.price')}: {cost:.2f}kr ({kr_km:.2f} kr/{distance_type})",
+                    f"{t('ui.common.price')}: {cost:.2f}{t('ui.common.valuta')} ({cost_per_distance:.2f} {t('ui.common.valuta')}/{distance_type})",
                     f"{t('ui.common.drive_efficiency')}: {round(efficiency, 1)}%",
                     f"{round(distance_per_kwh, 2)} {distance_type}/kWh ({wh_km} Wh/{distance_type})",
                 ]

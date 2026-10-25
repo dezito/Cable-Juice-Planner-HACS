@@ -38,8 +38,15 @@ class CJPSensor(CJPUpdatingEntity, SensorEntity):
 
     def __init__(self, coordinator: CJPCoordinator, key: str, unit, device_class, state_class, _requires) -> None:
         super().__init__(coordinator, "sensor", key)
+        # {distance} / {distance_kwh} in the entity name (translations/<language>.json)
+        self._attr_translation_placeholders = {"distance": coordinator.distance_unit, "distance_kwh": f"{coordinator.distance_unit}/kWh"}
         if unit:
-            self._attr_native_unit_of_measurement = unit
+            # {valuta} / {valuta_kwh}: the currency of Home Assistant, {distance}: its length unit
+            self._attr_native_unit_of_measurement = unit.format(
+                valuta=coordinator.t("ui.common.valuta"),
+                valuta_kwh=coordinator.t("ui.common.valuta_kwh"),
+                distance=coordinator.distance_unit,
+            )
         if device_class:
             self._attr_device_class = SensorDeviceClass(device_class)
         if state_class:
