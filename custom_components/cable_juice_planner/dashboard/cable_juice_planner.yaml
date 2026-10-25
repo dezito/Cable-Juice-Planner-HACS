@@ -23,20 +23,6 @@ views:
     - condition: state
       entity: input_boolean.dezito_show_debug_button
       state: 'on'
-  - type: custom:mushroom-template-badge
-    content: '@@export_debug@@'
-    icon: mdi:bug-outline
-    color: yellow
-    tap_action:
-      action: perform-action
-      perform_action: cable_juice_planner.export_debug
-      data:
-        config_entry_id: __ENTRY_ID__
-    label: ''
-    visibility:
-    - condition: state
-      entity: input_boolean.dezito_show_debug_button
-      state: 'on'
   - &id002
     type: entity
     entity: button.cjp_enforce_planning
@@ -2011,6 +1997,24 @@ views:
         name:
           type: entity
       - entity: switch.cjp_price_forecast_correction
+        name:
+          type: entity
+      grid_options: *id001
+    - type: heading
+      heading: '@@section_problem@@'
+      heading_style: subtitle
+      icon: mdi:bug-outline
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>
+
+@@help_problem@@
+
+</details>"
+      grid_options: *id001
+    - type: entities
+      show_header_toggle: false
+      entities:
+      - entity: button.cjp_export_debug
         name:
           type: entity
       grid_options: *id001
