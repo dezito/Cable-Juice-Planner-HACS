@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import json
 import zoneinfo
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -585,3 +586,84 @@ def test_without_location_home_follows_charger_status_and_cable(status, status_h
     result = engine.run_job(snap, engine.is_ev_home)
     assert result.error is None
     assert result.value is home
+
+
+def _price_history() -> dict:
+    """Price history where the price tells the weekday: 2.<weekday> kr in every hour."""
+    history = {hour: {dow: [2.0 + dow / 10] * 3 for dow in range(7)} for hour in range(24)}
+    return {"history": history, "history_sell": deepcopy(history), "max": [3.0], "mean": [2.0], "min": [1.0], "version": 2.0}
+
+
+def test_missing_hours_are_filled_from_the_price_history() -> None:
+    """Only today's prices are published: the rest of the plan (today + 7 days) uses the history of that weekday."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    snap.price_data["attributes"]["sensor.price"].update(raw_tomorrow=[], tomorrow_valid=False, forecast=[])
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    assert engine.run_job(snap, engine.charge_if_needed, True).error is None
+
+    prices = engine.grid_price_cache["prices"]
+    sources = engine.grid_price_cache["sources"]
+    assert prices[now.replace(hour=17)] == pytest.approx(1.0 + 1.5 + 0.17)  # published price kept
+    assert sources[now.replace(hour=17)] == "energidataservice:real"
+    for days in (1, 4, 7):
+        timestamp = now.replace(hour=17) + datetime.timedelta(days=days)
+        assert sources[timestamp] == "database"
+        assert prices[timestamp] == pytest.approx(round(2.0 + timestamp.weekday() / 10 + days / 30, 2))
+    assert max(prices) == datetime.datetime.combine(DAY + datetime.timedelta(days=7), datetime.time(23))
+    assert engine.grid_price_cache["using_offline_prices"] is False
+
+
+def test_offline_prices_use_the_same_weekday() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    snap.price_data = {"attributes": {}, "values": {}}
+    snap.attributes = {}
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()})
+    engine.run_job(snap, engine.get_grid_prices, True)
+    prices = engine.grid_price_cache["prices"]
+    assert engine.grid_price_cache["using_offline_prices"] is True
+    for days in range(7):
+        timestamp = now + datetime.timedelta(days=days)
+        assert prices[timestamp] == pytest.approx(round(2.0 + timestamp.weekday() / 10 + days / 30, 2))
+
+
+def test_price_history_never_stores_the_filled_hours() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    snap = snapshot(now)
+    rows = snap.price_data["attributes"]["sensor.price"]["raw_today"]
+    snap.price_data["attributes"]["sensor.price"]["raw_today"] = [row for row in rows if row["hour"][11:13] not in ("14", "15", "16")]
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {"kwh_avg_prices": _price_history()}).error is None
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+    assert engine.grid_price_cache["sources"][now.replace(hour=15)] == "database"
+    # 21 real hours: the day is not stored, so the filled hours never become history
+    assert engine.kwh_avg_prices_db["history"][15][DAY.weekday()] == _price_history()["history"][15][DAY.weekday()]
+
+
+def test_sell_value_with_fixed_solar_sell_price() -> None:
+    """A fixed price settles the difference to the hourly price: fixed - hourly, also negative."""
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.sell_value(5.0) == pytest.approx(5.0)
+    engine = CJPEngine(const.build_config({**OPTIONS, "solar_sell_fixed_price": 1.0}), "cjp_test", TEXTS)
+    assert engine.sell_value(5.0) == pytest.approx(-4.0)
+    assert engine.sell_value(0.5) == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("fixed", [-1.0, 1.0])
+def test_solar_sell_price_with_fixed_price(fixed: float) -> None:
+    """The solar kWh is worth what selling it would earn: the hourly sell price, or fixed - hourly."""
+    options = {**OPTIONS, "production_entity_id": "sensor.solar", "solar_sell_fixed_price": fixed}
+    now = datetime.datetime.combine(DAY, datetime.time(18, 0))
+    snap = snapshot(now)
+    snap.states["sensor.solar"] = "0"
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.get_solar_sell_price)
+    assert result.error is None, result.error
+    hourly = engine.price_provider.get_sell_price(now)["price"]
+    assert result.value == pytest.approx(hourly if fixed == -1.0 else 1.0 - hourly, abs=0.001)
+    if fixed != -1.0:
+        assert result.value < 0.0  # 18:00 sells for more than the fixed price

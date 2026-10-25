@@ -573,7 +573,8 @@ class EnergyMixin:
                     watt = round(data["pv_estimate"] * 1000.0, 0)
                     consumption = self.get_forecast_value(self.power_values_db[date.hour].get("power_consumption_without_all_exclusion", [0.0]))
                     available_kwh = round(max(watt - consumption, 0.0) / 1000.0, 3)
-                    forecast[date] = (available_kwh, self.price_provider.calculate_sell_price(date, hour_prices[date]))
+                    # hour_prices are sell prices already (ev.py calculated the sell price of them a second time)
+                    forecast[date] = (available_kwh, self.sell_value(hour_prices[date]))
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error("Error in forecast_task for %s: %s %s", entity_id, err, type(err))
         return forecast
@@ -585,7 +586,6 @@ class EnergyMixin:
         expected to charge from solar instead.
         """
         config = self.config
-        sell_price = float(config["solar"]["production_price"]) if self.is_solar_configured() else 0.0
         stop_prediction_before = 3
         days = 7
         today = self.start_of_day()
@@ -637,9 +637,7 @@ class EnergyMixin:
                     power_one_down_list = [self.get_forecast_value(power_one_down_list)] if power_one_down_list else []
                     power_one_up_list = [self.get_forecast_value(power_one_up_list)] if power_one_up_list else []
                     avg_power = max(average(power_list + power_list + power_list + power_one_down_list + power_one_up_list), 0.0)
-                    avg_sell_price = sell_price
-                    if avg_sell_price == -1.0:
-                        avg_sell_price = self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week])
+                    avg_sell_price = self.sell_value(self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week]))
                     return [avg_power / 1000, avg_sell_price]
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Cant get cloudiness: %s, hour: %s, day_of_week: %s. %s", cloudiness, hour, day_of_week, err)
@@ -912,19 +910,17 @@ class EnergyMixin:
             sell_price = float(production_price)
             entity_price = sell_price
             if get_avg_offline_sell_price:
-                if sell_price != -1.0:
-                    return sell_price
                 sun_events = self.get_sun_events()
-                return average([
+                return self.sell_value(average([
                     self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][hour][day_of_week])
                     for hour in range(sun_events["sunrise"].hour, sun_events["sunset"].hour)
-                ])
+                ]))
 
             sell_data = self.price_provider.get_sell_price(self.now())
             solar_sell_price = sell_data["price"]
             details = sell_data.get("details", {})
-            if sell_price == -1.0:
-                sell_price = round(solar_sell_price, 3)
+            # what the solar kWh would have been sold for (see sell_value)
+            sell_price = round(self.sell_value(solar_sell_price), 3)
 
             if set_entity_attr:
                 price = details.get("price", 0.0)
@@ -981,16 +977,14 @@ class EnergyMixin:
                 if "sell_fee" in details:
                     self.local_energy_prices["solar_kwh_price"]["sell_fee"] = round(details["sell_fee"], 3)
                 if entity_price >= 0.0:
-                    self.set_attr(key, "fixed_sell_price", f"{sell_price:.3f} {valuta_kwh}")
-                    self.local_energy_prices["solar_kwh_price"]["fixed_sell_price"] = sell_price
+                    self.set_attr(key, "fixed_sell_price", f"{entity_price:.3f} {valuta_kwh}")
+                    self.local_energy_prices["solar_kwh_price"]["fixed_sell_price"] = entity_price
         except Exception as err:  # noqa: BLE001
             sell_price = None
             using_text = "default"
             try:
-                sell_price = float(production_price)
-                if sell_price == -1.0:
-                    sell_price = self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week])
-                    using_text = "database forecast"
+                sell_price = self.sell_value(self.get_forecast_value(self.kwh_avg_prices_db["history_sell"][self.now().hour][day_of_week]))
+                using_text = "database forecast"
             except Exception:  # noqa: BLE001
                 pass
             if sell_price is None:
@@ -1041,6 +1035,8 @@ class EnergyMixin:
                     history_key = "history_sell" if solar_available_production > 0 else "history"
                     # the hour offset (not the hour of day) indexes the price history, like ev.py
                     kwh_price = self.get_forecast_value(self.kwh_avg_prices_db[history_key][hour][loop_timestamp.weekday()])
+                    if history_key == "history_sell":
+                        kwh_price = self.sell_value(kwh_price)
                     kwh_price_list.append(round(kwh_price, 3))
                     powerwall_kwh.append(round(charging, 3))
                     powerwall_total_cost.append(round(charging * kwh_price, 3))
@@ -1197,8 +1193,9 @@ class EnergyMixin:
             _LOGGER.info("KWH avg prices already updated today, skipping append")
             return
         try:
-            grid_prices = self.get_grid_prices()
-            sell_prices = self.get_sell_prices() if self.is_solar_configured() else {}
+            # only the provider's prices - the hours filled from the history must not be stored again
+            grid_prices = self.price_provider.get_buy_prices()
+            sell_prices = self.price_provider.get_sell_prices() if self.is_solar_configured() else {}
             today = self.now().date()
             day_of_week = self.now().weekday()
             max_length = self.config["database"]["kwh_avg_prices_db_data_to_save"]

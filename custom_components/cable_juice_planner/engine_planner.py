@@ -1869,7 +1869,8 @@ class PlannerMixin:
 
                     planning_basis_markdown()
 
-                if self.grid_price_cache.get('using_offline_prices', False):
+                # all prices offline, or hours the provider has no price for, filled from the price history
+                if self.grid_price_cache.get('missing_hours'):
                     def _build_header(n_pairs=4):
                         heads, aligns = [], []
                         for _ in range(n_pairs):

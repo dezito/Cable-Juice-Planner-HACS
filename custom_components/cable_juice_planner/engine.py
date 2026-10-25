@@ -983,7 +983,6 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
     def get_hour_prices(self, update_prices=False, sell_prices=False) -> dict:
         """Prices per period. Without online prices, offline prices from the price history."""
         now = self.now()
-        current_hour = reset_time_to_hour(now)
         database = self.sell_price_cache if sell_prices else self.grid_price_cache
         local_database_type = "history_sell" if sell_prices else "history"
         hour_prices: dict = {}
@@ -1002,10 +1001,18 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                     sources = provider.buy_price_sources
                 if not hour_prices:
                     raise ValueError(f"No {'sell' if sell_prices else 'grid'} prices returned from {type(provider).__name__}")
-                database.pop("missing_hours", None)
+                hour_prices = deepcopy(hour_prices)
+                sources = deepcopy(sources)
+                # hours of the plan (today + 7 days) the provider has no price for are filled from the price history
+                missing_hours = self._database_prices(local_database_type, hour_prices, 8)
+                if missing_hours:
+                    _LOGGER.debug("No %s price for %s hours, using the price history", "sell" if sell_prices else "grid", len(missing_hours))
+                    hour_prices = dict(sorted({**hour_prices, **missing_hours}.items()))
+                    sources.update({timestamp: "database" for timestamp in missing_hours})
+                database["missing_hours"] = missing_hours
                 database["last_update"] = now
                 database["prices"] = deepcopy(hour_prices)
-                database["sources"] = deepcopy(sources)
+                database["sources"] = sources
                 database["using_offline_prices"] = False
         except Exception as err:  # noqa: BLE001
             if "last_update" in database and minutes_between(database["last_update"], now) <= 120:
@@ -1015,26 +1022,15 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                 _LOGGER.warning("Can't get online %s prices, using database: %s", "sell" if sell_prices else "grid", err)
                 database["last_update"] = now
                 database["using_offline_prices"] = True
-                missing_hours = {}
                 try:
-                    if len(self.kwh_avg_prices_db) == 0:
-                        self.load_kwh_prices(None)
-                    if local_database_type not in self.kwh_avg_prices_db:
+                    if local_database_type not in self.kwh_avg_prices_db and self.kwh_avg_prices_db:
                         raise KeyError(f"Missing {local_database_type} in KWH_AVG_PRICES_DB")
-                    for h in range(24):
-                        for d in range(7):
-                            if d not in self.kwh_avg_prices_db[local_database_type][h]:
-                                raise KeyError(f"Missing hour {h} and day of week {d} in KWH_AVG_PRICES_DB")
-                            timestamp = reset_time_to_hour(current_hour.replace(hour=h)) + datetime.timedelta(days=d)
-                            if timestamp in hour_prices:
-                                continue
-                            forecast_price = self.get_forecast_value(self.kwh_avg_prices_db[local_database_type][h][d])
-                            price = round(forecast_price + (days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER), 2)
-                            missing_hours[timestamp] = price
-                            hour_prices[timestamp] = price
-                            database.setdefault("sources", {})[timestamp] = "offline"
-                    if missing_hours:
-                        database["missing_hours"] = dict(sorted(missing_hours.items()))
+                    missing_hours = self._database_prices(local_database_type, {}, 7, from_start_of_day=True)
+                    if not missing_hours:
+                        raise KeyError(f"No prices in {local_database_type} of KWH_AVG_PRICES_DB")
+                    hour_prices = dict(missing_hours)
+                    database["sources"] = {timestamp: "offline" for timestamp in missing_hours}
+                    database["missing_hours"] = missing_hours
                     database["prices"] = deepcopy(hour_prices)
                 except Exception as ex:  # noqa: BLE001
                     message = f"Can't get offline prices: {ex} {type(ex)}"
@@ -1042,6 +1038,38 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                     self.persistent_notification(message, f"{self.title} error", f"{self.name}_get_hour_prices_offline_prices_error")
                     raise ValueError(f"Offline prices error: {ex} {type(ex)}") from ex
         return hour_prices
+
+    def _database_prices(self, history_key: str, prices: dict, days: int, from_start_of_day: bool = False) -> dict:
+        """Prices from the price history for the hours from now (or midnight) until the end of days that have none in prices.
+
+        The forecast of the same hour and weekday, plus the same small daily adder as the
+        provider forecasts. Hours without any history are left out.
+        """
+        if len(self.kwh_avg_prices_db) == 0:
+            self.load_kwh_prices(None)
+        history = self.kwh_avg_prices_db.get(history_key, {})
+        current_hour = self.current_hour()
+        end = start_of_day(self.now()) + datetime.timedelta(days=days)
+        priced_hours = {reset_time_to_hour(timestamp) for timestamp in prices}
+        missing = {}
+        timestamp = start_of_day(self.now()) if from_start_of_day else current_hour
+        while timestamp < end:
+            values = history.get(timestamp.hour, {}).get(timestamp.weekday(), [])
+            if timestamp not in priced_hours and values:
+                adder = days_between(current_hour, timestamp) / PRICE_ADDER_DAY_BETWEEN_DIVIDER
+                missing[timestamp] = round(self.get_forecast_value(values) + adder, 2)
+            timestamp += datetime.timedelta(hours=1)
+        return missing
+
+    def sell_value(self, price: float) -> float:
+        """What a sold kWh is worth at this hourly sell price.
+
+        With a fixed solar sell price (a production agreement that settles the difference to the
+        spot price) it is the fixed price minus the hourly price - negative when the hourly price
+        is above the fixed price. Without one (-1) it is the hourly price itself.
+        """
+        fixed = float(self.config["solar"]["production_price"])
+        return price if fixed == -1.0 else fixed - price
 
     def get_grid_prices(self, update_prices=False) -> dict:
         return self.get_hour_prices(update_prices=update_prices)
