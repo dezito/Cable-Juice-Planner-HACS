@@ -65,6 +65,7 @@ from .helpers import float_or_none
 from .history import merge_rows
 from .prices import PRICE_SNAPSHOT_SECONDS, TARIFF_STATE_KEYS
 from .backup import async_load_backup, async_restore_databases, pending_restores
+from .debug_export import DebugRecorder
 from .storage import CJPStorage, load_legacy_databases
 
 _LOGGER = logging.getLogger(__name__)
@@ -131,6 +132,8 @@ class CJPCoordinator:
         self._log_listener: QueueListener | None = None
         self._log_handler: QueueHandler | None = None
         self.last_job: dict[str, Any] = {}
+        # last jobs and snapshots for the debug export (debug_export.py)
+        self.debug = DebugRecorder()
 
         charger = self.config["charger"]["entity_ids"]
         ev = self.config["ev_car"]["entity_ids"]
@@ -767,6 +770,7 @@ class CJPCoordinator:
             func = getattr(self.engine, job_name)
             result: JobResult = await self.hass.loop.run_in_executor(self._executor, partial(self.engine.run_job, snapshot, func, *args))
             await self._async_publish(result, job_name)
+            self.debug.record(job_name, args, snapshot, result, self.data.get("current_charging_rule"))
             _LOGGER.debug("Job %s ran in %s for %.3fs", job_name, result.worker_thread, result.duration)
             return result
 
@@ -1288,4 +1292,5 @@ class CJPCoordinator:
             func = partial(getattr(self.engine, job_name), **kwargs)
             result: JobResult = await self.hass.loop.run_in_executor(self._executor, partial(self.engine.run_job, snapshot, func))
             await self._async_publish(result, job_name)
+            self.debug.record(job_name, (kwargs,), snapshot, result, self.data.get("current_charging_rule"))
             return result

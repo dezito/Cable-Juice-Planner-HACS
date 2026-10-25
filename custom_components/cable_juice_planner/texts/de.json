@@ -294,6 +294,9 @@
     "backup": {
       "exported": "Backup gespeichert als {file}",
       "imported": "Backup {file} wiederhergestellt (Datenbanken: {databases})."
+    },
+    "debug": {
+      "exported": "**Debug-Datei erstellt**\n\n1. Herunterladen: {download} (der Link gilt {hours} Stunden, die Datei liegt außerdem als `{file}` im Config-Ordner).\n2. [Ein GitHub-Issue öffnen]({issue}) - Version und Zeitpunkt sind ausgefüllt.\n3. Beschreibe, was passiert ist, wann es passiert ist und was du erwartet hast, und ziehe die Datei in das Feld *Debug file*.\n\nErstelle die Datei möglichst bald nach dem Problem: Sie enthält die letzten Berechnungen und Logmeldungen.\n\nDie Datei enthält deine Einstellungen, Preise, Energiehistorie und Pläne. Namen, Entitätsnamen, Koordinaten, Notify-Dienste, Adressen und Schlüssel sind entfernt oder ersetzt. Es wird nichts verschickt - du entscheidest, was du hochlädst."
     }
   },
   "charging_type": {
@@ -520,6 +523,7 @@
     "sell_price": "Verkaufspreis",
     "solar_forecast": "Solarprognose",
     "debug_info": "Debug-Info",
+    "export_debug": "Debug exportieren",
     "read_more": "Mehr lesen",
     "view_overview": "Übersicht",
     "view_settings": "Einstellungen",

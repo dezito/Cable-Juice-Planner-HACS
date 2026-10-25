@@ -218,6 +218,9 @@
       "export_data": {
         "default": "mdi:database-export"
       },
+      "export_debug": {
+        "default": "mdi:bug-outline"
+      },
       "reset_dashboard": {
         "default": "mdi:view-dashboard-edit"
       },
@@ -341,6 +344,9 @@
   "services": {
     "debug_info": {
       "service": "mdi:bug"
+    },
+    "export_debug": {
+      "service": "mdi:bug-outline"
     },
     "enforce_planning": {
       "service": "mdi:calendar-refresh"

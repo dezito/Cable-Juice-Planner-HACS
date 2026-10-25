@@ -11,6 +11,7 @@ from .backup import BACKUP_DIR, async_export
 from .const import BUTTON_KEYS, EV_BUTTON_KEYS, is_ev_configured
 from .coordinator import CJPCoordinator
 from .dashboard import async_reset_dashboard
+from .debug_export import async_export_debug, async_notify_debug
 from .entity import CJPEntity
 
 
@@ -18,6 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
     coordinator: CJPCoordinator = entry.runtime_data
     keys = [*BUTTON_KEYS, *(EV_BUTTON_KEYS if is_ev_configured(coordinator.config) else ())]
     entities = [*(CJPButton(coordinator, "button", key) for key in keys), CJPExportButton(coordinator, "button", "export_data")]
+    entities.append(CJPExportDebugButton(coordinator, "button", "export_debug"))
     if coordinator.config.get("dashboard"):
         entities.append(CJPResetDashboardButton(coordinator, "button", "reset_dashboard"))
     async_add_entities(entities)
@@ -44,6 +46,16 @@ class CJPExportButton(CJPEntity, ButtonEntity):
             title=f"📟{self.coordinator.title}",
             notification_id=f"{self.coordinator.object_prefix}_backup",
         )
+
+
+class CJPExportDebugButton(CJPEntity, ButtonEntity):
+    """Write the anonymised debug file for a GitHub issue to cable_juice_planner_debug."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    async def async_press(self) -> None:
+        name = await async_export_debug(self.hass, self.coordinator)
+        await async_notify_debug(self.hass, self.coordinator, name)
 
 
 class CJPResetDashboardButton(CJPEntity, ButtonEntity):

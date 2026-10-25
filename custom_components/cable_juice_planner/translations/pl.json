@@ -1002,6 +1002,9 @@
       "export_data": {
         "name": "Eksportuj dane"
       },
+      "export_debug": {
+        "name": "Eksportuj informacje debug"
+      },
       "recalculate_charging_loss": {
         "name": "Przelicz stratę ładowania"
       }
@@ -1136,6 +1139,16 @@
         "config_entry_id": {
           "name": "Instancja",
           "description": "Instancja Cable Juice Planner (puste = wszystkie)."
+        }
+      }
+    },
+    "export_debug": {
+      "name": "Eksportuj informacje debug",
+      "description": "Zapisuje zanonimizowany plik debug (cable_juice_planner_debug) do zgłoszenia na GitHubie i pokazuje powiadomienie z linkiem do pobrania oraz instrukcją zgłoszenia problemu.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instancja",
+          "description": "Eksportuj tylko ten wpis (domyślnie: wszystkie)."
         }
       }
     },
