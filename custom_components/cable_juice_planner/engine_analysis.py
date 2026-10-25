@@ -15,6 +15,10 @@ planned against actually charged.
   When all real prices of a day are known, the forecast error per days ahead and how well it
   found the day's cheapest hours (price_days). The bias of the last 30 days corrects the
   forecast prices the plan uses (switch price_forecast_correction).
+- Forecast accuracy: before an hour's house consumption / a drive's km/kWh is added to its
+  history, what each forecast type (EMA, trend, average) predicted for it from that history.
+  Per day the hours, the measured kWh and per type the sum of |error| and error
+  (consumption_days); per drive the measured km/kWh and the forecasts (efficiency_drives).
 """
 from __future__ import annotations
 
@@ -41,6 +45,9 @@ PRICE_RANK_HOURS = 4  # the cheapest / most expensive hours of a day the forecas
 PRICE_CORRECTION_DAYS = 30  # days the bias of the price forecast is measured over
 PRICE_CORRECTION_MIN_DAYS = 7  # days needed per days ahead before the forecast is corrected
 PRICE_CORRECTION_MAX = 0.5  # kr/kWh the forecast is corrected by at most
+FORECAST_TYPES = ("ema", "trend", "average")
+FORECAST_DRIVES = 30  # drives the km/kWh forecast is judged over (FORECAST_DRIVES_RECENT: the short column)
+FORECAST_DRIVES_RECENT = 10
 
 
 def _is_num(value) -> bool:
@@ -167,6 +174,8 @@ class AnalysisMixin:
         self.analysis_db.setdefault("planned_days", {})
         self.analysis_db.setdefault("price_hours", {})
         self.analysis_db.setdefault("price_days", {})
+        self.analysis_db.setdefault("consumption_days", {})
+        self.analysis_db.setdefault("efficiency_drives", [])
 
     def _analysis_ts(self, moment: datetime.datetime | None = None) -> float:
         moment = moment or self.now()
@@ -364,6 +373,89 @@ class AnalysisMixin:
             ],
         }
 
+    # forecast accuracy ------------------------------------------------- #
+
+    def analysis_consumption_forecast(self, history: list, watt: float) -> None:
+        """power_values_to_db, before the hour is added: each type's forecast of it (W = Wh in an hour)."""
+        try:
+            if not history or not _is_num(watt):
+                return
+            days = self.analysis_db["consumption_days"]
+            day = days.setdefault(self.now().date().isoformat(), {"hours": 0, "use": 0.0, **{kind: [0.0, 0.0] for kind in FORECAST_TYPES}})
+            day["hours"] += 1
+            day["use"] = round(day["use"] + watt / 1000.0, 3)
+            for kind in FORECAST_TYPES:
+                error = (self.get_forecast_value(history, kind) - watt) / 1000.0
+                day[kind] = [round(day[kind][0] + abs(error), 3), round(day[kind][1] + error, 3)]
+            for key in sorted(days)[:-ANALYSIS_DAYS]:
+                del days[key]
+            self.mark_dirty("analysis")
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Recording the consumption forecast failed")
+
+    def analysis_efficiency_forecast(self, history: list, km_per_kwh: float) -> None:
+        """drive_efficiency, before the drive is added: each type's forecast of its km/kWh."""
+        try:
+            if not history or not _is_num(km_per_kwh):
+                return
+            drives = self.analysis_db["efficiency_drives"]
+            drives.append({"date": self.now().date().isoformat(), "actual": round(km_per_kwh, 2), **{kind: self.get_forecast_value(history, kind) for kind in FORECAST_TYPES}})
+            del drives[:-FORECAST_DRIVES]
+            self.mark_dirty("analysis")
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Recording the km/kWh forecast failed")
+
+    def _forecast_attributes(self) -> dict:
+        today = self.now().date()
+        closed = {date: day for date, day in self.analysis_db["consumption_days"].items() if date < today.isoformat()}
+
+        def consumption_errors(days: int) -> dict | None:
+            first = (today - datetime.timedelta(days=days)).isoformat()
+            selected = [day for date, day in closed.items() if date >= first]
+            hours = sum(_num(day.get("hours")) for day in selected)
+            use = sum(_num(day.get("use")) for day in selected)
+            if not hours:
+                return None
+            # the measured kWh per hour, and per type what it forecast on average (measured + bias)
+            result = {"hours": int(hours), "actual": round(use / hours, 3)}
+            for kind in FORECAST_TYPES:
+                absolute = sum(_num((day.get(kind) or [0, 0])[0]) for day in selected)
+                bias = sum(_num((day.get(kind) or [0, 0])[1]) for day in selected)
+                result[kind] = {
+                    "mae": round(absolute / hours, 3),
+                    "bias": round(bias / hours, 3),
+                    "relative": round(absolute / use, 3) if use > 0 else None,
+                    "forecast": round((use + bias) / hours, 3),
+                }
+            return result
+
+        def drive_errors(count: int) -> dict | None:
+            selected = [drive for drive in self.analysis_db["efficiency_drives"][-count:] if _is_num(drive.get("actual"))]
+            if not selected:
+                return None
+            actual = sum(drive["actual"] for drive in selected)
+            result = {"drives": len(selected), "actual": round(actual / len(selected), 2)}
+            for kind in FORECAST_TYPES:
+                errors = [_num(drive.get(kind)) - drive["actual"] for drive in selected]
+                result[kind] = {
+                    "mae": round(sum(abs(error) for error in errors) / len(errors), 2),
+                    "bias": round(sum(errors) / len(errors), 2),
+                    "relative": round(sum(abs(error) for error in errors) / actual, 3) if actual > 0 else None,
+                    "forecast": round(sum(_num(drive.get(kind)) for drive in selected) / len(selected), 2),
+                }
+            return result
+
+        def best(errors: dict | None) -> str | None:
+            return min(FORECAST_TYPES, key=lambda kind: errors[kind]["mae"]) if errors else None
+
+        consumption_30 = consumption_errors(30)
+        drives_30 = drive_errors(FORECAST_DRIVES)
+        return {
+            "selected": self.get_forecast_type(),
+            "consumption": {"last_7": consumption_errors(7), "last_30": consumption_30, "best": best(consumption_30)},
+            "drives": {"recent": drive_errors(FORECAST_DRIVES_RECENT), "all": drives_30, "best": best(drives_30)},
+        }
+
     # update and publish ------------------------------------------------ #
 
     def analysis_update(self, data: dict) -> None:
@@ -437,6 +529,7 @@ class AnalysisMixin:
             "actual_total": round(sum(d["actual"] for d in days), 1),
             "unplanned_total": round(unplanned, 1),
             "price_forecast": self._price_forecast_attributes(),
+            "forecast": self._forecast_attributes(),
         }
         for key, value in attrs.items():
             self.set_attr("analysis", key, value)

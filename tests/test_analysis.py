@@ -203,3 +203,31 @@ def test_price_forecast_is_corrected_with_its_bias() -> None:
     assert engine.run_job(snap, engine.hour_end).error is None
     assert engine.run_job(snap, engine.price_forecast_corrections).value == {}
     assert engine.run_job(snap, engine.get_grid_prices).value[hour] == provider[hour]
+
+
+def test_forecast_types_are_judged_against_the_measurements() -> None:
+    """Before an hour / a drive is added to its history: what each forecast type predicted for it."""
+    engine, snap = _engine()
+    stamps = [datetime.datetime.combine(DAY - datetime.timedelta(days=back), datetime.time(12)) for back in range(1, 5)]
+    history = [[stamp, watt] for stamp, watt in zip(stamps, (1000.0, 500.0, 500.0, 500.0))]  # newest first
+    engine.power_values_db[12]["power_consumption_without_all_exclusion"] = list(history)
+    predicted = {kind: engine.get_forecast_value(history, kind) for kind in ("ema", "trend", "average")}
+    assert engine.run_job(snap, engine.power_values_to_db, {"power_consumption_without_all_exclusion": 600.0}).error is None
+    day = engine.analysis_db["consumption_days"][DAY.isoformat()]
+    assert (day["hours"], day["use"]) == (1, 0.6)
+    assert day["average"] == [pytest.approx(0.025), pytest.approx(0.025)]  # the average of the history: 625 W
+    assert day["ema"][1] == pytest.approx((predicted["ema"] - 600.0) / 1000.0, abs=0.001)
+    engine.km_kwh_efficiency_db = [[stamps[0], 6.0], [stamps[1], 5.0]]
+    assert engine.run_job(snap, engine.analysis_efficiency_forecast, engine.km_kwh_efficiency_db, 5.25).error is None
+
+    # the next day: the closed day and the drive against the measurements
+    later = snapshot(datetime.datetime.combine(DAY + datetime.timedelta(days=1), datetime.time(12)))
+    forecast = engine.run_job(later, engine.publish_analysis).attributes["analysis"]["forecast"]
+    assert forecast["selected"] == "ema"
+    consumption = forecast["consumption"]["last_30"]
+    assert (consumption["hours"], consumption["actual"]) == (1, 0.6)
+    assert consumption["average"] == {"mae": 0.025, "bias": 0.025, "relative": pytest.approx(0.042, abs=0.001), "forecast": 0.625}
+    drives = forecast["drives"]["all"]
+    assert (drives["drives"], drives["actual"]) == (1, 5.25)
+    assert drives["average"]["forecast"] == 5.5 and drives["average"]["mae"] == 0.25
+    assert forecast["drives"]["best"] == min(("ema", "trend", "average"), key=lambda kind: drives[kind]["mae"])

@@ -666,6 +666,22 @@
     "price_forecast_correction_waiting": "Prognosen rettes pr. dag frem efter 7 dages målinger.",
     "price_forecast_explain": "Hver time gemmer CJP købsprisen fra prisintegrationens prognose (uden CJP's eget tillæg pr. dag frem) for de kommende dage. Når de rigtige priser for en dag kommer (omkring kl. 13 dagen før), sammenlignes de med det prognosen sagde 1, 2, 3 … dage før. **Fejl** er den gennemsnitlige afvigelse pr. time, **Afvigelse** > 0: prognosen var for høj. **Billigste ramt**: hvor mange af dagens 4 billigste timer ifølge prognosen der faktisk var blandt de 4 billigste – de timer planen helst lader bilen i. Merprisen i parentes er hvad det kostede pr. kWh at vælge efter prognosen frem for de rigtige timer. Grafen viser de rigtige priser og prognoserne for de seneste og kommende dage.",
     "price_forecast_correction_explain": "**Rettelse**: med *Ret prisprognosen* slået til (*Indstillinger → Avanceret*) lægger planen rettelsen oven i prognosepriserne: minus afvigelsen de sidste 30 dage for det antal dage frem, efter 7 dages målinger og højst ±0,50 kr. Grafen viser den prognose planen bruger for de kommende timer.",
+    "section_forecast": "Prognosens træfsikkerhed",
+    "forecast_consumption_intro": "Husets forbrug pr. time i kWh",
+    "forecast_drives_intro": "Bilens km/kWh pr. tur",
+    "forecast_type": "Prognosetype",
+    "forecast_actual": "Faktisk",
+    "forecast_average": "Gennemsnit",
+    "forecast_avg_kwh": "Gns. kWh/time",
+    "forecast_avg_km": "Gns. km/kWh",
+    "relative": "Relativ",
+    "hours": "timer",
+    "drives": "ture",
+    "last": "seneste",
+    "forecast_better": "⭐ <b>{best}</b> har ramt husets forbrug bedst de sidste 30 dage: i gennemsnit {best_mae} kWh ved siden af pr. time mod {selected_mae} kWh for den valgte ✅ <b>{selected}</b> ({percent} % mindre fejl). Faktisk forbrug var {actual} kWh pr. time; {best} forventede {best_forecast} kWh og {selected} {selected_forecast} kWh.",
+    "forecast_better_drives": "⭐ <b>{best}</b> har ramt bilens km/kWh bedst på de seneste ture: i gennemsnit {best_mae} km/kWh ved siden af pr. tur mod {selected_mae} km/kWh for den valgte ✅ <b>{selected}</b> ({percent} % mindre fejl). Faktisk kørte bilen {actual} km/kWh; {best} forventede {best_forecast} km/kWh og {selected} {selected_forecast} km/kWh.",
+    "forecast_no_data": "Samles fra nu af: husets forbrug efter første hele døgn, km/kWh efter første tur.",
+    "forecast_explain": "Lige før en ny måling gemmes i historikken (husets forbrug hver time, bilens km/kWh efter hver tur), beregnes det, hver prognosetype ville have forudsagt ud fra den samme historik, og det sammenlignes med målingen. ✅ den valgte prognosetype, ⭐ den der har ramt bedst. **Gns.** er det, hver type forventede i gennemsnit, mod det faktiske øverst. **Fejl** tælles time for time / tur for tur, så en type kan ramme gennemsnittet og alligevel fejle meget hver gang. **Afvigelse** > 0: prognosen var for høj.\n\nPrognosetypen (*Indstillinger → Avanceret → Prognosetype*) gælder både husets forbrug, km/kWh og reservepriserne, så vælg den, der rammer bedst der, hvor det betyder mest. Husets forbrug bruges kun til solcelleoverskuddet; km/kWh til hvor meget ture og arbejdsdage kræver.",
     "history_explain": "* **Batteriniveau og ladegrænse**: de sidste 48 timer.\n* **Køreeffektivitet**: de sidste 30 dage.\n* **Ladet af solen**: de sidste 7 dage."
   }
 }

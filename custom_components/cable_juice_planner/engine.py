@@ -747,14 +747,16 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
         self.forecast_type = forecast_type if forecast_type in ("average", "ema", "trend") else "ema"
         return self.forecast_type
 
-    def get_forecast_value(self, data=None) -> float:
+    def get_forecast_value(self, data=None, forecast_type: str | None = None) -> float:
+        """The forecast of the selected type, or of forecast_type (the forecast accuracy analysis)."""
+        forecast_type = forecast_type or self.forecast_type
         if not data or not isinstance(data, list) or len(data) == 0:
             return 0.0
-        if self.forecast_type == "ema":
+        if forecast_type == "ema":
             return round(calculate_ema(reverse_list(get_list_values(data))), 2)
-        if self.forecast_type == "average":
+        if forecast_type == "average":
             return round(average(get_list_values(data)), 2)
-        if self.forecast_type == "trend":
+        if forecast_type == "trend":
             return round(calculate_trend(reverse_list(get_list_values(data))), 2)
         return 0.0
 

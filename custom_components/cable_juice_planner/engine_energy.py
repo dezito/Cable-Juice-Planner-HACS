@@ -482,6 +482,8 @@ class EnergyMixin:
         for key, value in data.items():
             if key not in self.power_values_db[hour]:
                 self.power_values_db[hour][key] = []
+            if key == "power_consumption_without_all_exclusion":
+                self.analysis_consumption_forecast(self.power_values_db[hour][key], value)
             self.power_values_db[hour][key].insert(0, [self.now(), value])
             self.power_values_db[hour][key] = self.power_values_db[hour][key][:keep]
         self.mark_dirty("power_values")

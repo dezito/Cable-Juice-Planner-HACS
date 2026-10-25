@@ -668,6 +668,22 @@
     "price_forecast_correction_waiting": "Prognoza jest korygowana dla każdego dnia naprzód po 7 dniach pomiarów.",
     "price_forecast_explain": "Co godzinę CJP zapisuje cenę zakupu z prognozy integracji cenowej (bez własnego dodatku CJP za każdy dzień naprzód) na najbliższe dni. Gdy pojawią się rzeczywiste ceny danego dnia (około 13:00 dzień wcześniej), są porównywane z tym, co prognoza mówiła 1, 2, 3 … dni wcześniej. **Błąd** to średnie odchylenie na godzinę, **Odchylenie** > 0: prognoza była za wysoka. **Trafione najtańsze**: ile z 4 najtańszych godzin dnia według prognozy rzeczywiście było wśród 4 najtańszych – godzin, w których plan najchętniej ładuje samochód. Dopłata w nawiasie to koszt na kWh wyboru według prognozy zamiast rzeczywistych godzin. Wykres pokazuje rzeczywiste ceny i prognozy z ostatnich i nadchodzących dni.",
     "price_forecast_correction_explain": "**Korekta**: gdy *Koryguj prognozę cen* jest włączone (*Ustawienia → Zaawansowane*), plan dodaje korektę do cen z prognozy: minus odchylenie z ostatnich 30 dni dla tego dnia naprzód, po 7 dniach pomiarów i maksymalnie ±0,50 kr. Wykres pokazuje prognozę, której plan używa dla nadchodzących godzin.",
+    "section_forecast": "Trafność prognozy",
+    "forecast_consumption_intro": "Zużycie domu na godzinę w kWh",
+    "forecast_drives_intro": "km/kWh samochodu na przejazd",
+    "forecast_type": "Typ prognozy",
+    "forecast_actual": "Rzeczywiste",
+    "forecast_average": "Średnia",
+    "forecast_avg_kwh": "Śr. kWh/godz.",
+    "forecast_avg_km": "Śr. km/kWh",
+    "relative": "Względny",
+    "hours": "godzin",
+    "drives": "przejazdów",
+    "last": "ostatnie",
+    "forecast_better": "⭐ <b>{best}</b> najlepiej przewidział zużycie domu w ostatnich 30 dniach: średnio {best_mae} kWh błędu na godzinę wobec {selected_mae} kWh dla wybranego ✅ <b>{selected}</b> ({percent} % mniejszy błąd). Rzeczywiste zużycie wynosiło {actual} kWh na godzinę; {best} oczekiwał {best_forecast} kWh, a {selected} {selected_forecast} kWh.",
+    "forecast_better_drives": "⭐ <b>{best}</b> najlepiej przewidział km/kWh samochodu w ostatnich przejazdach: średnio {best_mae} km/kWh błędu na przejazd wobec {selected_mae} km/kWh dla wybranego ✅ <b>{selected}</b> ({percent} % mniejszy błąd). Samochód faktycznie jechał {actual} km/kWh; {best} oczekiwał {best_forecast} km/kWh, a {selected} {selected_forecast} km/kWh.",
+    "forecast_no_data": "Zbierane od teraz: zużycie domu po pierwszej pełnej dobie, km/kWh po pierwszym przejeździe.",
+    "forecast_explain": "Tuż przed dodaniem nowego pomiaru do historii (zużycie domu co godzinę, km/kWh samochodu po każdym przejeździe) CJP oblicza, co każdy typ prognozy przewidziałby z tej samej historii, i porównuje to z pomiarem. ✅ wybrany typ prognozy, ⭐ najdokładniejszy. **Śr.** to wartość, której każdy typ oczekiwał średnio, wobec rzeczywistej na górze. **Błąd** liczony jest godzina po godzinie / przejazd po przejeździe, więc typ może trafić w średnią, a mimo to za każdym razem mocno się mylić. **Odchylenie** > 0: prognoza była za wysoka.\n\nTyp prognozy (*Ustawienia → Zaawansowane → Typ prognozy*) dotyczy jednocześnie zużycia domu, km/kWh i cen zastępczych, więc wybierz ten, który trafia najlepiej tam, gdzie to najważniejsze. Zużycie domu służy tylko do nadwyżki słonecznej; km/kWh do tego, ile potrzebują wyjazdy i dni robocze.",
     "history_explain": "* **Poziom baterii i limit ładowania**: ostatnie 48 godzin.\n* **Efektywność jazdy**: ostatnie 30 dni.\n* **Naładowano słońcem**: ostatnie 7 dni."
   }
 }
