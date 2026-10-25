@@ -19,7 +19,7 @@ It needs the HACS frontend cards `mushroom`, `apexcharts-card`, `config-template
 | **Charging history** | each charge with time, reason, %, kWh, price and price/kWh, and per month km, kWh, share from solar and price |
 | **Overview** | the plan with a reason for each hour, the departure plan, the cost of the current battery level, the last drive's efficiency and the solar surplus forecast |
 
-At the top: **Force planning** recalculates the plan now.
+At the top: **Force planning** recalculates the plan now. The overview also has the emoji explanation – see [Emojis](emojis.md).
 
 ## Settings
 
