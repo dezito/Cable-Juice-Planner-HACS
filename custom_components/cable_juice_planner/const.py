@@ -572,6 +572,8 @@ SWITCH_SETTINGS: dict[str, dict[str, Any]] = {
     # the plan uses the continuously measured charging loss instead of the configured one
     "use_measured_charging_loss": {"default": False, "requires": "ev"},
     "powerwall_discharge_above_needed": {"default": False, "requires": "powerwall_level"},
+    # correct the price forecast with its measured bias (engine_analysis.py)
+    "price_forecast_correction": {"default": True},
 }
 
 
@@ -708,6 +710,7 @@ SIGNAL_SITE_UPDATE = "cable_juice_planner_site_update"
 
 # Help texts of the dashboard settings: entity key -> runtime text entity_help.<id>
 ENTITY_HELP_GROUPS: dict[str, str] = {
+    "price_forecast_correction": "price_forecast",
     "public_charging_session_cost": "public_charging",
     "public_charging_session_done": "public_charging",
     "forced_charging_daily_battery_level": "forced_charging",

@@ -489,7 +489,8 @@
     "recalculate_charging_loss": "Forgets the measured charging losses and reads Home Assistant's whole history again",
     "use_measured_charging_loss": "The plan uses the continuously measured charging loss (kWh from the charger per % at the max charging power, see Analysis) instead of the configured one. Without measurements the configured one is used",
     "economy": "This month's saving compared with daily charging (cheapest until the next departure, like most smart chargers). Months, prices and sources in the attributes",
-    "analysis": "The share of the last 30 work plan departures where the car had the required battery level. Driving against temperature and planned against actually charged are in the attributes"
+    "analysis": "The share of the last 30 work plan departures where the car had the required battery level. Driving against temperature and planned against actually charged are in the attributes",
+    "price_forecast_correction": "Correct the forecast prices with their measured bias per day ahead"
   },
   "entity_help": {
     "public_charging": "When a public charging session ends (charge port/cable used away from home), Public charging session done turns on and you get a notification.\n• Enter the total amount in Public charging session cost.\n• The session is added to the charging history about 1 min after entering it.\n• Enter -1 to ignore the session.",
@@ -505,7 +506,8 @@
     "cheap_limits": "Charge level at cheap prices:\n• Very cheap: when the price is at most the average of the cheapest known prices of the coming week, charge to {very_cheap_grid_charging_max_battery_level} %.\n• Ultra cheap: when the price is another 25 % lower, charge to {ultra_cheap_grid_charging_max_battery_level} %.\nUsed by planned charging hours at these prices, and always when \"Charge on cheap power\" is enabled.",
     "battery_preheat": "Battery level and preheating settings:\n• Minimum daily battery level ({min_daily_battery_level} %): at homecoming from work.\n• Minimum trip battery level ({min_trip_battery_level} %): at homecoming from a trip.\n• Minimum charge limit ({min_charge_limit_battery_level} %): the lowest charge limit the car allows.\n• Max recommended charge limit ({max_recommended_charge_limit_battery_level} %): the car maker's recommendation.\n• Preheat X min before ({preheat_minutes_before} min): preheat before leaving for work and trips (the preheat switch per weekday).",
     "powerwall": "Home battery settings:\n• Solar surplus only charges the car when the home battery is above the limit (now {ev_charge_after_powerwall_battery_level} %).\n• Use the home battery for the car: needs Solar charging and Home battery discharge above needed turned on; only energy above the limit is used.\nCreate an automation that disables home battery discharging while the car charges, and only allows it when the switch is on and the battery is above the limit.",
-    "virtual_ev": "Virtual EV (without a car integration):\n• Battery level: set the current battery level of the car when you plug it in.\n• Completed battery level: the level the car stops at.\n• Estimated total range: the realistic max range of the car."
+    "virtual_ev": "Virtual EV (without a car integration):\n• Battery level: set the current battery level of the car when you plug it in.\n• Completed battery level: the level the car stops at.\n• Estimated total range: the realistic max range of the car.",
+    "price_forecast": "Correct the price forecast: the plan corrects the forecast prices (e.g. Carnot) with how far off they were the last 30 days, per day ahead – after 7 days of measurements, at most ±0.50 kr. See *Price forecast* in the analysis."
   },
   "dashboard": {
     "enforce_planning": "Force planning",
@@ -640,6 +642,28 @@
     "drive_temperature_explain": "*Every drive from unplugging to plugging in again, with the outdoor temperature (the mean while the car was away) and km/kWh from the odometer and the battery level (with the battery size set in CJP). The orange line is the average per 5 °C. The fit shows how much km/kWh changes per degree and what the cold costs. Drives under 5 km or under 2 % battery are left out. The first time the drives of the recorder's history (the last days) are read, from then on every drive is recorded.*",
     "departures_explain": "*At every departure of the work plan the battery level the car left with is compared with the requirement: the day's driving plus the daily minimum level (✅ = met). The plan's target is the level the plan aimed for before work. Only departures from now on are saved (the plans of the past are not kept), the last 14 are shown.*",
     "planned_explain": "*Every evening at 23:59 the kWh the plan expects to charge the next day are saved. Here they are compared with what was actually charged that day. Outside the plan = manual charging, charging because the battery was low and other charging. Public charging is not counted.*",
+    "section_price_forecast": "Price forecast",
+    "price_forecast_intro": "The price integration's forecast against the real price, the last 30 days:",
+    "days_ahead": "Days ahead",
+    "days": "days",
+    "mae": "Error",
+    "bias": "Bias",
+    "worst_hour": "Worst hour",
+    "cheap_hits": "Cheapest found",
+    "correction": "Correction",
+    "price_forecast_unit": "Error and bias in kr/kWh. In brackets: the extra price per kWh of picking the hours by the forecast.",
+    "price_forecast_no_data": "Collected from now on: the first numbers at 13:00 tomorrow, when the real prices of the day after come.",
+    "price_forecast_title": "Real price against forecast",
+    "price_forecast_error_title": "Forecast error per day",
+    "real_price": "Real price",
+    "price_forecast_1": "1 day before",
+    "price_forecast_2": "2 days before",
+    "price_forecast_3": "3 days before",
+    "price_forecast_corrected": "Forecast used (corrected)",
+    "price_forecast_correction_off": "The correction of the price forecast is off (*Settings → Advanced*).",
+    "price_forecast_correction_waiting": "The forecast is corrected per day ahead after 7 days of measurements.",
+    "price_forecast_explain": "Every hour CJP saves the buy price from the price integration's forecast (without CJP's own adder per day ahead) for the coming days. When the real prices of a day arrive (around 13:00 the day before), they are compared with what the forecast said 1, 2, 3 … days before. **Error** is the average deviation per hour, **Bias** > 0: the forecast was too high. **Cheapest found**: how many of the day's 4 cheapest hours by the forecast really were among the 4 cheapest – the hours the plan prefers to charge the car in. The extra price in brackets is what picking by the forecast instead of the real hours cost per kWh. The chart shows the real prices and the forecasts of the last and the coming days.",
+    "price_forecast_correction_explain": "**Correction**: with *Correct the price forecast* on (*Settings → Advanced*), the plan adds the correction to the forecast prices: minus the bias of the last 30 days for that day ahead, after 7 days of measurements and at most ±0.50 kr. The chart shows the forecast the plan uses for the coming hours.",
     "history_explain": "* **Battery level and charging limit**: the last 48 hours.\n* **Driving efficiency**: the last 30 days.\n* **Charged by solar**: the last 7 days."
   }
 }

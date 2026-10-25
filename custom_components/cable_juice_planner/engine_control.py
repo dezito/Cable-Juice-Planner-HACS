@@ -1101,6 +1101,7 @@ class ControlMixin:
         self.solar_charged_percentage()
         self.record_daily_odometer()
         self.analysis_record_planned()
+        self.analysis_record_prices()
         self.economy_store_prices()
 
     def price_update(self) -> None:

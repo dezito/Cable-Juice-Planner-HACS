@@ -41,6 +41,13 @@ to be bought. See [Solar surplus charging](rules/solar.md).
 Buy prices per hour (or 15 minutes) from Energi Data Service and/or Strømligning, and sell prices for the
 solar surplus.
 
+**Forecast prices** (e.g. Carnot) get a small adder of 0.033 kr per day ahead, so the plan prefers known
+prices. With the switch *Correct the price forecast* on (default, *Settings → Advanced*), they are also corrected with how far off the
+forecast was the last 30 days for that day ahead: if the forecast 2 days ahead was 0.15 kr too high on
+average, the plan subtracts 0.15 kr. A day ahead is only corrected after 7 days of measurements, and by at
+most ±0.50 kr. The [price forecast analysis](dashboard-analysis.md#price-forecast) shows the measurements
+and the correction used.
+
 CJP also keeps its **own price database**: every day the prices from the price integration are stored per
 hour of the day and weekday (only real prices – never the estimates below). It is used when prices are
 missing:

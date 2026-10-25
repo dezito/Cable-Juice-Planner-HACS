@@ -25,7 +25,8 @@ At the top: **Force planning** recalculates the plan now. The overview also has 
 
 All rules with a **Read more** from the entities' help texts: the charging rules, the work plan per weekday
 (incl. [learn driving distance](learn-distance.md)), optimal weekly charging, the battery levels, cheap power,
-full charge, solar/home battery, charging loss and the virtual EV. Preheating is only shown with a car
+full charge, solar/home battery, charging loss, the virtual EV and, under *Advanced*, the forecast type and
+[correct the price forecast](how-it-works.md#prices). Preheating is only shown with a car
 integration that has a climate entity.
 
 The plan is recalculated 5 seconds after a change.
@@ -69,6 +70,33 @@ the first start. `sensor.cjp_<prefix>_analysis` is the share of the last 30 depa
 
 The kWh planned the evening before against what was charged, and how much was charged outside the plan
 (manual, forced charging …). Saved every evening from the first start.
+
+### Price forecast
+
+How well the price integration's forecast (e.g. Carnot in Energi Data Service, or Strømligning) hit the
+real buy price. Every hour CJP saves the forecast for the coming days, without its own small adder per day
+ahead. When the real prices of a day are published (around 13:00 the day before), they are compared with
+what the forecast said 1, 2, 3 … days before.
+
+| Column | Meaning |
+|---|---|
+| Days ahead | how many days before the forecast was made. 1 = the day before, before the real prices came |
+| Days | days compared the last 30 days |
+| Error 7 / 30 days | the average error per hour in kr/kWh |
+| Bias | > 0: the forecast was too high on average |
+| Worst hour | the biggest error in a single hour |
+| Cheapest found | how many of the day's 4 cheapest hours by the forecast really were among the 4 cheapest – the hours the plan prefers to charge in. In brackets the extra price per kWh of picking them by the forecast |
+| Correction | what the plan adds to the forecast prices for that day ahead: minus the bias, after 7 days of measurements and at most ±0.50 kr. – while there are too few days, or when *Correct the price forecast* (*Settings → Advanced*) is off |
+
+The level of the forecast matters less than the order of the hours: a forecast that is 0.30 kr too high but
+finds the right cheap hours plans almost as well as the real prices. The charts show the real price against
+the forecast 1, 2 and 3 days before per hour (from 2 days ago to 4 days ahead), the corrected forecast the
+plan uses for the coming hours, and the error per day for the last 31 days.
+
+Only the buy price is measured, and only hours with a forecast from the price integration – hours CJP fills
+from its own price database are not included. The measurements always use the forecast as the price
+integration published it, never the corrected one. The first numbers come at 13:00 the day after the first
+start, "3 days ahead" after 3 days.
 
 ### Battery capacity
 

@@ -199,7 +199,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
         self.charging_loss_db: dict = {"segments": [], "backfilled": False}
         self.economy_db: dict = {"windows": []}
-        self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}}
+        self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}, "price_hours": {}, "price_days": {}}
         self.charging_no_rule_count = 0
         self.error_count = 0
         self.forecast_type = "ema"
@@ -986,8 +986,10 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
         database = self.sell_price_cache if sell_prices else self.grid_price_cache
         local_database_type = "history_sell" if sell_prices else "history"
         hour_prices: dict = {}
+        # forecasts corrected with their measured bias per day ahead (the analysis); a change recalculates the prices
+        corrections = self.price_forecast_corrections()
         try:
-            if "prices" in database and database.get("using_offline_prices") is False and update_prices is False:
+            if "prices" in database and database.get("using_offline_prices") is False and update_prices is False and database.get("corrections") == corrections:
                 hour_prices = deepcopy(database["prices"])
             else:
                 provider = self.price_provider
@@ -1003,6 +1005,13 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                     raise ValueError(f"No {'sell' if sell_prices else 'grid'} prices returned from {type(provider).__name__}")
                 hour_prices = deepcopy(hour_prices)
                 sources = deepcopy(sources)
+                if corrections:
+                    current_hour = self.current_hour()
+                    hour_prices = {
+                        timestamp: round(price + corrections.get(days_between(current_hour, timestamp), 0.0), 2)
+                        if str(sources.get(timestamp, "")).endswith(":forecast") else price
+                        for timestamp, price in hour_prices.items()
+                    }
                 # hours of the plan (today + 7 days) the provider has no price for are filled from the price history
                 missing_hours = self._database_prices(local_database_type, hour_prices, 8)
                 if missing_hours:
@@ -1013,6 +1022,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                 database["last_update"] = now
                 database["prices"] = deepcopy(hour_prices)
                 database["sources"] = sources
+                database["corrections"] = corrections
                 database["using_offline_prices"] = False
         except Exception as err:  # noqa: BLE001
             if "last_update" in database and minutes_between(database["last_update"], now) <= 120:

@@ -489,7 +489,8 @@
     "recalculate_charging_loss": "Vergisst die gemessenen Ladeverluste und liest die ganze Historie von Home Assistant erneut",
     "use_measured_charging_loss": "Der Plan nutzt den laufend gemessenen Ladeverlust (kWh vom Lader pro % bei maximaler Ladeleistung, siehe Analyse) statt des eingestellten. Ohne Messungen wird der eingestellte genutzt",
     "economy": "Die Ersparnis dieses Monats gegenüber täglichem Laden (am günstigsten bis zur nächsten Abfahrt, wie die meisten smarten Lader). Monate, Preise und Quellen in den Attributen",
-    "analysis": "Anteil der letzten 30 Abfahrten des Arbeitsplans, bei denen das Auto den nötigen Akkustand hatte. Fahren nach Temperatur und geplant gegenüber tatsächlich geladen stehen in den Attributen"
+    "analysis": "Anteil der letzten 30 Abfahrten des Arbeitsplans, bei denen das Auto den nötigen Akkustand hatte. Fahren nach Temperatur und geplant gegenüber tatsächlich geladen stehen in den Attributen",
+    "price_forecast_correction": "Die Prognosepreise um ihre gemessene Abweichung pro Tag voraus korrigieren"
   },
   "entity_help": {
     "public_charging": "Endet eine öffentliche Ladesitzung (Ladeanschluss/Kabel außerhalb von zu Hause genutzt), schaltet sich Öffentliche Ladesitzung beendet ein, und du bekommst eine Benachrichtigung.\n• Gib den Gesamtbetrag bei Kosten der öffentlichen Ladesitzung ein.\n• Die Sitzung wird etwa 1 Min. nach der Eingabe zum Ladeverlauf hinzugefügt.\n• Gib -1 ein, um die Sitzung zu ignorieren.",
@@ -505,7 +506,8 @@
     "cheap_limits": "Ladestand bei günstigen Preisen:\n• Sehr günstig: liegt der Preis höchstens beim Durchschnitt der günstigsten bekannten Preise der kommenden Woche, wird bis {very_cheap_grid_charging_max_battery_level} % geladen.\n• Extrem günstig: ist der Preis noch 25 % niedriger, wird bis {ultra_cheap_grid_charging_max_battery_level} % geladen.\nGenutzt von geplanten Ladestunden zu diesen Preisen, und immer, wenn \"Bei günstigem Strom laden\" eingeschaltet ist.",
     "battery_preheat": "Einstellungen für Akkustand und Vorheizen:\n• Minimaler täglicher Akkustand ({min_daily_battery_level} %): bei der Heimkehr von der Arbeit.\n• Minimaler Akkustand bei Fahrten ({min_trip_battery_level} %): bei der Heimkehr von einer Fahrt.\n• Minimales Ladelimit ({min_charge_limit_battery_level} %): das niedrigste Ladelimit, das das Auto erlaubt.\n• Maximal empfohlenes Ladelimit ({max_recommended_charge_limit_battery_level} %): die Empfehlung des Herstellers.\n• Vorheizen X Min. vorher ({preheat_minutes_before} Min.): vor der Abfahrt zur Arbeit und zu Fahrten vorheizen (Vorheiz-Schalter pro Wochentag).",
     "powerwall": "Einstellungen für den Hausakku:\n• Der Solarüberschuss lädt das Auto erst, wenn der Hausakku über der Grenze liegt (jetzt {ev_charge_after_powerwall_battery_level} %).\n• Hausakku für das Auto nutzen: braucht eingeschaltetes Solarladen und Hausakku-Entladung über Bedarf; nur Energie über der Grenze wird genutzt.\nErstelle eine Automation, die das Entladen des Hausakkus sperrt, während das Auto lädt, und es nur erlaubt, wenn der Schalter an ist und der Akku über der Grenze liegt.",
-    "virtual_ev": "Virtuelles E-Auto (ohne Auto-Integration):\n• Akkustand: gib beim Anstecken den aktuellen Akkustand des Autos ein.\n• Akkustand bei Ende: der Stand, bei dem das Auto aufhört.\n• Geschätzte Gesamtreichweite: die realistische maximale Reichweite des Autos."
+    "virtual_ev": "Virtuelles E-Auto (ohne Auto-Integration):\n• Akkustand: gib beim Anstecken den aktuellen Akkustand des Autos ein.\n• Akkustand bei Ende: der Stand, bei dem das Auto aufhört.\n• Geschätzte Gesamtreichweite: die realistische maximale Reichweite des Autos.",
+    "price_forecast": "Preisprognose korrigieren: der Plan korrigiert die Prognosepreise (z. B. Carnot) um ihre Abweichung der letzten 30 Tage, pro Tag voraus – nach 7 Tagen Messung, höchstens ±0,50 kr. Siehe *Preisprognose* in der Analyse."
   },
   "dashboard": {
     "enforce_planning": "Planung erzwingen",
@@ -640,6 +642,28 @@
     "drive_temperature_explain": "*Jede Fahrt vom Abstecken bis zum erneuten Anstecken, mit der Außentemperatur (Mittelwert, während das Auto weg war) und km/kWh aus Kilometerzähler und Batteriestand (mit der in CJP eingestellten Batteriegröße). Die orange Linie ist der Durchschnitt pro 5 °C. Der Trend zeigt, wie sich km/kWh pro Grad ändert und was die Kälte kostet. Fahrten unter 5 km oder unter 2 % Batterie werden ausgelassen. Beim ersten Mal werden die Fahrten aus dem Verlauf des Recorders (die letzten Tage) gelesen, danach wird jede Fahrt gespeichert.*",
     "departures_explain": "*Bei jeder Abfahrt des Arbeitsplans wird der Batteriestand, mit dem das Auto losfuhr, mit der Anforderung verglichen: die Fahrstrecke des Tages plus das tägliche Minimum (✅ = erfüllt). Das Ziel des Plans ist der Stand, den der Plan vor der Arbeit anstrebte. Nur Abfahrten ab jetzt werden gespeichert (die Pläne der Vergangenheit werden nicht aufbewahrt), die letzten 14 werden gezeigt.*",
     "planned_explain": "*Jeden Abend um 23:59 werden die kWh gespeichert, die der Plan am nächsten Tag laden will. Hier werden sie mit dem verglichen, was an dem Tag tatsächlich geladen wurde. Außerhalb des Plans = manuelles Laden, Laden wegen niedrigem Batteriestand und sonstiges Laden. Öffentliches Laden wird nicht gezählt.*",
+    "section_price_forecast": "Preisprognose",
+    "price_forecast_intro": "Die Prognose der Preisintegration gegen den echten Preis, die letzten 30 Tage:",
+    "days_ahead": "Tage voraus",
+    "days": "Tage",
+    "mae": "Fehler",
+    "bias": "Abweichung",
+    "worst_hour": "Schlechteste Stunde",
+    "cheap_hits": "Günstigste getroffen",
+    "correction": "Korrektur",
+    "price_forecast_unit": "Fehler und Abweichung in kr/kWh. In Klammern: der Mehrpreis pro kWh, wenn die Stunden nach der Prognose gewählt werden.",
+    "price_forecast_no_data": "Wird ab jetzt gesammelt: die ersten Zahlen morgen um 13 Uhr, wenn die echten Preise des Folgetags kommen.",
+    "price_forecast_title": "Echter Preis gegen Prognose",
+    "price_forecast_error_title": "Prognosefehler pro Tag",
+    "real_price": "Echter Preis",
+    "price_forecast_1": "1 Tag vorher",
+    "price_forecast_2": "2 Tage vorher",
+    "price_forecast_3": "3 Tage vorher",
+    "price_forecast_corrected": "Verwendete Prognose (korrigiert)",
+    "price_forecast_correction_off": "Die Korrektur der Preisprognose ist aus (*Einstellungen → Erweitert*).",
+    "price_forecast_correction_waiting": "Die Prognose wird pro Tag voraus nach 7 Tagen Messung korrigiert.",
+    "price_forecast_explain": "Jede Stunde speichert CJP den Kaufpreis aus der Prognose der Preisintegration (ohne CJPs eigenen Aufschlag pro Tag voraus) für die kommenden Tage. Wenn die echten Preise eines Tages kommen (gegen 13 Uhr am Vortag), werden sie mit dem verglichen, was die Prognose 1, 2, 3 … Tage vorher sagte. **Fehler** ist die durchschnittliche Abweichung pro Stunde, **Abweichung** > 0: die Prognose war zu hoch. **Günstigste getroffen**: wie viele der 4 günstigsten Stunden des Tages laut Prognose wirklich unter den 4 günstigsten waren – die Stunden, in denen der Plan das Auto am liebsten lädt. Der Mehrpreis in Klammern ist, was die Wahl nach der Prognose statt der echten Stunden pro kWh gekostet hat. Das Diagramm zeigt die echten Preise und die Prognosen der letzten und kommenden Tage.",
+    "price_forecast_correction_explain": "**Korrektur**: mit *Preisprognose korrigieren* an (*Einstellungen → Erweitert*) addiert der Plan die Korrektur zu den Prognosepreisen: minus die Abweichung der letzten 30 Tage für diesen Tag voraus, nach 7 Tagen Messung und höchstens ±0,50 kr. Das Diagramm zeigt die Prognose, die der Plan für die kommenden Stunden nutzt.",
     "history_explain": "* **Batteriestand und Ladegrenze**: die letzten 48 Stunden.\n* **Fahreffizienz**: die letzten 30 Tage.\n* **Mit Solar geladen**: die letzten 7 Tage."
   }
 }

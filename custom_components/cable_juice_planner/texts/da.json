@@ -487,7 +487,8 @@
     "recalculate_charging_loss": "Sletter de målte ladetab og gennemgår hele Home Assistants historik igen",
     "use_measured_charging_loss": "Planen regner med det løbende målte ladetab (kWh fra laderen pr. % ved maks. ladeeffekt, se Analyse) i stedet for det indstillede. Uden målinger bruges det indstillede",
     "economy": "Månedens besparelse mod daglig opladning (billigst frem til næste afgang, som de fleste smarte ladere). Måneder, priser og fordeling i attributterne",
-    "analysis": "Andel af de sidste 30 afgange i arbejdsplanen, hvor bilen havde det nødvendige batteriniveau. Kørsel mod temperatur og planlagt mod faktisk ladet står i attributterne"
+    "analysis": "Andel af de sidste 30 afgange i arbejdsplanen, hvor bilen havde det nødvendige batteriniveau. Kørsel mod temperatur og planlagt mod faktisk ladet står i attributterne",
+    "price_forecast_correction": "Ret prognosepriserne med deres målte afvigelse pr. dag frem"
   },
   "entity_help": {
     "public_charging": "Når en offentlig ladning er afsluttet (ladelågen/kablet blev brugt væk fra hjemmet), slås Offentlig opladning afsluttet til, og du får en notifikation.\n• Indtast det samlede beløb i Offentlig ladning pris.\n• Ladningen tilføjes automatisk til ladehistorikken ca. 1 min efter indtastning.\n• Indtast -1 for at ignorere ladningen.",
@@ -503,7 +504,8 @@
     "cheap_limits": "Ladeprocent ved billig strøm:\n• Meget billig strøm: er prisen højst gennemsnittet af den kommende uges billigste kendte priser, lades til {very_cheap_grid_charging_max_battery_level} %.\n• Ekstremt billig strøm: er prisen yderligere 25 % lavere, lades til {ultra_cheap_grid_charging_max_battery_level} %.\nBruges af planlagte ladetimer til disse priser, og altid når \"Lad ved billig strøm\" er slået til.",
     "battery_preheat": "Batteriniveau- og forvarmningsindstillinger:\n• Minimum dagligt batteriniveau ({min_daily_battery_level} %): ved hjemkomst fra arbejde.\n• Minimum tur batteriniveau ({min_trip_battery_level} %): ved hjemkomst fra en tur.\n• Minimum ladegrænse ({min_charge_limit_battery_level} %): bilens laveste mulige ladegrænse.\n• Maks. anbefalet ladegrænse ({max_recommended_charge_limit_battery_level} %): bilproducentens anbefaling.\n• Forvarm X min før ({preheat_minutes_before} min): forvarm bilen før afgang til arbejde og ture (forvarm-kontakten pr. ugedag).",
     "powerwall": "Husbatteri-indstillinger:\n• Solcelleoverskud lader kun bilen, når husbatteriet er over grænsen (nu {ev_charge_after_powerwall_battery_level} %).\n• Brug husbatteriets strøm til bilen: kræver at Solcelleoverskud til opladning og Husbatteri aflader over behov er slået til; kun strøm over grænsen bruges.\nLav en automation der slår husbatteriets afladning fra, når bilen lader, og kun tillader den når kontakten er slået til og batteriet er over grænsen.",
-    "virtual_ev": "Virtuel elbil (uden bilintegration):\n• Batteriniveau: sæt bilens nuværende batteriniveau, når den tilsluttes.\n• Færdig batteriniveau: niveauet bilen stopper ved.\n• Estimeret samlet rækkevidde: bilens realistiske maks. rækkevidde."
+    "virtual_ev": "Virtuel elbil (uden bilintegration):\n• Batteriniveau: sæt bilens nuværende batteriniveau, når den tilsluttes.\n• Færdig batteriniveau: niveauet bilen stopper ved.\n• Estimeret samlet rækkevidde: bilens realistiske maks. rækkevidde.",
+    "price_forecast": "Ret prisprognosen: planen retter prognosepriserne (f.eks. Carnot) med hvor meget de har ramt ved siden af de sidste 30 dage, pr. dag frem – efter 7 dages målinger, højst ±0,50 kr. Se *Prisprognose* i analysen."
   },
   "dashboard": {
     "enforce_planning": "Gennemtving planlægning",
@@ -638,6 +640,28 @@
     "drive_temperature_explain": "*Hver tur fra bilen blev koblet fra til den blev sat til igen, med udetemperaturen (gennemsnittet mens bilen var væk) og km/kWh fra kilometertælleren og batteriniveauet (med batteristørrelsen sat i CJP). Den orange linje er gennemsnittet pr. 5 °C. Tendensen viser, hvor meget km/kWh ændrer sig pr. grad, og hvad kulden koster. Ture under 5 km eller under 2 % batteri udelades. Første gang læses turene fra recorderens historik (de sidste dage), derefter gemmes hver tur.*",
     "departures_explain": "*Ved hver afgang i arbejdsplanen sammenlignes det batteriniveau, bilen kørte med, med kravet: dagens kørsel plus det daglige minimum (✅ = opfyldt). Planens mål er det niveau, planen sigtede mod før arbejde. Kun afgange fra nu af gemmes (fortidens planer gemmes ikke), de sidste 14 vises.*",
     "planned_explain": "*Hver aften kl. 23:59 gemmes de kWh, planen vil lade næste dag. Her sammenlignes det med, hvad der faktisk blev ladet den dag. Uden for planen = manuel ladning, ladning fordi batteriet var lavt og anden ladning. Offentlig ladning tælles ikke med.*",
+    "section_price_forecast": "Prisprognose",
+    "price_forecast_intro": "Prisintegrationens prognose mod den rigtige pris, de sidste 30 dage:",
+    "days_ahead": "Dage frem",
+    "days": "dage",
+    "mae": "Fejl",
+    "bias": "Afvigelse",
+    "worst_hour": "Værste time",
+    "cheap_hits": "Billigste ramt",
+    "correction": "Rettelse",
+    "price_forecast_unit": "Fejl og afvigelse i kr/kWh. I parentes: merpris pr. kWh ved at vælge timerne ud fra prognosen.",
+    "price_forecast_no_data": "Samles fra nu af: de første tal kl. 13 i morgen, når de rigtige priser for dagen efter kommer.",
+    "price_forecast_title": "Rigtig pris mod prognose",
+    "price_forecast_error_title": "Prognosefejl pr. dag",
+    "real_price": "Rigtig pris",
+    "price_forecast_1": "1 dag før",
+    "price_forecast_2": "2 dage før",
+    "price_forecast_3": "3 dage før",
+    "price_forecast_corrected": "Brugt prognose (rettet)",
+    "price_forecast_correction_off": "Rettelsen af prisprognosen er slået fra (*Indstillinger → Avanceret*).",
+    "price_forecast_correction_waiting": "Prognosen rettes pr. dag frem efter 7 dages målinger.",
+    "price_forecast_explain": "Hver time gemmer CJP købsprisen fra prisintegrationens prognose (uden CJP's eget tillæg pr. dag frem) for de kommende dage. Når de rigtige priser for en dag kommer (omkring kl. 13 dagen før), sammenlignes de med det prognosen sagde 1, 2, 3 … dage før. **Fejl** er den gennemsnitlige afvigelse pr. time, **Afvigelse** > 0: prognosen var for høj. **Billigste ramt**: hvor mange af dagens 4 billigste timer ifølge prognosen der faktisk var blandt de 4 billigste – de timer planen helst lader bilen i. Merprisen i parentes er hvad det kostede pr. kWh at vælge efter prognosen frem for de rigtige timer. Grafen viser de rigtige priser og prognoserne for de seneste og kommende dage.",
+    "price_forecast_correction_explain": "**Rettelse**: med *Ret prisprognosen* slået til (*Indstillinger → Avanceret*) lægger planen rettelsen oven i prognosepriserne: minus afvigelsen de sidste 30 dage for det antal dage frem, efter 7 dages målinger og højst ±0,50 kr. Grafen viser den prognose planen bruger for de kommende timer.",
     "history_explain": "* **Batteriniveau og ladegrænse**: de sidste 48 timer.\n* **Køreeffektivitet**: de sidste 30 dage.\n* **Ladet af solen**: de sidste 7 dage."
   }
 }

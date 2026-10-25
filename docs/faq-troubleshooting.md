@@ -24,6 +24,7 @@ charging when something it depends on changes:
 
 - **The prices changed.** Forecast prices (e.g. Carnot) and hours filled from the price database are
   replaced by the real prices when they are published, and a cheaper time before the departure may turn up.
+  The [price forecast analysis](dashboard-analysis.md#price-forecast) shows how far off the forecast usually is.
 - **The need changed.** The battery level, the departure or the km needed are different from when you looked.
 - **The solar forecast changed.** More expected sun means less grid charging.
 
