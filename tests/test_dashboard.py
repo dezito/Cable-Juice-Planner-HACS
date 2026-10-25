@@ -48,7 +48,10 @@ def test_dashboard_for_a_car_without_solar() -> None:
     # the overview markdown is shown as the integration writes it
     contents = [card.get("content") for card in _cards(dashboard) if card.get("type") == "markdown"]
     assert "{{ state_attr('sensor.cjp_tesla_overview', 'overview') }}" in contents
-    assert "config_entry_id: entry1" in text
+    # the debug info badge depends on the owner's input_boolean, so it is removed without it
+    assert "cable_juice_planner.debug_info" not in text
+    with_debug = render_dashboard(config, "tesla", "entry1", existing | {"input_boolean.dezito_show_debug_button"})
+    assert "config_entry_id: entry1" in with_debug
 
 
 def test_dashboard_layout() -> None:
@@ -126,7 +129,10 @@ def test_charging_loss_section_on_analysis() -> None:
     analysis = yaml.safe_load(text)["views"][2]
     assert "Ladetab pr. effekt" in [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c.get("graph_span") == "12h"]
+    # the loss by charging power (measurements and model) and what it is made of (fixed use + charger loss)
     assert len(charts) == 2 and all(s["entity"] == "sensor.cjp_tesla_charging_loss_model" for c in charts for s in c["series"])
+    assert [c["header"]["title"] for c in charts] == ["Tab mod ladeeffekt", "Hvad tabet består af"]
+    assert charts[1]["stacked"] is True and [s["name"] for s in charts[1]["series"]] == ["Laderens tab", "Fast forbrug"]
     buttons = [row["entity"] for c in _cards(analysis) if c.get("type") == "entities" for row in c["entities"]]
     assert "button.cjp_tesla_recalculate_charging_loss" in buttons
     # without a car integration there is nothing to measure: the section is gone

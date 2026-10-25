@@ -2506,6 +2506,64 @@ views:
           const b = new Date(); b.setHours(0, 0, 0, 0);
           return (entity.attributes.segments || []).filter(s => s.phases !== 1).map(s => [b.getTime() + s.kw * 3600000, s.loss * 100]).sort((x, y) => x[0] - y[0]);
       grid_options: *id001
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: '@@loss_parts_title@@'
+        show_states: false
+      graph_span: 12h
+      span:
+        start: day
+      stacked: true
+      now:
+        show: false
+      yaxis:
+      - min: 0
+        decimals: 0
+        apex_config:
+          tickAmount: 5
+      all_series_config:
+        type: area
+        unit: ' %'
+        float_precision: 1
+        extend_to: false
+        stroke_width: 1
+        opacity: 0.6
+        show:
+          legend_value: false
+          in_header: false
+      apex_config:
+        chart:
+          height: 280px
+        stroke:
+          curve: straight
+        dataLabels:
+          enabled: false
+        xaxis:
+          labels:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((value - b.getTime()) / 3600000) + ' kW'; }
+          tooltip:
+            enabled: false
+        tooltip:
+          shared: true
+          x:
+            formatter: |
+              EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000).toFixed(1).replace('.', ',') + ' kW'; }
+      series:
+      - entity: sensor.cjp_charging_loss_model
+        name: '@@loss_charger@@'
+        color: '#2a78d6'
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return Object.values(entity.attributes.curve || {}).flat().sort((x, y) => x.kw - y.kw).map(p => [b.getTime() + p.kw * 3600000, p.charger * 100]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '@@loss_fixed@@'
+        color: '#eb6834'
+        data_generator: |
+          const b = new Date(); b.setHours(0, 0, 0, 0);
+          return Object.values(entity.attributes.curve || {}).flat().sort((x, y) => x.kw - y.kw).map(p => [b.getTime() + p.kw * 3600000, p.fixed * 100]);
+      grid_options: *id001
   - type: grid
     cards:
     - type: heading
