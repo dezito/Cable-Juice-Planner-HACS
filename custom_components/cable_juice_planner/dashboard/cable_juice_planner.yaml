@@ -2505,6 +2505,62 @@ views:
           return ((entity.attributes.price_forecast || {}).days || []).filter(d => d.d7 !== undefined).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.d7]);
       grid_options:
         columns: full
+  # the forecast types (EMA, trend, average) against the house consumption and the km/kWh (engine_analysis.py)
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_forecast@@'
+      icon: mdi:chart-timeline-variant
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@forecast_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      card_mod:
+        style: |
+          ha-card {
+            --markdown-table-border-color: transparent
+          }
+      content: |-
+        {% macro n(v, d=2) %}{{ v | round(d) if v is number else '–' }}{% endmacro %}
+        {% macro p(v) %}{{ (v * 100) | round(0) | int ~ ' %' if v is number else '–' }}{% endmacro %}
+        {% set f = states.sensor.cjp_analysis.attributes.forecast or {} %}
+        {% set labels = {'ema': 'EMA', 'trend': 'Trend', 'average': '@@forecast_average@@'} %}
+        {% macro table(short, long, best, avg_label, short_label, long_label, msg) -%}
+        | @@forecast_type@@ | {{ avg_label }} | @@mae@@ {{ short_label }} | @@mae@@ {{ long_label }} | @@relative@@ | @@bias@@ |
+        |:---|---:|---:|---:|---:|---:|
+        | 📏 @@forecast_actual@@ | {{ n(long.actual) }} | | | | |
+        {% for kind, label in labels.items() -%}
+        | {{ '✅ ' if kind == f.selected }}{{ '⭐ ' if kind == best }}{{ label }} | {{ n(long[kind].forecast) }} | {{ n(short[kind].mae if short else none) }} | {{ n(long[kind].mae) }} | {{ p(long[kind].relative) }} | {{ n(long[kind].bias) }} |
+        {% endfor %}
+        {% if best and best != f.selected and f.selected in long %}
+        {% set b, s = long[best], long[f.selected] %}
+        {% set percent = ((1 - b.mae / s.mae) * 100) | round(0) | int if s.mae else 0 %}
+        <ha-alert alert-type="warning">{{ msg
+          | replace('{best}', labels[best]) | replace('{selected}', labels[f.selected])
+          | replace('{best_mae}', n(b.mae)) | replace('{selected_mae}', n(s.mae))
+          | replace('{percent}', percent | string) | replace('{actual}', n(long.actual))
+          | replace('{best_forecast}', n(b.forecast)) | replace('{selected_forecast}', n(s.forecast)) }}</ha-alert>
+        {% endif %}
+        {%- endmacro %}
+        {% set c, d = f.consumption or {}, f.drives or {} %}
+        {% if c.last_30 or d.all -%}
+        {% if c.last_30 -%}
+        **@@forecast_consumption_intro@@** ({{ c.last_30.hours }} @@hours@@)
+        {% set msg %}@@forecast_better@@{% endset %}
+        {{ table(c.last_7, c.last_30, c.best, '@@forecast_avg_kwh@@', '7 @@days@@', '30 @@days@@', msg) }}
+        {%- endif %}
+        {% if d.all -%}
+        **@@forecast_drives_intro@@** ({{ d.all.drives }} @@drives@@)
+        {% set msg %}@@forecast_better_drives@@{% endset %}
+        {{ table(d.recent, d.all, d.best, '@@forecast_avg_km@@', '@@last@@ ' ~ d.recent.drives, '@@last@@ ' ~ d.all.drives, msg) }}
+        {%- endif %}
+        {%- else -%}
+        <ha-alert alert-type="info">@@forecast_no_data@@</ha-alert>
+        {%- endif %}
+      grid_options:
+        columns: full
   # battery capacity over time: kWh from the charger per % and month
   - type: grid
     column_span: 2

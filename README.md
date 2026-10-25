@@ -94,6 +94,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   - whether the car was ready at each work plan departure
   - planned the evening before against actually charged
   - the price forecast against the real prices per day ahead: the error, and how often it found the cheapest hours
+  - the error of each forecast type (EMA, trend, average) for the house consumption and the car's km/kWh, against the actual values, and why another type is suggested when it is more accurate
   - battery capacity over time, and the charging loss per power
 - **CO₂ emissions** and **kWh charged by solar**
 - **Very detailed charging history**

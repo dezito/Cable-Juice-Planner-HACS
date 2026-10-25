@@ -1129,6 +1129,7 @@ class HistoryMixin:
                 self.drive_efficiency_db = self.drive_efficiency_db[: self.config["database"]["drive_efficiency_db_data_to_save"]]
                 self.save_drive_efficiency()
                 self.analysis_drive(kilometers, used_battery)
+                self.analysis_efficiency_forecast(self.km_kwh_efficiency_db, distance_per_kwh)
                 self.km_kwh_efficiency_db.insert(0, [self.now(), distance_per_kwh])
                 self.km_kwh_efficiency_db = self.km_kwh_efficiency_db[: self.config["database"]["km_kwh_efficiency_db_data_to_save"]]
                 self.save_km_kwh_efficiency()

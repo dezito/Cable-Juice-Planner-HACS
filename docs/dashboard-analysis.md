@@ -98,6 +98,34 @@ from its own price database are not included. The measurements always use the fo
 integration published it, never the corrected one. The first numbers come at 13:00 the day after the first
 start, "3 days ahead" after 3 days.
 
+### Forecast accuracy
+
+How well each forecast type (EMA, trend, average) predicts the two things CJP forecasts from its own
+history:
+
+- **House consumption per hour** – used for the solar surplus the car can charge from
+- **The car's km/kWh per drive** – used for how much trips and workdays need
+
+Just before a new measurement is added to the history (the house consumption at the end of every hour, the
+km/kWh when a drive is saved), CJP calculates what each type would have predicted from the same history
+and compares it with the measurement. ✅ marks the selected type, ⭐ the most accurate.
+
+| Column | Meaning |
+|---|---|
+| Avg. kWh/hour, Avg. km/kWh | what each type expected on average. The 📏 **Actual** row at the top is the measured value |
+| Error | the average error per hour (house: 7 and 30 days) or per drive (car: the last 10 and 30 drives) |
+| Relative | the error as a share of the measured value |
+| Bias | > 0: the forecast was too high on average |
+
+The error is counted hour by hour and drive by drive, so a type can hit the average and still miss a lot
+each time. When another type is more accurate, a warning shows the numbers behind the suggestion: both
+types' error, how much smaller it is, and what each expected against the actual value.
+
+One forecast type (*Settings → Advanced → Forecast type*) is used for the house consumption, km/kWh and the
+fallback prices alike, so the two tables can point at different types. Pick the one that is most accurate
+where it matters most to you: without solar, the house consumption is not used. The numbers are collected
+from the first start: the house consumption after the first whole day, km/kWh after the first drive.
+
 ### Battery capacity
 
 kWh from the charger per 1 % per month and power group, from the [charging loss](charging-loss.md)

@@ -668,6 +668,22 @@
     "price_forecast_correction_waiting": "The forecast is corrected per day ahead after 7 days of measurements.",
     "price_forecast_explain": "Every hour CJP saves the buy price from the price integration's forecast (without CJP's own adder per day ahead) for the coming days. When the real prices of a day arrive (around 13:00 the day before), they are compared with what the forecast said 1, 2, 3 … days before. **Error** is the average deviation per hour, **Bias** > 0: the forecast was too high. **Cheapest found**: how many of the day's 4 cheapest hours by the forecast really were among the 4 cheapest – the hours the plan prefers to charge the car in. The extra price in brackets is what picking by the forecast instead of the real hours cost per kWh. The chart shows the real prices and the forecasts of the last and the coming days.",
     "price_forecast_correction_explain": "**Correction**: with *Correct the price forecast* on (*Settings → Advanced*), the plan adds the correction to the forecast prices: minus the bias of the last 30 days for that day ahead, after 7 days of measurements and at most ±0.50 kr. The chart shows the forecast the plan uses for the coming hours.",
+    "section_forecast": "Forecast accuracy",
+    "forecast_consumption_intro": "House consumption per hour in kWh",
+    "forecast_drives_intro": "The car's km/kWh per drive",
+    "forecast_type": "Forecast type",
+    "forecast_actual": "Actual",
+    "forecast_average": "Average",
+    "forecast_avg_kwh": "Avg. kWh/hour",
+    "forecast_avg_km": "Avg. km/kWh",
+    "relative": "Relative",
+    "hours": "hours",
+    "drives": "drives",
+    "last": "last",
+    "forecast_better": "⭐ <b>{best}</b> forecast the house consumption best the last 30 days: on average {best_mae} kWh off per hour against {selected_mae} kWh for the selected ✅ <b>{selected}</b> ({percent} % less error). The actual consumption was {actual} kWh per hour; {best} expected {best_forecast} kWh and {selected} {selected_forecast} kWh.",
+    "forecast_better_drives": "⭐ <b>{best}</b> forecast the car's km/kWh best on the last drives: on average {best_mae} km/kWh off per drive against {selected_mae} km/kWh for the selected ✅ <b>{selected}</b> ({percent} % less error). The car actually drove {actual} km/kWh; {best} expected {best_forecast} km/kWh and {selected} {selected_forecast} km/kWh.",
+    "forecast_no_data": "Collected from now on: the house consumption after the first whole day, km/kWh after the first drive.",
+    "forecast_explain": "Just before a new measurement is added to the history (the house consumption every hour, the car's km/kWh after every drive), CJP calculates what each forecast type would have predicted from the same history and compares it with the measurement. ✅ the selected forecast type, ⭐ the most accurate. **Avg.** is what each type expected on average, against the actual value at the top. The **error** is counted hour by hour / drive by drive, so a type can hit the average and still miss a lot each time. **Bias** > 0: the forecast was too high.\n\nThe forecast type (*Settings → Advanced → Forecast type*) applies to the house consumption, km/kWh and the fallback prices alike, so pick the one that is most accurate where it matters most. The house consumption is only used for the solar surplus; km/kWh for how much trips and workdays need.",
     "history_explain": "* **Battery level and charging limit**: the last 48 hours.\n* **Driving efficiency**: the last 30 days.\n* **Charged by solar**: the last 7 days."
   }
 }
