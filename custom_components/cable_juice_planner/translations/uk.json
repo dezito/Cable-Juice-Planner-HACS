@@ -856,6 +856,9 @@
       },
       "use_measured_charging_loss": {
         "name": "Використовувати виміряні втрати"
+      },
+      "price_forecast_correction": {
+        "name": "Коригувати прогноз цін"
       }
     },
     "number": {

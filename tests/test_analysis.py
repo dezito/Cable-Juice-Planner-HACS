@@ -7,9 +7,9 @@ import pytest
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
-from custom_components.cable_juice_planner.engine_analysis import find_drives, linear_fit, temperature_bins
+from custom_components.cable_juice_planner.engine_analysis import evaluate_price_day, find_drives, linear_fit, temperature_bins
 
-from .test_engine import DAY, OPTIONS, PLUGGED_IN, TEXTS, TZ, snapshot
+from .test_engine import DAY, OPTIONS, PLUGGED_IN, TEXTS, TZ, _price_rows, snapshot
 
 BATTERY = 75.0
 
@@ -109,3 +109,97 @@ def test_capacity_per_month_counts_every_segment() -> None:
     months = result.attributes["charging_loss_model"]["capacity_months"]
     assert sum(m["segments"] for m in months) > 10
     assert all(m["group"] == "> 7 kW" and m["kwh_per_percent"] > BATTERY / 100 for m in months)
+
+
+def test_price_day_is_judged_per_days_ahead() -> None:
+    rows = [{"real": hour / 10, "1": hour / 10 + 0.1, "2": (23 - hour) / 10, **({"3": 1.0} if hour < 10 else {})} for hour in range(24)]
+    day = evaluate_price_day(rows)
+    # 1 day ahead: 0.1 too high but the same order
+    assert day["1"]["n"] == 24
+    assert day["1"]["bias"] / 24 == pytest.approx(0.1)
+    assert (day["1"]["cheap"], day["1"]["cheap_miss"]) == (4, 0.0)
+    # 2 days ahead: the order turned around, the "cheap" hours were the 4 most expensive
+    assert day["2"]["cheap"] == 0
+    assert day["2"]["cheap_miss"] == pytest.approx(2.0)
+    # 3 days ahead: too few hours
+    assert "3" not in day
+
+
+def _forecast_snapshot(now: datetime.datetime):
+    """Tomorrow is only a forecast (0.1 above the real prices of snapshot())."""
+    tomorrow = now.date() + datetime.timedelta(days=1)
+    snap = snapshot(now)
+    snap.price_data["attributes"]["sensor.price"].update(
+        raw_tomorrow=[], tomorrow_valid=False,
+        forecast=_price_rows(tomorrow, 0.9) + _price_rows(tomorrow + datetime.timedelta(days=1), 1.1),
+    )
+    return snap
+
+
+def _hour_end(engine: CJPEngine, snap):
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+    result = engine.run_job(snap, engine.hour_end)
+    assert result.error is None, result.error
+    return result
+
+
+def test_price_forecast_is_compared_with_the_real_prices() -> None:
+    tomorrow = DAY + datetime.timedelta(days=1)
+    morning = datetime.datetime.combine(DAY, datetime.time(10, 59))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(_forecast_snapshot(morning), engine.startup, {}).error is None
+    _hour_end(engine, _forecast_snapshot(morning))
+    hours = engine.analysis_db["price_hours"]
+    forecast = {row["hour"][11:13]: row["price"] for row in _price_rows(tomorrow, 0.9)}
+    # without the daily adder of the providers
+    assert hours[f"{tomorrow.isoformat()}T05"]["1"] == pytest.approx(forecast["05"], abs=0.006)
+    assert "real" not in hours[f"{tomorrow.isoformat()}T05"]
+
+    # 13: the real prices of tomorrow are known
+    afternoon = datetime.datetime.combine(DAY, datetime.time(13, 59))
+    result = _hour_end(engine, snapshot(afternoon))
+    judged = engine.analysis_db["price_days"][tomorrow.isoformat()]["1"]
+    assert judged["n"] == 24
+    assert judged["bias"] / 24 == pytest.approx(0.1, abs=0.006)
+    assert judged["cheap"] == 4
+    published = result.attributes["analysis"]["price_forecast"]
+    assert published["last_30"][0]["lead"] == 1
+    assert published["last_30"][0]["mae"] == pytest.approx(0.1, abs=0.006)
+    assert published["last_30"][0]["correction"] is None  # 1 day measured
+
+
+def test_price_forecast_is_corrected_with_its_bias() -> None:
+    tomorrow = DAY + datetime.timedelta(days=1)
+    now = datetime.datetime.combine(DAY, datetime.time(10, 5))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = _forecast_snapshot(now)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    for back in range(1, 8):
+        engine.analysis_db["price_days"][(DAY - datetime.timedelta(days=back)).isoformat()] = {
+            # 1 day ahead 0.2 too high; 3 days ahead 2 kr too low (capped at 0.5); 2 days ahead: too few days
+            "1": {"n": 24, "abs": 4.8, "bias": 4.8},
+            "3": {"n": 24, "abs": 48.0, "bias": -48.0},
+            **({"2": {"n": 24, "abs": 2.4, "bias": 2.4}} if back <= 3 else {}),
+        }
+    assert engine.price_forecast_corrections() == {1: -0.2, 3: 0.5}
+
+    assert engine.run_job(snap, engine.update_grid_prices).error is None
+    provider = engine.price_provider.buy_prices
+    prices = engine.get_grid_prices()
+    hour = datetime.datetime.combine(tomorrow, datetime.time(5))
+    later = hour + datetime.timedelta(days=1)
+    today = datetime.datetime.combine(DAY, datetime.time(15))
+    assert prices[hour] == pytest.approx(provider[hour] - 0.2)
+    assert prices[later] == provider[later]
+    assert prices[today] == provider[today]  # real prices are never corrected
+
+    published = engine.run_job(snap, engine.hour_end).attributes["analysis"]["price_forecast"]
+    assert {entry["lead"]: entry["correction"] for entry in published["last_30"]} == {1: -0.2, 2: None, 3: 0.5}
+    row = next(row for row in published["hours"] if row["t"] == f"{tomorrow.isoformat()}T05")
+    assert row["corrected"] == pytest.approx(row["d1"] - 0.2)
+
+    # the switch off: the cached prices are recalculated without a new price update
+    snap.settings["price_forecast_correction"] = False
+    assert engine.run_job(snap, engine.hour_end).error is None
+    assert engine.run_job(snap, engine.price_forecast_corrections).value == {}
+    assert engine.run_job(snap, engine.get_grid_prices).value[hour] == provider[hour]

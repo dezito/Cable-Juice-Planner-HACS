@@ -489,7 +489,8 @@
     "recalculate_charging_loss": "Zapomina zmierzone straty ładowania i ponownie czyta całą historię Home Assistant",
     "use_measured_charging_loss": "Plan używa mierzonej na bieżąco straty ładowania (kWh z ładowarki na % przy maksymalnej mocy, patrz Analiza) zamiast ustawionej. Bez pomiarów używana jest ustawiona",
     "economy": "Oszczędność w tym miesiącu względem codziennego ładowania (najtaniej do następnego wyjazdu, jak większość inteligentnych ładowarek). Miesiące, ceny i źródła w atrybutach",
-    "analysis": "Udział ostatnich 30 wyjazdów z planu pracy, przy których auto miało wymagany poziom baterii. Jazda a temperatura oraz zaplanowane a faktycznie naładowane są w atrybutach"
+    "analysis": "Udział ostatnich 30 wyjazdów z planu pracy, przy których auto miało wymagany poziom baterii. Jazda a temperatura oraz zaplanowane a faktycznie naładowane są w atrybutach",
+    "price_forecast_correction": "Koryguj ceny z prognozy o ich zmierzone odchylenie dla każdego dnia naprzód"
   },
   "entity_help": {
     "public_charging": "Gdy kończy się publiczna sesja ładowania (gniazdo/kabel użyte poza domem), włącza się Publiczna sesja ładowania zakończona i dostajesz powiadomienie.\n• Wpisz łączną kwotę w Koszt publicznej sesji ładowania.\n• Sesja jest dodawana do historii ładowania ok. 1 min po wpisaniu.\n• Wpisz -1, aby zignorować sesję.",
@@ -505,7 +506,8 @@
     "cheap_limits": "Poziom ładowania przy tanich cenach:\n• Bardzo tanio: gdy cena jest najwyżej równa średniej najtańszych znanych cen nadchodzącego tygodnia, ładuj do {very_cheap_grid_charging_max_battery_level} %.\n• Ekstremalnie tanio: gdy cena jest jeszcze o 25 % niższa, ładuj do {ultra_cheap_grid_charging_max_battery_level} %.\nUżywane przez zaplanowane godziny ładowania w tych cenach i zawsze, gdy włączone jest \"Ładuj przy tanim prądzie\".",
     "battery_preheat": "Ustawienia poziomu baterii i nagrzewania:\n• Minimalny dzienny poziom baterii ({min_daily_battery_level} %): po powrocie z pracy.\n• Minimalny poziom baterii w podróży ({min_trip_battery_level} %): po powrocie z podróży.\n• Minimalny limit ładowania ({min_charge_limit_battery_level} %): najniższy limit ładowania, na jaki pozwala auto.\n• Maksymalny zalecany limit ładowania ({max_recommended_charge_limit_battery_level} %): zalecenie producenta.\n• Nagrzewaj X min wcześniej ({preheat_minutes_before} min): nagrzewanie przed wyjazdem do pracy i w podróż (przełącznik nagrzewania na dzień tygodnia).",
     "powerwall": "Ustawienia baterii domowej:\n• Nadwyżka słoneczna ładuje auto dopiero, gdy bateria domowa jest powyżej limitu (teraz {ev_charge_after_powerwall_battery_level} %).\n• Użyj baterii domowej dla auta: wymaga włączonego ładowania słonecznego i rozładowania baterii domowej powyżej potrzeb; używana jest tylko energia powyżej limitu.\nUtwórz automatyzację, która blokuje rozładowanie baterii domowej podczas ładowania auta i zezwala na nie tylko, gdy przełącznik jest włączony, a bateria jest powyżej limitu.",
-    "virtual_ev": "Wirtualne EV (bez integracji auta):\n• Poziom baterii: ustaw aktualny poziom baterii auta przy podłączaniu.\n• Poziom po zakończeniu: poziom, przy którym auto kończy ładowanie.\n• Szacowany całkowity zasięg: realistyczny maksymalny zasięg auta."
+    "virtual_ev": "Wirtualne EV (bez integracji auta):\n• Poziom baterii: ustaw aktualny poziom baterii auta przy podłączaniu.\n• Poziom po zakończeniu: poziom, przy którym auto kończy ładowanie.\n• Szacowany całkowity zasięg: realistyczny maksymalny zasięg auta.",
+    "price_forecast": "Koryguj prognozę cen: plan koryguje ceny z prognozy (np. Carnot) o ich odchylenie z ostatnich 30 dni, dla każdego dnia naprzód – po 7 dniach pomiarów, maksymalnie ±0,50 kr. Zobacz *Prognoza cen* w analizie."
   },
   "dashboard": {
     "enforce_planning": "Wymuś planowanie",
@@ -640,6 +642,28 @@
     "drive_temperature_explain": "*Każda jazda od odłączenia do ponownego podłączenia, z temperaturą zewnętrzną (średnia, gdy auta nie było) i km/kWh z licznika kilometrów i poziomu baterii (z rozmiarem baterii ustawionym w CJP). Pomarańczowa linia to średnia na 5 °C. Trend pokazuje, jak km/kWh zmienia się na stopień i ile kosztuje zimno. Jazdy poniżej 5 km lub poniżej 2 % baterii są pomijane. Za pierwszym razem jazdy są odczytywane z historii recordera (ostatnie dni), potem zapisywana jest każda jazda.*",
     "departures_explain": "*Przy każdym wyjeździe z planu pracy poziom baterii, z jakim auto odjechało, jest porównywany z wymaganiem: jazda dnia plus dzienne minimum (✅ = spełnione). Cel planu to poziom, do którego plan dążył przed pracą. Zapisywane są tylko wyjazdy od teraz (dawne plany nie są przechowywane), pokazano ostatnie 14.*",
     "planned_explain": "*Każdego wieczoru o 23:59 zapisywane są kWh, które plan chce naładować następnego dnia. Tutaj porównuje się je z tym, co faktycznie naładowano tego dnia. Poza planem = ładowanie ręczne, ładowanie z powodu niskiej baterii i inne ładowanie. Ładowanie publiczne nie jest liczone.*",
+    "section_price_forecast": "Prognoza cen",
+    "price_forecast_intro": "Prognoza integracji cenowej a rzeczywista cena, ostatnie 30 dni:",
+    "days_ahead": "Dni naprzód",
+    "days": "dni",
+    "mae": "Błąd",
+    "bias": "Odchylenie",
+    "worst_hour": "Najgorsza godzina",
+    "cheap_hits": "Trafione najtańsze",
+    "correction": "Korekta",
+    "price_forecast_unit": "Błąd i odchylenie w kr/kWh. W nawiasie: dopłata za kWh przy wyborze godzin według prognozy.",
+    "price_forecast_no_data": "Zbierane od teraz: pierwsze liczby jutro o 13:00, gdy pojawią się rzeczywiste ceny na następny dzień.",
+    "price_forecast_title": "Rzeczywista cena a prognoza",
+    "price_forecast_error_title": "Błąd prognozy dziennie",
+    "real_price": "Rzeczywista cena",
+    "price_forecast_1": "1 dzień wcześniej",
+    "price_forecast_2": "2 dni wcześniej",
+    "price_forecast_3": "3 dni wcześniej",
+    "price_forecast_corrected": "Używana prognoza (skorygowana)",
+    "price_forecast_correction_off": "Korekta prognozy cen jest wyłączona (*Ustawienia → Zaawansowane*).",
+    "price_forecast_correction_waiting": "Prognoza jest korygowana dla każdego dnia naprzód po 7 dniach pomiarów.",
+    "price_forecast_explain": "Co godzinę CJP zapisuje cenę zakupu z prognozy integracji cenowej (bez własnego dodatku CJP za każdy dzień naprzód) na najbliższe dni. Gdy pojawią się rzeczywiste ceny danego dnia (około 13:00 dzień wcześniej), są porównywane z tym, co prognoza mówiła 1, 2, 3 … dni wcześniej. **Błąd** to średnie odchylenie na godzinę, **Odchylenie** > 0: prognoza była za wysoka. **Trafione najtańsze**: ile z 4 najtańszych godzin dnia według prognozy rzeczywiście było wśród 4 najtańszych – godzin, w których plan najchętniej ładuje samochód. Dopłata w nawiasie to koszt na kWh wyboru według prognozy zamiast rzeczywistych godzin. Wykres pokazuje rzeczywiste ceny i prognozy z ostatnich i nadchodzących dni.",
+    "price_forecast_correction_explain": "**Korekta**: gdy *Koryguj prognozę cen* jest włączone (*Ustawienia → Zaawansowane*), plan dodaje korektę do cen z prognozy: minus odchylenie z ostatnich 30 dni dla tego dnia naprzód, po 7 dniach pomiarów i maksymalnie ±0,50 kr. Wykres pokazuje prognozę, której plan używa dla nadchodzących godzin.",
     "history_explain": "* **Poziom baterii i limit ładowania**: ostatnie 48 godzin.\n* **Efektywność jazdy**: ostatnie 30 dni.\n* **Naładowano słońcem**: ostatnie 7 dni."
   }
 }

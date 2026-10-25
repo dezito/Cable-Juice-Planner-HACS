@@ -856,6 +856,9 @@
       },
       "use_measured_charging_loss": {
         "name": "Use measured charging loss"
+      },
+      "price_forecast_correction": {
+        "name": "Correct the price forecast"
       }
     },
     "number": {

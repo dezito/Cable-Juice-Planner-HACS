@@ -856,6 +856,9 @@
       },
       "use_measured_charging_loss": {
         "name": "Gemessenen Ladeverlust nutzen"
+      },
+      "price_forecast_correction": {
+        "name": "Preisprognose korrigieren"
       }
     },
     "number": {

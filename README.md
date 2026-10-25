@@ -68,7 +68,8 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - **Multiple cars on the same main fuse:** [load balancing](docs/load-balancing.md) with priority and phase order
 - **House consumption** is estimated from own history (excluding car, home battery and ignored consumers)
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
-  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund
+  [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund;
+  forecast prices are corrected with their measured bias
 - **Realistic consumption** based on the driving pattern: driving efficiency, km/kWh, Wh/km and estimated range
 - **[Public charging](docs/public-charging.md)** (with EV integration)
   - a charge away from home is detected automatically: time, battery level at start and end, and percentage added
@@ -92,6 +93,7 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   - driving efficiency against the outdoor temperature (how much more the car uses at 0 °C)
   - whether the car was ready at each work plan departure
   - planned the evening before against actually charged
+  - the price forecast against the real prices per day ahead: the error, and how often it found the cheapest hours
   - battery capacity over time, and the charging loss per power
 - **CO₂ emissions** and **kWh charged by solar**
 - **Very detailed charging history**
@@ -233,7 +235,7 @@ The settings from the dashboard are entities that are kept across restarts:
 
 | Type | Examples |
 |---|---|
-| `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance |
+| `switch` | charging rules, workdays and preheating per day, manual charging, forced charging, charge on cheap power, calculate charging loss, use measured charging loss, learn driving distance, correct the price forecast |
 | `number` | km per workday, battery levels, charge level on cheap power, trip, full charge every X days, price of public charging, virtual EV |
 | `time` | departure and arrival per workday |
 | `datetime` | the trip's departure and arrival |
@@ -262,8 +264,8 @@ e.g. `/cjp-planner` (without prefix) or `/cjp-tesla`, with three views:
   charging history and the overview
 - **Settings:** all charging rules, the work plan per weekday, battery levels, cheap power, full charge,
   solar/home battery, charging loss and virtual EV – with "Read more"
-- **Analysis:** economy, driving and temperature, ready at departure, planned against charged, battery
-  capacity and charging loss
+- **Analysis:** economy, driving and temperature, ready at departure, planned against charged, price
+  forecast, battery capacity and charging loss
 
 Every view is explained in [Dashboard and analysis](docs/dashboard-analysis.md). Once you save your own
 changes to the dashboard, your version is kept. Press **Reset dashboard** (on the integration's device) to
