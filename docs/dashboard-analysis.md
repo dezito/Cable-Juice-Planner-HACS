@@ -90,7 +90,7 @@ what the forecast said 1, 2, 3 … days before.
 
 The level of the forecast matters less than the order of the hours: a forecast that is 0.30 kr too high but
 finds the right cheap hours plans almost as well as the real prices. The charts show the real price against
-the forecast 1, 2 and 3 days before per hour (from 2 days ago to 4 days ahead), the corrected forecast the
+the forecast 1 to 7 days before per hour (from 2 days ago to 4 days ahead), the corrected forecast the
 plan uses for the coming hours, and the error per day for the last 31 days.
 
 Only the buy price is measured, and only hours with a forecast from the price integration – hours CJP fills
