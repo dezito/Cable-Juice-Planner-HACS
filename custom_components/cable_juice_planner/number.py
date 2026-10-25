@@ -30,12 +30,19 @@ class CJPNumber(CJPUpdatingEntity, NumberEntity, RestoreEntity):
 
     def __init__(self, coordinator: CJPCoordinator, key: str, info: dict[str, Any]) -> None:
         super().__init__(coordinator, "number", key)
+        # {distance} / {distance_kwh} in the entity name (translations/<language>.json)
+        self._attr_translation_placeholders = {"distance": coordinator.distance_unit, "distance_kwh": f"{coordinator.distance_unit}/kWh"}
         self._attr_native_min_value = info["min"]
         self._max = info["max"]
         self._attr_native_step = info["step"]
         self._attr_mode = NumberMode.BOX if info["mode"] == "box" else NumberMode.SLIDER
         if info.get("unit"):
-            self._attr_native_unit_of_measurement = info["unit"]
+            # {valuta} / {valuta_kwh}: the currency of Home Assistant, {distance}: its length unit
+            self._attr_native_unit_of_measurement = info["unit"].format(
+                valuta=coordinator.t("ui.common.valuta"),
+                valuta_kwh=coordinator.t("ui.common.valuta_kwh"),
+                distance=coordinator.distance_unit,
+            )
         if key not in PRIMARY_NUMBERS:
             self._attr_entity_category = EntityCategory.CONFIG
         default = info["default"]

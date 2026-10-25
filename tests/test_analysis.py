@@ -176,7 +176,7 @@ def test_price_forecast_is_corrected_with_its_bias() -> None:
     assert engine.run_job(snap, engine.startup, {}).error is None
     for back in range(1, 8):
         engine.analysis_db["price_days"][(DAY - datetime.timedelta(days=back)).isoformat()] = {
-            # 1 day ahead 0.2 too high; 3 days ahead 2 kr too low (capped at 0.5); 2 days ahead: too few days
+            # 1 day ahead 0.2 too high; 3 days ahead 2.00 too low (capped at 0.5); 2 days ahead: too few days
             "1": {"n": 24, "abs": 4.8, "bias": 4.8},
             "3": {"n": 24, "abs": 48.0, "bias": -48.0},
             **({"2": {"n": 24, "abs": 2.4, "bias": 2.4}} if back <= 3 else {}),

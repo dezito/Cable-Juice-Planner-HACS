@@ -85,7 +85,7 @@ views:
         name: '@@distance_per_day@@'
         yaxis_id: distance
         type: area
-        unit: km
+        unit: '@@distance@@'
         color: '#FF9800'
         opacity: 0.15
         stroke_width: 2
@@ -290,7 +290,7 @@ views:
               yaxis_id: price
               type: column
               name: '@@incl_taxes@@'
-              unit: kr.
+              unit: '@@valuta@@'
               color: green
               data_generator: |
                 var data = []
@@ -348,7 +348,7 @@ views:
               yaxis_id: price
               type: area
               name: '@@sell_price@@'
-              unit: kr.
+              unit: '@@valuta@@'
               color: white
               stroke_width: 0
               data_generator: |
@@ -429,8 +429,8 @@ views:
               stroke_width: 0
               opacity: 0.25
               color: purple
-              data_generator: "try {\n  var eds = (entity && entity.attributes) ? entity.attributes : {};\n  //if (eds.tomorrow_valid) return [];\n\n  // Start: første forecast-hour (mest korrekt)\n  var start = null;\n  if (eds.forecast && eds.forecast.length && eds.forecast[0] && eds.forecast[0].hour) {\n    start = new Date(eds.forecast[0].hour).getTime();\n  }\n  \n  // Fallback: i morgen 00:00 lokal tid\n  if (!start || isNaN(start)) {\n    var now = new Date();\n    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime();\n  }\n  \n  \n  // Brug de samme rækker som du alligevel plotter\n  var rows = [];\n  if (eds.raw_today) rows = rows.concat(eds.raw_today);\n  if (eds.forecast) rows = rows.concat(eds.forecast);\n  if (eds.raw_tomorrow) rows = rows.concat(eds.raw_tomorrow);\n\n  // Max pris til at fylde \"hele højden\"\n  var maxP = 0;\n  for (var i = 0; i < rows.length; i++) {\n    var p = Number(rows[i] && rows[i].price);\n    if (!isNaN(p) &&\
-                \ p > maxP) maxP = p;\n  }\n  if (maxP <= 0) maxP = 10;\n\n  // Unikke tider sorteret\n  var map = {};\n  for (var j = 0; j < rows.length; j++) {\n    var h = rows[j] && rows[j].hour;\n    if (!h) continue;\n    var t = new Date(h).getTime();\n    if (isNaN(t)) continue;\n    map[t] = 1;\n  }\n  var times = Object.keys(map).map(function(x){ return Number(x); }).sort(function(a,b){ return a-b; });\n\n  // Fail-safe: hvis vi ikke fik tider, lav 2 punkter så kortet ikke hænger\n  if (!times.length) {\n    return [\n      [new Date(start), maxP],\n      [new Date(start + 3600000), maxP]\n    ];\n  }\n\n  // 0 før start, max efter start => udfylder resten\n  var out = [];\n  for (var k = 0; k < times.length; k++) {\n    var tt = times[k];\n    out.push([new Date(tt), (tt >= start) ? maxP : 0]);\n  }\n  return out;\n\n} catch (e) {\n  console.log(\"forecast_zone error\", e);\n  return [];\n}\n"
+              data_generator: "try {\n  var eds = (entity && entity.attributes) ? entity.attributes : {};\n  //if (eds.tomorrow_valid) return [];\n\n  // Start: the first forecast hour (most accurate)\n  var start = null;\n  if (eds.forecast && eds.forecast.length && eds.forecast[0] && eds.forecast[0].hour) {\n    start = new Date(eds.forecast[0].hour).getTime();\n  }\n  \n  // Fallback: tomorrow 00:00 local time\n  if (!start || isNaN(start)) {\n    var now = new Date();\n    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime();\n  }\n  \n  \n  // Use the same rows as the ones plotted\n  var rows = [];\n  if (eds.raw_today) rows = rows.concat(eds.raw_today);\n  if (eds.forecast) rows = rows.concat(eds.forecast);\n  if (eds.raw_tomorrow) rows = rows.concat(eds.raw_tomorrow);\n\n  // Max price to fill \"the full height\"\n  var maxP = 0;\n  for (var i = 0; i < rows.length; i++) {\n    var p = Number(rows[i] && rows[i].price);\n    if (!isNaN(p) &&\
+                \ p > maxP) maxP = p;\n  }\n  if (maxP <= 0) maxP = 10;\n\n  // Unique times, sorted\n  var map = {};\n  for (var j = 0; j < rows.length; j++) {\n    var h = rows[j] && rows[j].hour;\n    if (!h) continue;\n    var t = new Date(h).getTime();\n    if (isNaN(t)) continue;\n    map[t] = 1;\n  }\n  var times = Object.keys(map).map(function(x){ return Number(x); }).sort(function(a,b){ return a-b; });\n\n  // Fail-safe: without times, make 2 points so the card doesn't hang\n  if (!times.length) {\n    return [\n      [new Date(start), maxP],\n      [new Date(start + 3600000), maxP]\n    ];\n  }\n\n  // 0 before the start, max after it => fills the rest\n  var out = [];\n  for (var k = 0; k < times.length; k++) {\n    var tt = times[k];\n    out.push([new Date(tt), (tt >= start) ? maxP : 0]);\n  }\n  return out;\n\n} catch (e) {\n  console.log(\"forecast_zone error\", e);\n  return [];\n}\n"
               group_by:
                 func: avg
                 duration: 15min
@@ -707,13 +707,13 @@ views:
               yaxis_id: price
               type: column
               name: '@@incl_taxes@@'
-              unit: kr.
+              unit: '@@valuta@@'
               color: green
               data_generator: |
                 const data = [];
 
                 // ------------------------------------------
-                // I DAG
+                // TODAY
                 // ------------------------------------------
 
                 const today =
@@ -766,7 +766,7 @@ views:
 
 
                 // ------------------------------------------
-                // SIDSTE OFFICIELLE PRIS
+                // LAST OFFICIAL PRICE
                 // ------------------------------------------
 
                 let officialEnd = 0;
@@ -802,7 +802,7 @@ views:
 
 
                 // ------------------------------------------
-                // SIDSTE TOMORROW-TIDSPUNKT
+                // LAST TOMORROW TIMESTAMP
                 // ------------------------------------------
 
                 let tomorrowEnd = officialEnd;
@@ -884,7 +884,7 @@ views:
               yaxis_id: price
               type: area
               name: '@@sell_price@@'
-              unit: kr.
+              unit: '@@valuta@@'
               color: white
               stroke_width: 0
               data_generator: |
@@ -911,7 +911,7 @@ views:
 
 
                 // ------------------------------------------
-                // I DAG
+                // TODAY
                 // ------------------------------------------
 
                 const today =
@@ -956,7 +956,7 @@ views:
 
 
                 // ------------------------------------------
-                // SIDSTE PRIS FRA TOMORROW ENTITY
+                // LAST PRICE FROM THE TOMORROW ENTITY
                 // ------------------------------------------
 
                 let availableEnd = 0;
@@ -1035,7 +1035,7 @@ views:
 
 
                 // ------------------------------------------
-                // OPRET ALLE PRISTIMESTAMPS SOM 0
+                // CREATE ALL PRICE TIMESTAMPS AS 0
                 // ------------------------------------------
 
                 const addTimes = (rows) => {
@@ -1052,7 +1052,7 @@ views:
                 };
 
 
-                // I dag
+                // Today
                 addTimes(
                   hass.states[
                     'sensor.stromligning_current_price_vat'
@@ -1060,7 +1060,7 @@ views:
                 );
 
 
-                // I morgen - både forecast og officielle
+                // Tomorrow - both forecast and official
                 const tomorrowEntity =
                   hass.states[
                     'binary_sensor.stromligning_tomorrow_available_vat'
@@ -1170,7 +1170,7 @@ views:
                 try {
 
                   // ------------------------------------------
-                  // I DAG
+                  // TODAY
                   // ------------------------------------------
 
                   const today =
@@ -1216,7 +1216,7 @@ views:
 
 
                   // ------------------------------------------
-                  // FIND STARTEN PÅ FORECAST
+                  // FIND THE START OF THE FORECAST
                   // ------------------------------------------
 
                   let forecastStart = 0;
@@ -1262,7 +1262,7 @@ views:
 
 
                   // ------------------------------------------
-                  // ALLE RÆKKER
+                  // ALL ROWS
                   // ------------------------------------------
 
                   const rows = [
@@ -1296,7 +1296,7 @@ views:
 
 
                   // ------------------------------------------
-                  // ALLE TIMESTAMPS
+                  // ALL TIMESTAMPS
                   // ------------------------------------------
 
                   const times = [
@@ -1334,7 +1334,7 @@ views:
 
 
                   // ------------------------------------------
-                  // 0 FØR FORECAST
+                  // 0 BEFORE THE FORECAST
                   // MAX EFTER FORECAST
                   // ------------------------------------------
 
@@ -2005,11 +2005,7 @@ views:
       heading_style: subtitle
       icon: mdi:bug-outline
     - type: markdown
-      content: "<details><summary>@@read_more@@</summary>
-
-@@help_problem@@
-
-</details>"
+      content: "<details><summary>@@read_more@@</summary>\n\n@@help_problem@@\n\n</details>"
       grid_options: *id001
     - type: entities
       show_header_toggle: false
@@ -2046,13 +2042,13 @@ views:
         @@economy_intro@@
 
         {% if e.months -%}
-        | @@economy_month@@ | kWh | @@economy_paid@@ | kr/kWh | @@economy_average@@ | @@economy_daily@@ | @@economy_lowest@@ | @@economy_saved@@ | Score | kr/km |
+        | @@economy_month@@ | kWh | @@economy_paid@@ | @@valuta_kwh@@ | @@economy_average@@ | @@economy_daily@@ | @@economy_lowest@@ | @@economy_saved@@ | Score | @@valuta@@/@@distance@@ |
         |:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
         {% for m in e.months | reverse -%}
-        | **{{ m.month }}** | {{ m.kwh | round(0) }} | {{ m.cost | round(0) }} kr | {{ m.unit_price | round(2) if m.unit_price else '–' }} | {{ m.average_unit | round(2) if m.average_unit else '–' }} | {{ m.daily_unit | round(2) if m.daily_unit else '–' }} | {{ m.lowest_unit | round(2) if m.lowest_unit else '–' }} | {{ (m.saving_daily | round(0) | string + ' kr') if m.saving_daily is not none else '–' }} | {{ ((m.score * 100) | round(0) | string + ' %') if m.score is not none else '–' }} | {{ m.price_per_km | round(2) if m.price_per_km else '–' }} |
+        | **{{ m.month }}** | {{ m.kwh | round(0) }} | {{ m.cost | round(0) }} @@valuta@@ | {{ m.unit_price | round(2) if m.unit_price else '–' }} | {{ m.average_unit | round(2) if m.average_unit else '–' }} | {{ m.daily_unit | round(2) if m.daily_unit else '–' }} | {{ m.lowest_unit | round(2) if m.lowest_unit else '–' }} | {{ (m.saving_daily | round(0) | string + ' @@valuta@@') if m.saving_daily is not none else '–' }} | {{ ((m.score * 100) | round(0) | string + ' %') if m.score is not none else '–' }} | {{ m.price_per_km | round(2) if m.price_per_km else '–' }} |
         {% endfor %}
 
-        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ e.total.cost | round(0) }} kr{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} kr @@economy_vs_daily@@{% if e.total.score is not none %} · Score {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
+        **@@economy_total@@:** {{ e.total.kwh | round(0) }} kWh, {{ e.total.cost | round(0) }} @@valuta@@{% if e.total.compared_kwh %} · @@economy_saved@@ {{ e.total.saving_daily | round(0) }} @@valuta@@ @@economy_vs_daily@@{% if e.total.score is not none %} · Score {{ (e.total.score * 100) | round(0) }} %{% endif %}{% endif %}
         {%- else -%}
         <ha-alert alert-type="info">@@economy_no_data@@</ha-alert>
         {%- endif %}
@@ -2125,7 +2121,7 @@ views:
         decimals: 2
       all_series_config:
         type: line
-        unit: ' kr/kWh'
+        unit: ' @@valuta_kwh@@'
         float_precision: 2
         stroke_width: 2
         show:
@@ -2178,7 +2174,7 @@ views:
         {% set a = states.sensor.cjp_analysis.attributes %}
         {% set f = a.temperature_fit %}
         {% if f -%}
-        @@drive_temperature_fit_1@@ **{{ (f.per_degree | abs) | round(2) }} km/kWh** @@drive_temperature_fit_2@@
+        @@drive_temperature_fit_1@@ **{{ (f.per_degree | abs) | round(2) }} @@distance_kwh@@** @@drive_temperature_fit_2@@
 
         | -10 °C | 0 °C | 10 °C | 20 °C |
         |---:|---:|---:|---:|
@@ -2204,7 +2200,7 @@ views:
       - min: 0
         decimals: 1
       all_series_config:
-        unit: ' km/kWh'
+        unit: ' @@distance_kwh@@'
         float_precision: 2
         extend_to: false
         show:
@@ -2400,7 +2396,7 @@ views:
       all_series_config:
         type: line
         curve: stepline
-        unit: ' kr/kWh'
+        unit: ' @@valuta_kwh@@'
         float_precision: 2
         stroke_width: 2
         show:
@@ -2474,7 +2470,7 @@ views:
         decimals: 2
       all_series_config:
         type: line
-        unit: ' kr/kWh'
+        unit: ' @@valuta_kwh@@'
         float_precision: 3
         stroke_width: 2
         show:
@@ -2523,7 +2519,7 @@ views:
           return ((entity.attributes.price_forecast || {}).days || []).filter(d => d.d7 !== undefined).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.d7]);
       grid_options:
         columns: full
-  # the forecast types (EMA, trend, average) against the house consumption and the km/kWh (engine_analysis.py)
+  # the forecast types (EMA, trend, average) against the house consumption and the @@distance_kwh@@ (engine_analysis.py)
   - type: grid
     column_span: 2
     cards:

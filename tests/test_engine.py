@@ -589,7 +589,7 @@ def test_without_location_home_follows_charger_status_and_cable(status, status_h
 
 
 def _price_history() -> dict:
-    """Price history where the price tells the weekday: 2.<weekday> kr in every hour."""
+    """Price history where the price tells the weekday: 2.<weekday> in every hour."""
     history = {hour: {dow: [2.0 + dow / 10] * 3 for dow in range(7)} for hour in range(24)}
     return {"history": history, "history_sell": deepcopy(history), "max": [3.0], "mean": [2.0], "min": [1.0], "version": 2.0}
 

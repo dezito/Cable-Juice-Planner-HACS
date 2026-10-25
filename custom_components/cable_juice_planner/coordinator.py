@@ -183,6 +183,11 @@ class CJPCoordinator:
         return translate(self.texts, key, default, **fmt)
 
     @property
+    def distance_unit(self) -> str:
+        """km or mi: the unit system of Home Assistant, the car's distance sensors are shown in it."""
+        return str(self.hass.config.units.length_unit)
+
+    @property
     def title(self) -> str:
         return instance_title(self.prefix, self.car_name)
 
@@ -226,7 +231,7 @@ class CJPCoordinator:
 
     async def async_setup(self) -> None:
         language = normalize_language(self.config.get("language"), normalize_language(self.hass.config.language))
-        self.texts = await self.hass.async_add_executor_job(load_texts, language)
+        self.texts = await self.hass.async_add_executor_job(load_texts, language, self.hass.config.currency, self.distance_unit)
         self.engine = CJPEngine(self.config, self.object_prefix, self.texts, title=self.title)
         if self.site is not None:
             self.site.register(self)

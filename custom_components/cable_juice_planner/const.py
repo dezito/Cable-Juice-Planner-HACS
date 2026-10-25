@@ -126,6 +126,29 @@ def normalize_language(value: str | None, fallback: str = "en") -> str:
     return language if language in LANGUAGES else fallback
 
 
+# Symbol shown for hass.config.currency (ISO 4217); other currencies are shown with their code
+CURRENCY_SYMBOLS = {
+    "DKK": "kr",
+    "SEK": "kr",
+    "NOK": "kr",
+    "ISK": "kr",
+    "EUR": "€",
+    "GBP": "£",
+    "USD": "$",
+    "PLN": "zł",
+    "UAH": "₴",
+    "CZK": "Kč",
+    "HUF": "Ft",
+}
+
+
+def currency_symbol(currency: str | None) -> str | None:
+    """'DKK' -> 'kr', 'CHF' -> 'CHF', None/'' -> None (the language's own valuta texts are used)."""
+    if not currency:
+        return None
+    return CURRENCY_SYMBOLS.get(currency.upper(), currency.upper())
+
+
 WEATHER_CONDITION_DICT = {
     "sunny": 100,
     "windy": 80,
@@ -582,7 +605,7 @@ def _level(default: float, config: str | None = None, icon_min: int = 10) -> dic
 
 
 def _distance(config: str) -> dict[str, Any]:
-    return {"min": 0, "max": 500, "step": 5, "mode": "box", "unit": "km", "default": 50.0, "config": config}
+    return {"min": 0, "max": 500, "step": 5, "mode": "box", "unit": "{distance}", "default": 50.0, "config": config}
 
 
 NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
@@ -597,12 +620,12 @@ NUMBER_SETTINGS: dict[str, dict[str, Any]] = {
     "ultra_cheap_grid_charging_max_battery_level": _level(90.0, "ev_car.ultra_cheap_grid_charging_max_battery_level"),
     "battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 0.0, "requires": "no_ev"},
     "completed_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "box", "unit": "%", "default": 100.0, "requires": "no_ev"},
-    "estimated_total_range": {"min": 0, "max": 1000, "step": 1, "mode": "box", "unit": "km", "default": 0.0, "requires": "no_ev"},
+    "estimated_total_range": {"min": 0, "max": 1000, "step": 1, "mode": "box", "unit": "{distance}", "default": 0.0, "requires": "no_ev"},
     "trip_charge_procent": {"min": 0, "max": 100, "step": 5, "mode": "slider", "unit": "%", "default": 0.0},
-    "trip_range_needed": {"min": 0, "max": 1000, "step": 5, "mode": "slider", "unit": "km", "default": 0.0},
+    "trip_range_needed": {"min": 0, "max": 1000, "step": 5, "mode": "slider", "unit": "{distance}", "default": 0.0},
     "full_charge_recommended": {"min": 0, "max": 60, "step": 1, "mode": "slider", "unit": "d", "default": 0.0},
     "ev_charge_after_powerwall_battery_level": {"min": 0, "max": 100, "step": 1, "mode": "slider", "unit": "%", "default": 0.0, "config": "solar.ev_charge_after_powerwall_battery_level", "requires": "powerwall_level"},
-    "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "kr", "default": 0.0, "requires": "ev"},
+    "public_charging_session_cost": {"min": -2, "max": 5000, "step": 0.01, "mode": "box", "unit": "{valuta}", "default": 0.0, "requires": "ev"},
 }
 
 FORECAST_TYPE_OPTIONS = ["Average", "EMA (Exponential Moving Average)", "Trend"]
@@ -637,16 +660,16 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     "overview": (None, None, None, None),
     "charging_history": (None, None, None, None),
     "emoji_description": (None, None, None, None),
-    "kwh_cost_price": ("kr/kWh", None, "measurement", None),
+    "kwh_cost_price": ("{valuta_kwh}", None, "measurement", None),
     "charge_very_cheap_battery_level": ("%", None, "measurement", None),
     "charge_ultra_cheap_battery_level": ("%", None, "measurement", None),
     "solar_over_production_current_hour": ("W", "power", "measurement", "solar"),
     "solar_charged_percentage": ("%", None, "measurement", "solar"),
     "drive_efficiency": ("%", None, "measurement", "ev"),
-    "km_per_kwh": ("km/kWh", None, "measurement", "ev"),
-    "estimated_range": ("km", "distance", "measurement", "ev"),
+    "km_per_kwh": ("{distance}/kWh", None, "measurement", "ev"),
+    "estimated_range": ("{distance}", "distance", "measurement", "ev"),
     "drive_efficiency_last_battery_level": ("%", None, None, None),
-    "drive_efficiency_last_odometer": ("km", "distance", None, "ev"),
+    "drive_efficiency_last_odometer": ("{distance}", "distance", None, "ev"),
     "co2_emitted": ("kg", "weight", "total_increasing", None),
     "kwh_charged_by_solar": ("kWh", "energy", "total_increasing", "solar"),
     # set by the integration when the battery was full (was a settable datetime / input_datetime)
@@ -654,7 +677,7 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     # the measured charging loss at the max charging power, the model in the attributes
     "charging_loss_model": ("%", None, None, "ev"),
     # this month's saving compared with daily charging, the months in the attributes
-    "economy": ("kr", None, None, None),
+    "economy": ("{valuta}", None, None, None),
     # the share of the last 30 departures with the required battery level, the analysis in the attributes
     "analysis": ("%", None, None, "ev"),
 }

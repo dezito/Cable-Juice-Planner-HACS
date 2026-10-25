@@ -1747,7 +1747,7 @@ class PlannerMixin:
 
         try:
             if last_drive_efficiency:
-                kr_km = round(last_drive_efficiency['cost'] / last_drive_efficiency['distance'], 2) if last_drive_efficiency['distance'] > 0 else 0.0
+                cost_per_distance = round(last_drive_efficiency['cost'] / last_drive_efficiency['distance'], 2) if last_drive_efficiency['distance'] > 0 else 0.0
 
                 overview.append("<center>\n")
                 overview.append(f"## 🛣️ {self.t('ui.cheap_grid_charge_hours.last_drive_efficiency.title')} ##")
@@ -1756,7 +1756,7 @@ class PlannerMixin:
                 overview.append(f"| **📅 {self.t('ui.cheap_grid_charge_hours.last_drive_efficiency.drive_date')}** | **{date_to_string(last_drive_efficiency['timestamp'], format='%d/%m %H:%M')}** |")
                 overview.append(f"| **🚗 {self.t('ui.cheap_grid_charge_hours.last_drive_efficiency.last_distance')}** | **{round(last_drive_efficiency['distance'], 1):.1f} {self.t('ui.common.distance_type')}** |")
                 overview.append(f"| **🔋 {self.t('ui.cheap_grid_charge_hours.last_drive_efficiency.used_battery')}** | **{round(last_drive_efficiency['usedBattery'], 1):.1f}% ({round(last_drive_efficiency['usedkWh'], 2):.2f} kWh)** |")
-                overview.append(f"| **💰 {self.t('ui.common.expense')}** | **{round(last_drive_efficiency['cost'], 2):.2f} {self.t('ui.common.valuta')} ({kr_km:.2f} {self.t('ui.common.valuta_distance')})**")
+                overview.append(f"| **💰 {self.t('ui.common.expense')}** | **{round(last_drive_efficiency['cost'], 2):.2f} {self.t('ui.common.valuta')} ({cost_per_distance:.2f} {self.t('ui.common.valuta_distance')})**")
                 overview.append(f"| **📊 {self.t('ui.common.drive_efficiency')}** | **{round(last_drive_efficiency['efficiency'], 1):.1f}%** |")
                 overview.append(f"| **📏 {self.t('ui.cheap_grid_charge_hours.last_drive_efficiency.distance_per_kwh')}** | **{round(last_drive_efficiency['distancePerkWh'], 2):.2f} {self.t('ui.common.distance_kwh')} ({last_drive_efficiency['wh_km']} {self.t('ui.common.wh_distance')})** |")
                 overview.append("***")

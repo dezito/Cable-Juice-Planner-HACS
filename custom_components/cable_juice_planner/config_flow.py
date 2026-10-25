@@ -38,6 +38,7 @@ from .const import (
     OPTIONS_MENU,
     PRICE_PROVIDER_KEYS,
     SENSOR_DEFS,
+    currency_symbol,
     default_options,
     CONF_CAR_NAME,
     instance_title,
@@ -158,15 +159,15 @@ SELECTORS: dict[str, Any] = {
     "stromligning_sell_nettariff": _entity("sensor", integration="stromligning"),
     "stromligning_sell_systemtariff": _entity("sensor", integration="stromligning"),
     "stromligning_sell_surcharge": _entity("sensor", integration="stromligning"),
-    "refund": _number(0, 10, 0.001, "kr/kWh"),
-    "sell_fee": _number(0, 10, 0.001, "kr/kWh"),
+    "refund": _number(0, 10, 0.001, "{valuta_kwh}"),
+    "sell_fee": _number(0, 10, 0.001, "{valuta_kwh}"),
     # solar / weather
     "production_entity_id": _entity("sensor", device_class="power"),
     "forecast_entity_id": _entity("sensor", integration="solcast_solar"),
     "inverter_discharging_power_limit": _number(100, 100000, 100, "W"),
     "enable_selling_during_expensive_hours": BOOLEAN,
     # -1 = use the hourly sell price
-    "solar_sell_fixed_price": _number(-1, 10, 0.01, "kr/kWh"),
+    "solar_sell_fixed_price": _number(-1, 10, 0.01, "{valuta_kwh}"),
     "solarpower_use_before_minutes": _number(0, 180, 1, "min"),
     "max_to_current_hour": BOOLEAN,
     "allow_grid_charging_above_solar_available": _number(-10000, 10000, 10, "W"),
@@ -252,7 +253,18 @@ def _form_value(key: str, value: Any) -> Any:
     return value
 
 
-def build_schema(keys: list[str], values: dict[str, Any], notify_services: list[str] | None = None) -> vol.Schema:
+def _selector(key: str, currency: str | None) -> Any:
+    """SELECTORS[key] with {valuta_kwh} in the unit replaced by the currency of Home Assistant."""
+    field = SELECTORS[key]
+    if isinstance(field, selector.NumberSelector) and "{valuta_kwh}" in str(field.config.get("unit_of_measurement")):
+        unit = field.config["unit_of_measurement"].replace("{valuta_kwh}", f"{currency_symbol(currency) or 'kr'}/kWh")
+        return selector.NumberSelector(selector.NumberSelectorConfig(**{**field.config, "unit_of_measurement": unit}))
+    return field
+
+
+def build_schema(
+    keys: list[str], values: dict[str, Any], notify_services: list[str] | None = None, currency: str | None = None
+) -> vol.Schema:
     schema: dict[Any, Any] = {}
     for key in keys:
         value = _form_value(key, values.get(key))
@@ -263,13 +275,13 @@ def build_schema(keys: list[str], values: dict[str, Any], notify_services: list[
             )
         elif key in ENTITY_OPTION_KEYS:
             marker = vol.Required if key in REQUIRED_KEYS else vol.Optional
-            schema[marker(key, description={"suggested_value": value or None})] = SELECTORS[key]
+            schema[marker(key, description={"suggested_value": value or None})] = _selector(key, currency)
         elif key in LIST_OPTION_KEYS:
-            schema[vol.Optional(key, description={"suggested_value": value})] = SELECTORS[key]
+            schema[vol.Optional(key, description={"suggested_value": value})] = _selector(key, currency)
         elif key in REQUIRED_KEYS:
-            schema[vol.Required(key, default=value)] = SELECTORS[key]
+            schema[vol.Required(key, default=value)] = _selector(key, currency)
         else:
-            schema[vol.Optional(key, default=bool(value))] = SELECTORS[key]
+            schema[vol.Optional(key, default=bool(value))] = _selector(key, currency)
     return vol.Schema(schema)
 
 
@@ -405,7 +417,12 @@ class CJPFlowPages:
             values_for_form.update(values)
         return self.async_show_form(  # type: ignore[attr-defined]
             step_id=step,
-            data_schema=build_schema(keys, values_for_form, self._notify_services() if step == "notifications" else None),
+            data_schema=build_schema(
+                keys,
+                values_for_form,
+                self._notify_services() if step == "notifications" else None,
+                self.hass.config.currency,  # type: ignore[attr-defined]
+            ),
             errors=errors,
             description_placeholders={**self._placeholders(), "eds_url": ENERGIDATASERVICE_URL},
         )

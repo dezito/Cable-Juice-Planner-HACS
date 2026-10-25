@@ -920,7 +920,7 @@
         "name": "Ładowanie podróży do"
       },
       "trip_range_needed": {
-        "name": "Podróż dystans w km"
+        "name": "Podróż dystans w {distance}"
       },
       "full_charge_recommended": {
         "name": "Zalecane pełne ładowanie co"
@@ -1063,7 +1063,7 @@
         "name": "Efektywność jazdy"
       },
       "km_per_kwh": {
-        "name": "km/kWh"
+        "name": "{distance_kwh}"
       },
       "estimated_range": {
         "name": "Szacowany zasięg"

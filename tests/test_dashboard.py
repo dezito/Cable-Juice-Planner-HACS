@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.dashboard import render_dashboard
+from custom_components.cable_juice_planner.formatting import load_texts
 
 from .conftest import MOCK_OPTIONS, OBJECT_PREFIX, async_setup, async_unload_and_join, make_entry, set_source_states
 from .test_engine import OPTIONS
@@ -52,6 +53,44 @@ def test_dashboard_for_a_car_without_solar() -> None:
     assert "cable_juice_planner.debug_info" not in text
     with_debug = render_dashboard(config, "tesla", "entry1", existing | {"input_boolean.dezito_show_debug_button"})
     assert "config_entry_id: entry1" in with_debug
+
+
+def test_currency_follows_home_assistant() -> None:
+    texts = load_texts("en", "DKK")
+    assert (texts["ui.common.valuta"], texts["ui.common.valuta_kwh"], texts["ui.common.valuta_distance"]) == ("kr", "kr/kWh", "kr/mi")
+    assert load_texts("da", "EUR")["ui.common.valuta_distance"] == "€/km"
+    assert "{alternative_cost}€ {alternative_per_kwh}€/kWh" in load_texts("da", "EUR")["ui.cheap_grid_charge_hours.departure_plan.estimated_daily_charging"]
+    config = const.build_config({**OPTIONS, "language": "da"})
+    text = render_dashboard(config, "tesla", "entry1", _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price"}, "EUR")
+    assert "€/kWh" in text and "kr/kWh" not in text and "{valuta" not in text
+
+
+def test_distance_follows_home_assistant() -> None:
+    metric = load_texts("en", "GBP", "km")
+    assert (metric["ui.common.distance_type"], metric["ui.common.distance_kwh"], metric["ui.common.valuta_distance"]) == ("km", "km/kWh", "£/km")
+    assert "{distance" not in metric["dashboard.forecast_avg_km"] and "km/kWh" in metric["dashboard.forecast_avg_km"]
+    assert load_texts("da", "DKK", "mi")["ui.common.wh_distance"] == "Wh/mi"
+    assert load_texts("uk", None, "km")["ui.common.distance_type"] == "км"
+    config = const.build_config({**OPTIONS, "language": "da"})
+    text = render_dashboard(config, "tesla", "entry1", _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price"}, "DKK", "mi")
+    assert "mi/kWh" in text and "km/kWh" not in text and "{distance" not in text
+
+
+def test_every_language_has_every_text() -> None:
+    """A key missing in a language (and in English, the fallback) is shown as the raw key."""
+    import json
+    from pathlib import Path
+
+    def flat(data: dict, prefix: str = "") -> set[str]:
+        keys: set[str] = set()
+        for key, value in data.items():
+            keys |= flat(value, f"{prefix}{key}.") if isinstance(value, dict) else {f"{prefix}{key}"}
+        return keys
+
+    folder = Path(__file__).parents[1] / "custom_components" / "cable_juice_planner" / "texts"
+    keys = {path.stem: flat(json.loads(path.read_text(encoding="utf-8"))) for path in folder.glob("*.json")}
+    every = set().union(*keys.values())
+    assert {language: sorted(every - found) for language, found in keys.items() if every - found} == {}
 
 
 def test_dashboard_layout() -> None:

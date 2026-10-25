@@ -1120,7 +1120,7 @@ class EnergyMixin:
                     self.set_attr(key, "solar_kwh_price", f"{solar_kwh_price:.2f} {valuta_kwh}")
                     if self.is_powerwall_configured():
                         self.set_attr(key, "powerwall_share", f"{ev_powerwall_share * 100:.0f}%")
-                        self.set_attr(key, "powerwall_cost", f"{ev_powerwall_cost:.2f} kr")
+                        self.set_attr(key, "powerwall_cost", f"{ev_powerwall_cost:.2f} {valuta}")
                         self.set_attr(key, "powerwall_kwh_price", f"{powerwall_kwh_price:.2f} {valuta_kwh}")
                     self.set_attr(key, "grid_share", f"{ev_grid_share * 100:.0f}%")
                     self.set_attr(key, "grid_cost", f"{ev_grid_cost:.2f} {valuta}")

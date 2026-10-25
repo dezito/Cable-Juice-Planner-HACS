@@ -142,7 +142,7 @@ class EconomyMixin:
     # calculation ------------------------------------------------------- #
 
     def economy_update(self, data: dict) -> None:
-        """data from the coordinator: hourly prices {ts: kr/kWh}, odometer km per month {"YYYY-MM": km}
+        """data from the coordinator: hourly prices {ts: currency/kWh}, odometer km per month {"YYYY-MM": km}
         and (the first time) connection windows from the recorder [(start, end)]."""
         windows = self.economy_db["windows"]
         for start, end in data.get("windows") or []:

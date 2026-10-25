@@ -920,7 +920,7 @@
         "name": "Ціль заряджання для поїздки"
       },
       "trip_range_needed": {
-        "name": "Км, потрібні для поїздки"
+        "name": "{distance}, потрібні для поїздки"
       },
       "full_charge_recommended": {
         "name": "Повна зарядка кожні"
@@ -1063,7 +1063,7 @@
         "name": "Ефективність поїздки"
       },
       "km_per_kwh": {
-        "name": "км/кВт·год"
+        "name": "{distance_kwh}"
       },
       "estimated_range": {
         "name": "Оцінений пробіг"
