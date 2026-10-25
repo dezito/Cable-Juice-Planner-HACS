@@ -37,6 +37,7 @@ The [README](../README.md) gives the short version. These pages go into detail: 
 
 | Page | Content |
 |---|---|
+| [Emojis](emojis.md) | what every emoji in the plan, the history and the current rule means |
 | [Recipes](cookbook.md) | typical setups: no car integration, solar with a fixed sell price, together with BattMind … |
 | [Switching from the PyScript version](migration.md) | import of configuration and databases |
 | [FAQ and troubleshooting](faq-troubleshooting.md) | "why doesn't it charge now?", logs and debug info |

@@ -17,6 +17,28 @@ Check in this order:
 - **Is the action `charge`, but the car doesn't charge?** Then it is the automation: check the blueprint's
   trace (*Automations → ⋮ → Traces*) and its *Charging state* inputs.
 
+## It planned to charge tonight, but the car wasn't charged in the morning
+
+Usually the plan changed during the night. CJP recalculates the plan every few minutes, and it moves the
+charging when something it depends on changes:
+
+- **The prices changed.** Forecast prices (e.g. Carnot) and hours filled from the price database are
+  replaced by the real prices when they are published, and a cheaper time before the departure may turn up.
+- **The need changed.** The battery level, the departure or the km needed are different from when you looked.
+- **The solar forecast changed.** More expected sun means less grid charging.
+
+As long as the car is ready at the departure, the plan has done its job. To see what actually happened:
+
+- open the history of `sensor.cjp_<prefix>_charger_action` (*History* or the entity's dialog): it shows
+  when the action was `charge` and `stop` during the night
+- `sensor.cjp_<prefix>_current_charging_rule` and its history tell why
+- the overview shows the plan as it is now, with the charge hours that are left
+- [Planned against actually charged](dashboard-analysis.md#planned-against-actually-charged) in the analysis
+  compares the plan from the evening before with what was charged
+
+If the action was `charge` but the car didn't charge, the automation or the charger is the problem – see
+[Why doesn't it charge now?](#why-doesnt-it-charge-now).
+
 ## Why does it charge at max. current all the time?
 
 All charging rules are off – then CJP charges like a normal charger. Turn on at least one rule.
