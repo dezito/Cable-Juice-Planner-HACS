@@ -62,6 +62,9 @@ async def test_export_is_anonymised(hass: HomeAssistant, config_dir: Path, loade
     assert data["snapshots"][-1]["snapshot"]["astral"]["latitude"] == round(hass.config.latitude)
     assert any(record["message"] == "<redacted> reads sensor.power_consumption" for record in data["log"])
     assert f"sensor.{OBJECT_PREFIX}_" in text
+    # time settings stay times for the replay, the prices are there even when the snapshots have none
+    assert any(isinstance(value, dict) and "__time__" in value for value in data["settings"].values())
+    assert data["price_data"]["attributes"]
 
     item = hass.data["persistent_notification"][f"{OBJECT_PREFIX}_debug_export"]
     assert "Cable-Juice-Planner-HACS/issues/new?template=bug_report.yml" in item["message"]
@@ -85,6 +88,7 @@ async def test_replay_reproduces_the_plan(hass: HomeAssistant, config_dir: Path,
     response = await hass.services.async_call(DOMAIN, "export_debug", {}, blocking=True, return_response=True)
     export = debug_replay.load_export(str(config_dir.parent / response["files"][OBJECT_PREFIX]))
     assert export["snapshots"][-1]["job"] == "cron"
+    assert export["planning_job"]["job"] == "cron"
 
     engine = debug_replay.build_engine(export)
     engine.sensor_states.pop("current_charging_rule", None)
