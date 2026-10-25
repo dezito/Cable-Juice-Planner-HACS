@@ -1002,6 +1002,9 @@
       "export_data": {
         "name": "Export data"
       },
+      "export_debug": {
+        "name": "Export debug info"
+      },
       "recalculate_charging_loss": {
         "name": "Recalculate charging loss"
       }
@@ -1136,6 +1139,16 @@
         "config_entry_id": {
           "name": "Instance",
           "description": "The Cable Juice Planner instance (empty = all)."
+        }
+      }
+    },
+    "export_debug": {
+      "name": "Export debug info",
+      "description": "Saves an anonymised debug file (cable_juice_planner_debug) for a GitHub issue and shows a notification with a download link and how to report the problem.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instance",
+          "description": "Only export this entry (default: all)."
         }
       }
     },

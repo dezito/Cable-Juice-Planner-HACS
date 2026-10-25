@@ -22,6 +22,7 @@ from .const import (
     SERVICE_ADD_PUBLIC_CHARGING,
     SERVICE_DEBUG_INFO,
     SERVICE_ENFORCE_PLANNING,
+    SERVICE_EXPORT_DEBUG,
     SERVICE_EXPORT_DATA,
     SERVICE_IMPORT_DATA,
 )
@@ -29,6 +30,7 @@ from .coordinator import CJPCoordinator
 from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix
 from .blueprint_install import async_install_blueprints
 from .dashboard import async_remove_dashboard_file, async_setup_dashboard
+from .debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
 from .helpers import float_or_none
 from .site import CJPSite
 
@@ -82,6 +84,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             output[coordinator.object_prefix] = await coordinator.async_debug_info()
         return {"debug_info": output} if call.return_response else None
 
+    async def _export_debug(call: ServiceCall) -> ServiceResponse:
+        files = {}
+        for coordinator in _coordinators(hass, call):
+            name = await async_export_debug(hass, coordinator)
+            await async_notify_debug(hass, coordinator, name)
+            files[coordinator.object_prefix] = f"{DEBUG_DIR}/{name}"
+        return {"files": files} if call.return_response else None
+
     async def _enforce_planning(call: ServiceCall) -> None:
         for coordinator in _coordinators(hass, call):
             coordinator.async_enforce_planning()
@@ -111,6 +121,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.services.async_register(DOMAIN, SERVICE_EXPORT_DATA, _export_data, schema=SERVICE_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_IMPORT_DATA, _import_data, schema=IMPORT_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_DEBUG_INFO, _debug_info, schema=SERVICE_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, SERVICE_EXPORT_DEBUG, _export_debug, schema=SERVICE_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
+    install_log_buffer()
+    if getattr(hass, "http", None) is not None:
+        hass.http.register_view(DebugDownloadView())
     hass.services.async_register(DOMAIN, SERVICE_ENFORCE_PLANNING, _enforce_planning, schema=SERVICE_SCHEMA)
     hass.services.async_register(
         DOMAIN, SERVICE_ADD_PUBLIC_CHARGING, _add_public_charging, schema=PUBLIC_CHARGING_SCHEMA, supports_response=SupportsResponse.ONLY

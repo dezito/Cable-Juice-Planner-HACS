@@ -281,6 +281,7 @@ go back to the generated dashboard.
 | `cable_juice_planner.enforce_planning` | Recalculate the plan now |
 | `cable_juice_planner.manual_add_public_charging_session` | Calculate (and optionally save) a public charging session |
 | `cable_juice_planner.debug_info` | Returns internal state for troubleshooting |
+| `cable_juice_planner.export_debug` | Save an anonymised debug file for a GitHub issue |
 | `cable_juice_planner.export_data` | Save a backup of data and settings (see below) |
 | `cable_juice_planner.import_data` | Replace data and settings with a backup |
 
@@ -317,7 +318,8 @@ See [Switching from the PyScript version](docs/migration.md) for the steps and w
 See [FAQ and troubleshooting](docs/faq-troubleshooting.md). In short:
 
 - Turn on **Diagnostic file log** under **Configure → Advanced** (`cable_juice_planner_<prefix>.log` in the config folder).
-- Call `cable_juice_planner.debug_info` under **Developer tools → Actions**, and attach the response when you open an issue.
+- Found a bug? Press **Export debug info** on the device (or run `cable_juice_planner.export_debug`) right after it happened, and follow the
+  notification: it links to the file and to a prefilled GitHub issue. See [Report a problem](docs/faq-troubleshooting.md#report-a-problem).
 
 ---
 

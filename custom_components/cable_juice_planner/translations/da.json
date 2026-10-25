@@ -1002,6 +1002,9 @@
       "export_data": {
         "name": "Eksportér data"
       },
+      "export_debug": {
+        "name": "Eksportér debug-info"
+      },
       "recalculate_charging_loss": {
         "name": "Genberegn ladetab"
       }
@@ -1136,6 +1139,16 @@
         "config_entry_id": {
           "name": "Instans",
           "description": "Cable Juice Planner instansen (tom = alle)."
+        }
+      }
+    },
+    "export_debug": {
+      "name": "Eksportér debug-info",
+      "description": "Gemmer en anonymiseret debug-fil (cable_juice_planner_debug) til et GitHub-issue og viser en notifikation med downloadlink og vejledning i at rapportere problemet.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Instans",
+          "description": "Eksportér kun denne instans (standard: alle)."
         }
       }
     },

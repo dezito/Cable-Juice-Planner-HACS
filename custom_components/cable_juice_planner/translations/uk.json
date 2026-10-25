@@ -1002,6 +1002,9 @@
       "export_data": {
         "name": "Експортувати дані"
       },
+      "export_debug": {
+        "name": "Експорт debug інформації"
+      },
       "recalculate_charging_loss": {
         "name": "Перерахувати втрати заряджання"
       }
@@ -1136,6 +1139,16 @@
         "config_entry_id": {
           "name": "Екземпляр",
           "description": "Екземпляр Cable Juice Planner (порожньо = усі)."
+        }
+      }
+    },
+    "export_debug": {
+      "name": "Експортувати debug інформацію",
+      "description": "Зберігає анонімізований debug-файл (cable_juice_planner_debug) для GitHub issue і показує сповіщення з посиланням для завантаження та інструкцією, як повідомити про проблему.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Екземпляр",
+          "description": "Експортувати лише цей запис (за замовчуванням: усі)."
         }
       }
     },
