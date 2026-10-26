@@ -62,13 +62,20 @@ def test_segments_match_the_simulated_loss() -> None:
         assert segment["kw"] == pytest.approx(11.04, rel=0.01)
 
 
-def test_unsteady_power_is_not_a_segment() -> None:
+def test_variable_power_is_still_a_segment() -> None:
     soc, meter, power = _session(1_760_000_000.0, 11.04, 3, 2)
-    # the power changes in the middle (e.g. load balancing): only the steady parts count
+    # Solar surplus can vary the power substantially during one charging session.
     middle = power[len(power) // 2][0]
     power = [(s, m / 2, lo / 2, hi / 2) if s >= middle else (s, m, lo, hi) for s, m, lo, hi in power]
-    for segment in find_segments(soc, meter, power, [], BATTERY, 3):
-        assert segment["end"] <= middle + 300 or segment["start"] >= middle - 300
+    segments = find_segments(soc, meter, power, [], BATTERY, 3)
+    assert any(segment["start"] < middle < segment["end"] for segment in segments)
+
+
+def test_power_below_minimum_breaks_a_segment() -> None:
+    soc, meter, power = _session(1_760_000_000.0, 11.04, 3, 2)
+    middle = power[len(power) // 2][0]
+    power = [(start, 900.0, 500.0, 1300.0) if start == middle else (start, mean, low, high) for start, mean, low, high in power]
+    assert not any(segment["start"] < middle < segment["end"] for segment in find_segments(soc, meter, power, [], BATTERY, 3))
 
 
 def test_no_segment_before_both_have_reported_after_it() -> None:
@@ -109,17 +116,37 @@ def test_merge_skips_the_same_charging_and_keeps_the_newest_per_group() -> None:
     assert merged[-1]["start"] == max(s["start"] for s in many)
 
 
-def test_statistics_segments_from_steady_hours() -> None:
+def test_statistics_segments_from_variable_power_hours() -> None:
     kw, share = 11.04, P0 / 11.04 + C3
-    soc_per_hour = kw * (1 - share) / BATTERY * 100
-    hours = [{"start": 1_760_000_000.0 + h * 3600, "power_mean": kw * 1000, "power_min": kw * 980, "power_max": kw * 1020, "kwh": kw, "soc": 20 + soc_per_hour * (h + 0.5)} for h in range(4)]
+    powers = [8.0, 10.0, 12.0, 14.0]
+    hours = []
+    soc = 20.0
+    for h, power_kw in enumerate(powers):
+        soc_mid = soc + power_kw * (1 - share) / BATTERY * 50
+        hours.append({
+            "start": 1_760_000_000.0 + h * 3600, "power_mean": power_kw * 1000,
+            "power_min": 0.0, "power_max": (power_kw + 2) * 1000,
+            "kwh": power_kw, "soc": soc_mid,
+        })
+        soc += power_kw * (1 - share) / BATTERY * 100
     # an hour where the charging stopped ends the run
-    hours.append({"start": hours[-1]["start"] + 3600, "power_mean": 3000.0, "power_min": 0.0, "power_max": kw * 1000, "kwh": 3.0, "soc": 80})
+    hours.append({"start": hours[-1]["start"] + 3600, "power_mean": 0.0, "power_min": 0.0, "power_max": kw * 1000, "kwh": 0.0, "soc": soc})
     segments = find_statistics_segments(hours, BATTERY, 3)
     assert len(segments) == 1
     assert segments[0]["source"] == "statistics"
     assert segments[0]["loss"] == pytest.approx(share, abs=0.005)
     assert segments[0]["hours"] == pytest.approx(3)
+
+
+def test_old_segments_are_invalidated_for_backfill() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0)))
+    old_database = {"segments": [{"start": 1.0}], "backfilled": True}
+    result = engine.run_job(snap, engine.startup, {"charging_loss": old_database})
+    assert result.error is None, result.error
+    assert engine.charging_loss_db["segments"] == []
+    assert not engine.charging_loss_backfilled()
+    assert engine.charging_loss_db["segment_version"] == 2
 
 
 def test_resample_holds_the_value_until_the_next_reading() -> None:

@@ -3,11 +3,12 @@
 A segment runs from one change of the car's battery level to a later one (e.g. 55 % ->
 60 %), so the battery side is exact: the level changes by whole percents. The energy
 from the charger is the kWh meter, interpolated to the times of those changes. A
-segment is only used while the charging power and the phases were the same all the
-way, and only once both the meter and the battery level have reported after it.
+segment is only used while charging power stays above the minimum and phases stay the
+same, and only once both the meter and the battery level have reported after it.
 
 Older charging (beyond the recorder's raw history) comes from the hourly long-term
-statistics: runs of hours with a steady charging power. They count half.
+statistics: runs of hours with charging power throughout. Variable charging power is
+expected when solar surplus controls the charger. These measurements count half.
 
 The model, fitted over all segments:
 
@@ -22,7 +23,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import statistics
 from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,10 +32,10 @@ LOSS_GROUP_SIZE = 10  # newest segments kept per power group
 LOSS_MIN_SOC_DELTA = 5.0  # % per segment: the car reports its level with a delay, short segments are noisy
 LOSS_MAX_SEGMENT_HOURS = 8.0
 LOSS_MIN_POWER = 1000.0  # W: below this it is not charging
-LOSS_POWER_TOLERANCE = 0.15  # the power may vary +-15 % in a segment
 LOSS_METER_MAX_GAP = 20 * 60  # s between the meter readings around a change of the battery level
 LOSS_POWER_MAX_GAP = 15 * 60  # s without a power value inside a segment
 LOSS_STATISTICS_WEIGHT = 0.5
+LOSS_SEGMENT_VERSION = 2
 LOSS_SHARE_LIMITS = (-0.3, 0.6)  # a wrong battery size moves the loss, so the limits are wide
 CAPACITY_MONTHS = 36
 LOSS_THREE_PHASE_MIN_KW = 3.8  # above the most 1 phase can give (16 A * 230 V = 3.7 kW)
@@ -85,7 +85,7 @@ def _infer_phases(kw: float, configured: int) -> int:
     return 3 if configured >= 3 and kw > LOSS_THREE_PHASE_MIN_KW else 1
 
 
-def _power_steady(power: list[tuple[float, float, float, float]], ts_from: float, ts_to: float) -> bool:
+def _power_continuous(power: list[tuple[float, float, float, float]], ts_from: float, ts_to: float) -> bool:
     """power: (start, mean, min, max) of 5 minute statistics or of single readings."""
     inside = [row for row in power if ts_from - 300 < row[0] < ts_to]
     if not inside:
@@ -93,10 +93,7 @@ def _power_steady(power: list[tuple[float, float, float, float]], ts_from: float
     starts = [ts_from, *(row[0] for row in inside if row[0] > ts_from), ts_to]
     if max(b - a for a, b in zip(starts, starts[1:])) > LOSS_POWER_MAX_GAP:
         return False
-    median = statistics.median(row[1] for row in inside)
-    if median < LOSS_MIN_POWER:
-        return False
-    return all(row[2] >= median * (1 - LOSS_POWER_TOLERANCE) and row[3] <= median * (1 + LOSS_POWER_TOLERANCE) for row in inside)
+    return all(row[1] >= LOSS_MIN_POWER for row in inside)
 
 
 def _segment(start: float, end: float, kwh_in: float, soc_delta: float, battery_size: float, phases: int, source: str) -> dict | None:
@@ -142,7 +139,7 @@ def find_segments(soc: Series, meter: Series, power, phase_series: list[Series],
             # both entities must have reported after the end of the segment
             if t_b >= last_meter or t_b >= last_soc:
                 break
-            if kwh_a is None or not _power_steady(power, t_a, t_b):
+            if kwh_a is None or not _power_continuous(power, t_a, t_b):
                 break
             kwh_b = _value_at(meter, t_b, LOSS_METER_MAX_GAP)
             if kwh_b is not None and kwh_b > kwh_a:
@@ -165,17 +162,16 @@ def find_segments(soc: Series, meter: Series, power, phase_series: list[Series],
 
 
 def find_statistics_segments(hours: list[dict], battery_size: float, configured_phases: int) -> list[dict]:
-    """Segments from runs of hours with a steady charging power (hourly long-term statistics).
+    """Segments from runs of hours with charging power throughout (hourly statistics).
 
     hours: {"start", "power_mean", "power_min", "power_max", "kwh" (meter change), "soc" (mean)}
     The mean battery level is the level at the middle of the hour, so from the middle of the
     first to the middle of the last hour: half of the first and last hour's kWh plus the rest.
     """
-    def steady(hour):
+    def charging(hour):
         mean = hour.get("power_mean") or 0.0
         return (
-            mean >= LOSS_MIN_POWER and hour.get("power_min") is not None and hour.get("power_max") is not None
-            and hour["power_min"] >= mean * (1 - LOSS_POWER_TOLERANCE) and hour["power_max"] <= mean * (1 + LOSS_POWER_TOLERANCE)
+            mean >= LOSS_MIN_POWER
             and (hour.get("kwh") or 0.0) > 0.0 and hour.get("soc") is not None
         )
 
@@ -183,8 +179,7 @@ def find_statistics_segments(hours: list[dict], battery_size: float, configured_
     run: list[dict] = []
     for hour in [*sorted(hours, key=lambda h: h["start"]), None]:
         same = (
-            hour is not None and steady(hour) and run and hour["start"] - run[-1]["start"] == 3600
-            and abs(hour["power_mean"] - run[0]["power_mean"]) <= run[0]["power_mean"] * LOSS_POWER_TOLERANCE
+            hour is not None and charging(hour) and run and hour["start"] - run[-1]["start"] == 3600
         )
         if same:
             run.append(hour)
@@ -197,7 +192,7 @@ def find_statistics_segments(hours: list[dict], battery_size: float, configured_
                 phases = _infer_phases(kwh / ((end - start) / 3600), configured_phases)
                 if (segment := _segment(start, end, kwh, soc_delta, battery_size, phases, "statistics")) is not None:
                     segments.append(segment)
-        run = [hour] if hour is not None and steady(hour) else []
+        run = [hour] if hour is not None and charging(hour) else []
     return segments
 
 
@@ -279,6 +274,9 @@ class LossMixin:
 
     def load_charging_loss_db(self, database) -> None:
         self.charging_loss_db = database if isinstance(database, dict) and isinstance(database.get("segments"), list) else {"segments": [], "backfilled": False}
+        if self.charging_loss_db.get("segment_version") != LOSS_SEGMENT_VERSION:
+            self.charging_loss_db.update(segments=[], backfilled=False, segment_version=LOSS_SEGMENT_VERSION)
+            self.mark_dirty("charging_loss")
 
     def _fallback_loss_share(self) -> float:
         loss = abs(self.config["charger"]["charging_loss"])  # kWh from the charger = kWh in the car * (1 + loss)
@@ -324,7 +322,7 @@ class LossMixin:
 
     def charging_loss_reset(self) -> None:
         """button recalculate_charging_loss: forget the segments, the coordinator reads the history again."""
-        self.charging_loss_db = {"segments": [], "backfilled": False}
+        self.charging_loss_db = {"segments": [], "backfilled": False, "segment_version": LOSS_SEGMENT_VERSION}
         self.mark_dirty("charging_loss")
         self.publish_charging_loss_model()
 
