@@ -16,6 +16,7 @@ With phase sensors an overloaded phase immediately limits the last charging car.
 """
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import time
@@ -59,6 +60,7 @@ class CJPSite:
         self._unsubs: list = []
         self._pending: dict[str, Any] = {}
         self._last_overload: dict[str, float] = {}
+        self._startup_ready = asyncio.Event()
 
     # ------------------------------------------------------------------ #
     # Setup
@@ -77,11 +79,20 @@ class CJPSite:
         return [max(float(self.config.get(f"fuse_l{i}") or 0.0) - margin, 0.0) for i in (1, 2, 3)]
 
     async def async_start(self) -> None:
-        if self.has_phase_sensors:
-            self._unsubs.append(async_track_state_change_event(self.hass, self.phase_entities, self._phase_changed))
-            self._unsubs.append(async_track_time_change(self.hass, self._refresh_forecast, minute=7, second=0))
-            await self._async_refresh_forecast()
-        self.recalculate_all()
+        try:
+            if self.has_phase_sensors:
+                self._unsubs.append(async_track_state_change_event(self.hass, self.phase_entities, self._phase_changed))
+                self._unsubs.append(async_track_time_change(self.hass, self._refresh_forecast, minute=7, second=0))
+                await self._async_refresh_forecast()
+            self.recalculate_all()
+        finally:
+            # Cars starting on the same homeassistant_started event must not
+            # calculate against a half-initialized site forecast.
+            self._startup_ready.set()
+
+    async def async_wait_started(self) -> None:
+        """Wait until the site's initial load-balancing data is ready."""
+        await self._startup_ready.wait()
 
     async def async_stop(self) -> None:
         for unsub in (*self._unsubs, *self._pending.values()):

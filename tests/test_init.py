@@ -2,17 +2,19 @@
 from __future__ import annotations
 
 import datetime
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant, State
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, HomeAssistant, State
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
+from custom_components.cable_juice_planner import _async_run_after_home_assistant_started
 from custom_components.cable_juice_planner.const import (
     BUTTON_KEYS,
     DOMAIN,
@@ -51,6 +53,29 @@ def _expected_settings(requires_ok) -> list[str]:
         *(f"time.{OBJECT_PREFIX}_{key}" for key in TIME_SETTINGS),
         *(f"button.{OBJECT_PREFIX}_{key}" for key in BUTTON_KEYS),
     ]
+
+
+async def test_post_setup_work_waits_until_home_assistant_started(hass: HomeAssistant, mock_entry) -> None:
+    """Every car dashboard and the site must wait, not only the first entry."""
+    action = AsyncMock()
+    second_action = AsyncMock()
+    second_entry = make_entry("second")
+    hass.set_state(CoreState.starting)
+
+    await _async_run_after_home_assistant_started(hass, mock_entry, action, "cjp_test_startup")
+    await _async_run_after_home_assistant_started(hass, second_entry, second_action, "cjp_second_test_startup")
+    action.assert_not_awaited()
+    second_action.assert_not_awaited()
+
+    hass.set_state(CoreState.running)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+    await hass.async_block_till_done()
+    action.assert_awaited_once_with()
+    second_action.assert_awaited_once_with()
+
+    action.reset_mock()
+    await _async_run_after_home_assistant_started(hass, mock_entry, action, "cjp_test_reload")
+    action.assert_awaited_once_with()
 
 
 async def test_setup_creates_entities(hass: HomeAssistant, loaded_entry) -> None:

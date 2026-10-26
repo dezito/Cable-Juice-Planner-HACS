@@ -340,6 +340,11 @@ class CJPCoordinator:
     # ------------------------------------------------------------------ #
 
     async def _async_startup(self) -> None:
+        # All config entries receive homeassistant_started together. Yield once,
+        # then wait for the shared site entry before the first car calculation.
+        await asyncio.sleep(0)
+        if (site := self.site) is not None:
+            await site.async_wait_started()
         t = self.t
         log_lines: list[str] = []
         _LOGGER.info("Cable Juice Planner %s starting, calculations run in thread cjp_%s_worker_0", self.prefix, self.prefix)
