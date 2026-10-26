@@ -151,7 +151,7 @@ class ControlMixin:
         if text != self.site_charging_text:
             self.site_charging_text = text
             if self.last_charging_rule_text:
-                self.set_charging_rule(self.last_charging_rule_text)
+                self.set_charging_rule(self.last_charging_rule_text, fresh=False)
         return circuit_amps, limited
 
     def set_circuit_phase_limits(self, phase_1=0, phase_2=0, phase_3=0) -> None:
@@ -501,6 +501,7 @@ class ControlMixin:
         """
         self.charger_mode = "normal"
         try:
+            self.is_battery_fully_charged()
             return self._charge_if_needed(force_recalculate)
         finally:
             self.publish_site()
@@ -511,6 +512,7 @@ class ControlMixin:
         t = self.t
         config = self.config
         max_amps = self._max_amps
+        self.rule_set_this_run = False
         try:
             charging_rule = None
             trip_date_time = self.get_trip_date_time() if self.get_trip_date_time() != reset_datetime() else reset_datetime()
@@ -688,6 +690,9 @@ class ControlMixin:
                 self.stop_charging()
             if charging_rule:
                 self.set_charging_rule(charging_rule)
+            elif not self.rule_set_this_run:
+                # no branch set a rule this run, so never keep the previous one (stale emoji)
+                self.set_charging_rule(t("ui.charge_if_needed.not_charging"))
             self.set_charger_phase_limits(circuit_amps, charger_amps)
         except Exception as err:  # noqa: BLE001
             self.charger_mode = "error"
@@ -971,6 +976,8 @@ class ControlMixin:
         runtime = databases.get("runtime") or {}
         for key, value in (runtime.get("sensors") or {}).items():
             self.sensor_states.setdefault(key, value)
+        full_charge_99_since = runtime.get("full_charge_99_since")
+        self.full_charge_99_since = full_charge_99_since if isinstance(full_charge_99_since, datetime.datetime) else None
         if runtime.get("last_battery_level_attributes"):
             self.sensor_attrs.setdefault("drive_efficiency_last_battery_level", {}).update(runtime["last_battery_level_attributes"])
         if isinstance(runtime.get("charging_loss"), (int, float)):

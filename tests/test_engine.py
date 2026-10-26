@@ -477,15 +477,67 @@ def test_full_charge_not_needed_after_a_recent_one() -> None:
     assert not [ts for ts in charge_hours(engine) if "battery_health" in engine.charge_hours[ts]]
 
 
-@pytest.mark.parametrize(("level", "registered"), [(100, True), (99, True), (98, False)])
-def test_full_charge_is_registered_at_99(level: int, registered: bool) -> None:
+def test_full_charge_is_registered_at_100() -> None:
     engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
-    result = engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(6, 0)), level=level), engine.is_battery_fully_charged)
+    result = engine.run_job(snapshot(datetime.datetime.combine(DAY, datetime.time(6, 0)), level=100), engine.is_battery_fully_charged)
     assert result.error is None
-    # a sensor set by the integration (no setting the user can change), kept in the runtime database
-    assert ("last_full_charge" in result.states) is registered
-    assert ("runtime" in result.db_saves) is registered
+    assert "last_full_charge" in result.states
+    assert "runtime" in result.db_saves
     assert "last_full_charge" not in result.settings
+
+
+def test_full_charge_at_99_requires_30_minutes_stopped() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    started = datetime.datetime.combine(DAY, datetime.time(6, 0))
+    first = engine.run_job(snapshot(started, level=99, status="awaiting_start"), engine.is_battery_fully_charged)
+    assert first.error is None
+    assert "last_full_charge" not in first.states
+    assert engine.full_charge_99_since == started
+    assert decode(first.db_saves["runtime"])["full_charge_99_since"] == started
+
+    after_29_minutes = started + datetime.timedelta(minutes=29)
+    waiting = engine.run_job(snapshot(after_29_minutes, level=99, status="awaiting_start"), engine.is_battery_fully_charged)
+    assert waiting.error is None
+    assert "last_full_charge" not in waiting.states
+
+    after_30_minutes = started + datetime.timedelta(minutes=30)
+    completed = engine.run_job(snapshot(after_30_minutes, level=99, status="awaiting_start"), engine.is_battery_fully_charged)
+    assert completed.error is None
+    assert completed.states["last_full_charge"] == after_30_minutes
+    assert engine.full_charge_99_since is None
+
+
+def test_full_charge_at_99_does_not_start_wait_while_charging() -> None:
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    engine.full_charge_99_since = datetime.datetime.combine(DAY, datetime.time(5, 45))
+    result = engine.run_job(
+        snapshot(datetime.datetime.combine(DAY, datetime.time(6, 0)), level=99, status="charging"),
+        engine.is_battery_fully_charged,
+    )
+    assert result.error is None
+    assert "last_full_charge" not in result.states
+    assert engine.full_charge_99_since is None
+
+
+def test_full_charge_at_99_is_not_retried_during_wait() -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    since = now - datetime.timedelta(minutes=15)
+    last = now - datetime.timedelta(days=10)
+    engine, _ = run(
+        12,
+        {
+            "runtime": {
+                "sensors": {"last_full_charge": last},
+                "full_charge_99_since": since,
+            }
+        },
+        level=99,
+        status="awaiting_start",
+        settings={"full_charge_recommended": 7.0},
+    )
+    assert engine.full_charge_99_since == since
+    assert not [ts for ts in charge_hours(engine) if "battery_health" in engine.charge_hours[ts]]
+    assert engine.charger_action == "stop"
 
 
 @pytest.mark.parametrize(("location", "hour", "expected_km"), [("not_home", 12, 50.0), ("not_home", 6, 50.0), ("home", 6, 100.0), ("home", 12, None)])

@@ -11,6 +11,7 @@ import logging
 from pprint import pformat
 
 from .const import (
+    CHARGER_CHARGING_STATUS,
     CHARGER_NOT_READY_STATUS,
     CHARGER_READY_STATUS,
     ENTITY_UNAVAILABLE_STATES,
@@ -48,7 +49,8 @@ EFFICIENCY_FACTORS = {
     for month, factor in {1: 0.85, 2: 0.87, 3: 0.90, 4: 0.95, 5: 1.00, 6: 1.02, 7: 1.03, 8: 1.02, 9: 1.00, 10: 0.95, 11: 0.90, 12: 0.87}.items()
 }
 HEATING_STATES = ("preheat_start", "preheat_cancel")
-FULL_CHARGE_BATTERY_LEVEL = 99.0  # sets last_full_charge (full_charge_recommended)
+FULL_CHARGE_BATTERY_LEVEL = 99.0
+FULL_CHARGE_99_WAIT_MINUTES = 30
 
 
 class HistoryMixin:
@@ -984,11 +986,43 @@ class HistoryMixin:
         return max_battery_level
 
     def is_battery_fully_charged(self) -> None:
-        # a cold battery stops at 99%, that counts as the full charge too
-        if self.battery_level() < FULL_CHARGE_BATTERY_LEVEL:
+        battery_level = self.battery_level()
+        if battery_level < FULL_CHARGE_BATTERY_LEVEL:
+            if self.full_charge_99_since is not None:
+                self.full_charge_99_since = None
+                self.mark_dirty("runtime")
             return
-        self.set_state("last_full_charge", self.now())
-        self.mark_dirty("runtime")
+
+        if battery_level >= 100.0:
+            self.set_state("last_full_charge", self.now())
+            self.full_charge_99_since = None
+            self.mark_dirty("runtime")
+            return
+
+        charger_status = self.get_state(
+            self.config["charger"]["entity_ids"]["status_entity_id"],
+            error_state="unavailable",
+        )
+        if charger_status in ENTITY_UNAVAILABLE_STATES:
+            if self.full_charge_99_since is not None:
+                self.full_charge_99_since = None
+                self.mark_dirty("runtime")
+            return
+        if charger_status in CHARGER_CHARGING_STATUS:
+            if self.full_charge_99_since is not None:
+                self.full_charge_99_since = None
+                self.mark_dirty("runtime")
+            return
+
+        if self.full_charge_99_since is None:
+            self.full_charge_99_since = self.now()
+            self.mark_dirty("runtime")
+            return
+
+        if minutes_between(self.full_charge_99_since, self.now()) >= FULL_CHARGE_99_WAIT_MINUTES:
+            self.set_state("last_full_charge", self.now())
+            self.full_charge_99_since = None
+            self.mark_dirty("runtime")
 
     def drive_efficiency_save_car_stats(self, bootup=False) -> None:
         def set_last_odometer():
