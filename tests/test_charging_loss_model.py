@@ -109,6 +109,42 @@ def test_model_finds_the_fixed_share_and_the_chargers_loss() -> None:
     assert model["c"][1] == pytest.approx(C1, abs=0.02)
 
 
+def test_noisy_real_measurements_refit_when_a_loss_reaches_zero() -> None:
+    """A constrained fit must refit P0, not clip negative phase losses afterwards."""
+    battery_kwh_per_percent = 0.69
+    measurements = [
+        (1.4, 1, 0.705, "< 2,5 kW"),
+        (3.2, 1, 0.743, "2,5-4 kW"),
+        (5.5, 3, 0.758, "4-7 kW"),
+        (11.5, 3, 0.683, "> 7 kW"),
+    ]
+    segments = []
+    for index, (kw, phases, kwh_per_percent, group) in enumerate(measurements):
+        soc_delta = 10.0
+        kwh = kwh_per_percent * soc_delta
+        kwh_battery = battery_kwh_per_percent * soc_delta
+        segments.append({
+            "start": 1_760_000_000.0 + index * 86400,
+            "end": 1_760_000_000.0 + index * 86400 + kwh / kw * 3600,
+            "hours": kwh / kw, "kwh": kwh, "kwh_battery": kwh_battery,
+            "soc_delta": soc_delta, "kw": kw, "phases": phases,
+            "loss": 1 - kwh_battery / kwh, "source": "history", "group": group,
+        })
+
+    model = fit_model(segments, 0.05)
+
+    def squared_error(p0, c1, c3):
+        return sum(
+            (segment["kwh"] - segment["kwh_battery"] - p0 * segment["hours"]
+             - segment["kwh"] * (c3 if segment["phases"] == 3 else c1)) ** 2
+            for segment in segments
+        )
+
+    assert model["p0"] >= 0 and model["c"][1] >= 0 and model["c"][3] >= 0
+    assert squared_error(model["p0"], model["c"][1], model["c"][3]) < squared_error(0.36, 0.0, 0.0)
+    assert model["p0"] < 0.36
+
+
 @pytest.mark.parametrize(("outlier_index", "share_deviation"), [
     (0, -0.35), (0, 0.35), (3, -0.35), (3, 0.35),
     (6, -0.35), (6, 0.35), (9, -0.35), (9, 0.35),

@@ -89,20 +89,17 @@ views:
         color: '#FF9800'
         opacity: 0.15
         stroke_width: 2
-        curve: straight
+        curve: stepline
         extend_to: false
         float_precision: 0
         data_generator: |
-          // a step per day: the planned km from the start to the end of the day
+          const flow = entity.attributes.battery_forecast || [];
           const days = entity.attributes.distance_forecast || [];
-          const data = [];
-          days.forEach(d => {
-            const start = new Date(d.time).getTime();
-            const end = new Date(d.end).getTime();
-            const km = Number(d.km);
-            data.push([start, km], [end - 1, km]);
+          return flow.map(p => {
+            const time = new Date(p.time).getTime();
+            const day = days.find(d => time >= new Date(d.time).getTime() && time < new Date(d.end).getTime());
+            return [time, day ? Number(day.km) : 0];
           });
-          return data;
         show:
           in_brush: true
           legend_value: false
@@ -128,20 +125,21 @@ views:
         color: '#2196F3'
         opacity: 0.6
         stroke_width: 1
-        curve: straight
+        curve: stepline
         extend_to: false
         float_precision: 2
         data_generator: |
-          // a block from start to end of each planned charging, so it fills the charging period
+          const flow = entity.attributes.battery_forecast || [];
           const plan = entity.attributes.charge_plan || [];
-          const data = [];
-          plan.forEach(p => {
-            const start = new Date(p.time).getTime();
-            const end = p.end ? new Date(p.end).getTime() : start + 3600000;
-            const kwh = Number(p.kwh);
-            data.push([start, 0], [start, kwh], [end, kwh], [end, 0]);
+          return flow.map(point => {
+            const time = new Date(point.time).getTime();
+            const charging = plan.find(p => {
+              const start = new Date(p.time).getTime();
+              const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+              return time >= start && time < end;
+            });
+            return [time, charging ? Number(charging.kwh) : 0];
           });
-          return data;
         show:
           in_brush: true
           legend_value: false
@@ -293,27 +291,18 @@ views:
               unit: '@@valuta@@'
               color: green
               data_generator: |
-                var data = []
-                if (entity.attributes.raw_today) {
-                  var raw_today = entity.attributes.raw_today.map((start, index) => {
-                    return [new Date(start["hour"]), entity.attributes.raw_today[index]["price"]];
-                  });
-                  data = data.concat(raw_today);
-                }
-                if (entity.attributes.forecast) {
-                  var forecast = entity.attributes.forecast.map((start, index) => {
-                    return [new Date(start["hour"]), entity.attributes.forecast[index]["price"]];
-                  });
-                  data = data.concat(forecast);
-                }
-                if (entity.attributes.tomorrow_valid) {
-                  var tomorrow = entity.attributes.raw_tomorrow.map((start, index) => {
-                    return [new Date(start["hour"]), entity.attributes.raw_tomorrow[index]["price"]];
-                  });
-                  data = data.concat(tomorrow);
-                }
-                //console.log('energi_data_service ', data);
-                return data;
+                const buy = entity.attributes || {};
+                const sell = hass.states['sensor.energi_data_service_salg']?.attributes || {};
+                const buyRows = [...(buy.raw_today || []), ...(buy.forecast || []), ...(buy.tomorrow_valid ? buy.raw_tomorrow || [] : [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.forecast || []), ...(sell.tomorrow_valid ? sell.raw_tomorrow || [] : [])];
+                const values = new Map(buyRows.map(row => [new Date(row.hour).getTime(), Number(row.price)]));
+                const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+                const hourlyValues = new Map(buyRows.map(row => [hourKey(row.hour), Number(row.price)]));
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.hour).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => {
+                  const value = values.has(time) ? values.get(time) : hourlyValues.get(hourKey(time));
+                  return [time, Number.isFinite(value) ? value : null];
+                });
               float_precision: 2
               group_by:
                 func: avg
@@ -344,7 +333,7 @@ views:
               opacity: 0.75
               show:
                 in_brush: true
-            - entity: sensor.energi_data_service_salg
+            - entity: sensor.energi_data_service
               yaxis_id: price
               type: area
               name: '@@sell_price@@'
@@ -352,27 +341,13 @@ views:
               color: white
               stroke_width: 0
               data_generator: |
-                var data = []
-                if (entity.attributes.raw_today) {
-                  var raw_today = entity.attributes.raw_today.map((start, index) => {
-                    return [new Date(start["hour"]), entity.attributes.raw_today[index]["price"]];
-                  });
-                  data = data.concat(raw_today);
-                }
-                if (entity.attributes.forecast) {
-                  var forecast = entity.attributes.forecast.map((start, index) => {
-                    return [new Date(start["hour"]), entity.attributes.forecast[index]["price"]];
-                  });
-                  data = data.concat(forecast);
-                }
-                if (entity.attributes.tomorrow_valid) {
-                  var tomorrow = entity.attributes.raw_tomorrow.map((start, index) => {
-                    return [new Date(start["hour"]), entity.attributes.raw_tomorrow[index]["price"]];
-                  });
-                  data = data.concat(tomorrow);
-                }
-                //console.log('energi_data_service ', data);
-                return data;
+                const sell = hass.states['sensor.energi_data_service_salg']?.attributes || {};
+                const buy = hass.states['sensor.energi_data_service']?.attributes || {};
+                const buyRows = [...(buy.raw_today || []), ...(buy.forecast || []), ...(buy.tomorrow_valid ? buy.raw_tomorrow || [] : [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.forecast || []), ...(sell.tomorrow_valid ? sell.raw_tomorrow || [] : [])];
+                const values = new Map(sellRows.map(row => [new Date(row.hour).getTime(), Number(row.price)]));
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.hour).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => [time, values.has(time) && Number.isFinite(values.get(time)) ? values.get(time) : null]);
               float_precision: 2
               group_by:
                 func: avg
@@ -380,39 +355,27 @@ views:
               opacity: 0.75
               show:
                 in_brush: true
-            - entity: sensor.solcast_pv_forecast_forecast_today
+            - entity: sensor.energi_data_service
               yaxis_id: solar
               type: area
               name: '@@solar_forecast@@'
               data_generator: |
-                const toUTC00 = (d) => {
-                  const x = new Date(d);
-                  return new Date(Date.UTC(
-                    x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate(), x.getUTCHours(), 0, 0, 0
-                  ));
-                };
-                const map = new Map(); const eds = hass.states['sensor.energi_data_service']?.attributes || {}; const pushZero = (rows) => {
-                  (rows || []).forEach(r => {
-                    const key = toUTC00(r.hour).getTime();
-                    if (!map.has(key)) map.set(key, 0);
-                  });
-                };
-                pushZero(eds.raw_today); pushZero(eds.forecast);
-                if (eds.tomorrow_valid) pushZero(eds.raw_tomorrow);
+                const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+                const buy = hass.states['sensor.energi_data_service']?.attributes || {};
+                const sell = hass.states['sensor.energi_data_service_salg']?.attributes || {};
+                const buyRows = [...(buy.raw_today || []), ...(buy.forecast || []), ...(buy.tomorrow_valid ? buy.raw_tomorrow || [] : [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.forecast || []), ...(sell.tomorrow_valid ? sell.raw_tomorrow || [] : [])];
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.hour).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                const solarByHour = new Map();
                 const overlay = (series) => {
                   (series || []).forEach(row => {
-                    const key = toUTC00(row.period_start).getTime();
-                    map.set(key, row.pv_estimate);
+                    const value = Number(row.pv_estimate);
+                    if (Number.isFinite(value)) solarByHour.set(hourKey(row.period_start), value);
                   });
                 };
 
-                overlay(entity.attributes.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_tomorrow']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_3']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_4']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_5']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_6']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_7']?.attributes?.detailedHourly || []);
-                const out = Array.from(map.entries())
-                  .sort((a,b) => a[0] - b[0])
-                  .map(([k,v]) => [new Date(Number(k)), v]);
-
-                //console.log('solcast ', out);
-                return out;
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_today']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_tomorrow']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_3']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_4']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_5']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_6']?.attributes?.detailedHourly || []); overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_7']?.attributes?.detailedHourly || []);
+                return times.map(time => [time, solarByHour.get(hourKey(time)) || 0]);
               color: orange
               stroke_width: 0
               opacity: 0.5
@@ -445,20 +408,24 @@ views:
               color: '#2196F3'
               opacity: 0.6
               stroke_width: 1
-              curve: straight
+              curve: stepline
               extend_to: false
               float_precision: 2
               data_generator: |
-                // a block from start to end of each planned charging, so it fills the charging period
                 const plan = entity.attributes.charge_plan || [];
-                const data = [];
-                plan.forEach(p => {
-                  const start = new Date(p.time).getTime();
-                  const end = p.end ? new Date(p.end).getTime() : start + 3600000;
-                  const kwh = Number(p.kwh);
-                  data.push([start, 0], [start, kwh], [end, kwh], [end, 0]);
+                const buy = hass.states['sensor.energi_data_service']?.attributes || {};
+                const sell = hass.states['sensor.energi_data_service_salg']?.attributes || {};
+                const buyRows = [...(buy.raw_today || []), ...(buy.forecast || []), ...(buy.tomorrow_valid ? buy.raw_tomorrow || [] : [])];
+                const sellRows = [...(sell.raw_today || []), ...(sell.forecast || []), ...(sell.tomorrow_valid ? sell.raw_tomorrow || [] : [])];
+                const times = [...new Set([...buyRows, ...sellRows].map(row => new Date(row.hour).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => {
+                  const charging = plan.find(p => {
+                    const start = new Date(p.time).getTime();
+                    const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+                    return time >= start && time < end;
+                  });
+                  return [time, charging ? Number(charging.kwh) : 0];
                 });
-                return data;
               show:
                 in_brush: true
                 legend_value: false
@@ -845,11 +812,19 @@ views:
                     ]);
                   }
                 });
-
-
-                return data.sort(
-                  (a, b) => a[0] - b[0]
-                );
+                const sellRows = [
+                  ...(hass.states['sensor.stromligning_15min_spotprice_ex_vat']?.attributes?.prices || []),
+                  ...(hass.states['binary_sensor.stromligning_15min_tomorrow_available_ex_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_15min_forecasts_ex_vat']?.attributes?.prices || [])
+                ];
+                const values = new Map(data.map(([time, value]) => [new Date(time).getTime(), value]));
+                const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+                const hourlyValues = new Map(data.map(([time, value]) => [hourKey(time), value]));
+                const times = [...new Set([
+                  ...data.map(([time]) => new Date(time).getTime()),
+                  ...sellRows.map(row => new Date(row.start).getTime())
+                ].filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => [time, values.has(time) ? values.get(time) : (hourlyValues.has(hourKey(time)) ? hourlyValues.get(hourKey(time)) : null)]);
               float_precision: 2
               group_by:
                 func: avg
@@ -880,7 +855,7 @@ views:
               opacity: 0.75
               show:
                 in_brush: true
-            - entity: sensor.stromligning_15min_spotprice_ex_vat
+            - entity: sensor.stromligning_current_price_vat
               yaxis_id: price
               type: area
               name: '@@sell_price@@'
@@ -1000,11 +975,17 @@ views:
                     ]);
                   }
                 });
-
-
-                return data.sort(
-                  (a, b) => a[0] - b[0]
-                );
+                const buyRows = [
+                  ...(hass.states['sensor.stromligning_current_price_vat']?.attributes?.prices || []),
+                  ...(hass.states['binary_sensor.stromligning_tomorrow_available_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || [])
+                ];
+                const values = new Map(data.map(([time, value]) => [new Date(time).getTime(), value]));
+                const times = [...new Set([
+                  ...data.map(([time]) => new Date(time).getTime()),
+                  ...buyRows.map(row => new Date(row.start).getTime())
+                ].filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => [time, values.has(time) ? values.get(time) : null]);
               float_precision: 2
               group_by:
                 func: avg
@@ -1012,144 +993,36 @@ views:
               opacity: 0.75
               show:
                 in_brush: true
-            - entity: sensor.solcast_pv_forecast_forecast_today
+            - entity: sensor.stromligning_current_price_vat
               yaxis_id: solar
               type: area
               name: '@@solar_forecast@@'
               data_generator: |
-                const toUTC00 = (d) => {
-                  const x = new Date(d);
-
-                  return new Date(Date.UTC(
-                    x.getUTCFullYear(),
-                    x.getUTCMonth(),
-                    x.getUTCDate(),
-                    x.getUTCHours(),
-                    0,
-                    0,
-                    0
-                  ));
-                };
-
-                const map = new Map();
-
-
-                // ------------------------------------------
-                // CREATE ALL PRICE TIMESTAMPS AS 0
-                // ------------------------------------------
-
-                const addTimes = (rows) => {
-                  (rows || []).forEach(row => {
-                    if (!row.start)
-                      return;
-
-                    const key =
-                      toUTC00(row.start).getTime();
-
-                    if (!map.has(key))
-                      map.set(key, 0);
-                  });
-                };
-
-
-                // Today
-                addTimes(
-                  hass.states[
-                    'sensor.stromligning_current_price_vat'
-                  ]?.attributes?.prices || []
-                );
-
-
-                // Tomorrow - both forecast and official
-                const tomorrowEntity =
-                  hass.states[
-                    'binary_sensor.stromligning_tomorrow_available_vat'
-                  ];
-
-                addTimes(
-                  tomorrowEntity?.attributes?.prices || []
-                );
-
-
-                // Forecast
-                addTimes(
-                  hass.states[
-                    'sensor.stromligning_forecasts_vat'
-                  ]?.attributes?.prices || []
-                );
-
-
-                // ------------------------------------------
-                // SOLCAST DATA
-                // ------------------------------------------
-
+                const hourKey = value => { const d = new Date(value); d.setMinutes(0, 0, 0); return d.getTime(); };
+                const rows = [
+                  ...(hass.states['sensor.stromligning_current_price_vat']?.attributes?.prices || []),
+                  ...(hass.states['binary_sensor.stromligning_tomorrow_available_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_15min_spotprice_ex_vat']?.attributes?.prices || []),
+                  ...(hass.states['binary_sensor.stromligning_15min_tomorrow_available_ex_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_15min_forecasts_ex_vat']?.attributes?.prices || [])
+                ];
+                const times = [...new Set(rows.map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                const solarByHour = new Map();
                 const overlay = (series) => {
                   (series || []).forEach(row => {
-                    if (!row.period_start)
-                      return;
-
-                    const key =
-                      toUTC00(
-                        row.period_start
-                      ).getTime();
-
-                    map.set(
-                      key,
-                      Number(row.pv_estimate) || 0
-                    );
+                    const value = Number(row.pv_estimate);
+                    if (Number.isFinite(value)) solarByHour.set(hourKey(row.period_start), value);
                   });
                 };
-
-
-                overlay(
-                  entity.attributes?.detailedHourly || []
-                );
-
-                overlay(
-                  hass.states[
-                    'sensor.solcast_pv_forecast_forecast_tomorrow'
-                  ]?.attributes?.detailedHourly || []
-                );
-
-                overlay(
-                  hass.states[
-                    'sensor.solcast_pv_forecast_forecast_day_3'
-                  ]?.attributes?.detailedHourly || []
-                );
-
-                overlay(
-                  hass.states[
-                    'sensor.solcast_pv_forecast_forecast_day_4'
-                  ]?.attributes?.detailedHourly || []
-                );
-
-                overlay(
-                  hass.states[
-                    'sensor.solcast_pv_forecast_forecast_day_5'
-                  ]?.attributes?.detailedHourly || []
-                );
-
-                overlay(
-                  hass.states[
-                    'sensor.solcast_pv_forecast_forecast_day_6'
-                  ]?.attributes?.detailedHourly || []
-                );
-
-                overlay(
-                  hass.states[
-                    'sensor.solcast_pv_forecast_forecast_day_7'
-                  ]?.attributes?.detailedHourly || []
-                );
-
-
-                return Array.from(
-                  map.entries()
-                )
-                  .sort((a, b) => a[0] - b[0])
-                  .map(([time, value]) => [
-                    new Date(Number(time)),
-                    value
-                  ]);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_today']?.attributes?.detailedHourly || []);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_tomorrow']?.attributes?.detailedHourly || []);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_3']?.attributes?.detailedHourly || []);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_4']?.attributes?.detailedHourly || []);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_5']?.attributes?.detailedHourly || []);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_6']?.attributes?.detailedHourly || []);
+                overlay(hass.states['sensor.solcast_pv_forecast_forecast_day_7']?.attributes?.detailedHourly || []);
+                return times.map(time => [time, solarByHour.get(hourKey(time)) || 0]);
               color: orange
               stroke_width: 0
               opacity: 0.5
@@ -1158,7 +1031,7 @@ views:
                 duration: 15min
               show:
                 in_brush: true
-            - entity: sensor.stromligning_forecasts_vat
+            - entity: sensor.stromligning_current_price_vat
               yaxis_id: price
               type: area
               name: '@@forecast@@'
@@ -1235,8 +1108,8 @@ views:
                   }
 
 
-                  const normalForecast =
-                    entity.attributes?.prices || [];
+                const normalForecast =
+                  hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || [];
 
 
                   if (
@@ -1369,20 +1242,28 @@ views:
               color: '#2196F3'
               opacity: 0.6
               stroke_width: 1
-              curve: straight
+              curve: stepline
               extend_to: false
               float_precision: 2
               data_generator: |
-                // a block from start to end of each planned charging, so it fills the charging period
                 const plan = entity.attributes.charge_plan || [];
-                const data = [];
-                plan.forEach(p => {
-                  const start = new Date(p.time).getTime();
-                  const end = p.end ? new Date(p.end).getTime() : start + 3600000;
-                  const kwh = Number(p.kwh);
-                  data.push([start, 0], [start, kwh], [end, kwh], [end, 0]);
+                const rows = [
+                  ...(hass.states['sensor.stromligning_current_price_vat']?.attributes?.prices || []),
+                  ...(hass.states['binary_sensor.stromligning_tomorrow_available_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_forecasts_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_15min_spotprice_ex_vat']?.attributes?.prices || []),
+                  ...(hass.states['binary_sensor.stromligning_15min_tomorrow_available_ex_vat']?.attributes?.prices || []),
+                  ...(hass.states['sensor.stromligning_15min_forecasts_ex_vat']?.attributes?.prices || [])
+                ];
+                const times = [...new Set(rows.map(row => new Date(row.start).getTime()).filter(Number.isFinite))].sort((a, b) => a - b);
+                return times.map(time => {
+                  const charging = plan.find(p => {
+                    const start = new Date(p.time).getTime();
+                    const end = p.end ? new Date(p.end).getTime() : start + 3600000;
+                    return time >= start && time < end;
+                  });
+                  return [time, charging ? Number(charging.kwh) : 0];
                 });
-                return data;
               show:
                 in_brush: true
                 legend_value: false
@@ -2428,48 +2309,57 @@ views:
         color: '#6250d6'
         stroke_width: 3
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.real !== null && h.real !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.real]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.real !== null && h.real !== undefined ? h.real : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_1@@'
         color: '#2a78d6'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d1 !== null && h.d1 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d1]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d1 !== null && h.d1 !== undefined ? h.d1 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_2@@'
         color: '#1baf7a'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d2 !== null && h.d2 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d2]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d2 !== null && h.d2 !== undefined ? h.d2 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_3@@'
         color: '#eb6834'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d3 !== null && h.d3 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d3]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d3 !== null && h.d3 !== undefined ? h.d3 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_4@@'
         color: '#eda100'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d4 !== null && h.d4 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d4]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d4 !== null && h.d4 !== undefined ? h.d4 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_5@@'
         color: '#0aa2b5'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d5 !== null && h.d5 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d5]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d5 !== null && h.d5 !== undefined ? h.d5 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_6@@'
         color: '#d14b9a'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d6 !== null && h.d6 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d6]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d6 !== null && h.d6 !== undefined ? h.d6 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_7@@'
         color: '#8a8a8a'
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.d7 !== null && h.d7 !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.d7]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.d7 !== null && h.d7 !== undefined ? h.d7 : null]);
       - entity: sensor.cjp_analysis
         name: '@@price_forecast_corrected@@'
         color: '#e34948'
         stroke_width: 3
         data_generator: |
-          return ((entity.attributes.price_forecast || {}).hours || []).filter(h => h.corrected !== null && h.corrected !== undefined).map(h => [new Date(h.t + ':00:00').getTime(), h.corrected]);
+          const hours = ((entity.attributes.price_forecast || {}).hours || []);
+          return hours.map(h => [new Date(h.t + ':00:00').getTime(), h.corrected !== null && h.corrected !== undefined ? h.corrected : null]);
       grid_options:
         columns: full
     - type: custom:apexcharts-card
@@ -2642,17 +2532,34 @@ views:
         name: '> 7 kW'
         color: '#eb6834'
         data_generator: |
-          return (entity.attributes.capacity_months || []).filter(m => m.group === '> 7 kW').map(m => [new Date(m.month + '-15T12:00:00').getTime(), m.kwh_per_percent]);
+          const rows = entity.attributes.capacity_months || [];
+          const months = [...new Set(rows.map(m => m.month))].sort();
+          const values = new Map(rows.filter(m => m.group === '> 7 kW').map(m => [m.month, m.kwh_per_percent]));
+          return months.map(month => [new Date(month + '-15T12:00:00').getTime(), values.has(month) ? values.get(month) : null]);
       - entity: sensor.cjp_charging_loss_model
         name: '4-7 kW'
         color: '#1baf7a'
         data_generator: |
-          return (entity.attributes.capacity_months || []).filter(m => m.group === '4-7 kW').map(m => [new Date(m.month + '-15T12:00:00').getTime(), m.kwh_per_percent]);
+          const rows = entity.attributes.capacity_months || [];
+          const months = [...new Set(rows.map(m => m.month))].sort();
+          const values = new Map(rows.filter(m => m.group === '4-7 kW').map(m => [m.month, m.kwh_per_percent]));
+          return months.map(month => [new Date(month + '-15T12:00:00').getTime(), values.has(month) ? values.get(month) : null]);
       - entity: sensor.cjp_charging_loss_model
-        name: '< 4 kW'
+        name: '2,5-4 kW'
+        color: '#6250d6'
+        data_generator: |
+          const rows = entity.attributes.capacity_months || [];
+          const months = [...new Set(rows.map(m => m.month))].sort();
+          const values = new Map(rows.filter(m => m.group === '2,5-4 kW').map(m => [m.month, m.kwh_per_percent]));
+          return months.map(month => [new Date(month + '-15T12:00:00').getTime(), values.has(month) ? values.get(month) : null]);
+      - entity: sensor.cjp_charging_loss_model
+        name: '< 2,5 kW'
         color: '#2a78d6'
         data_generator: |
-          return (entity.attributes.capacity_months || []).filter(m => m.group === '< 2,5 kW' || m.group === '2,5-4 kW').map(m => [new Date(m.month + '-15T12:00:00').getTime(), m.kwh_per_percent]);
+          const rows = entity.attributes.capacity_months || [];
+          const months = [...new Set(rows.map(m => m.month))].sort();
+          const values = new Map(rows.filter(m => m.group === '< 2,5 kW').map(m => [m.month, m.kwh_per_percent]));
+          return months.map(month => [new Date(month + '-15T12:00:00').getTime(), values.has(month) ? values.get(month) : null]);
       grid_options:
         columns: full
   # charging loss per power: apexcharts only has a time axis, so 1 kW is drawn as 1 hour after midnight
