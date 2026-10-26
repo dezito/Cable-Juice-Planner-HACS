@@ -844,7 +844,11 @@ class PlannerMixin:
                             fill_up_top_kwh = self.kwh_needed_for_charging(self.get_max_recommended_charge_limit_battery_level(), midnight_battery_level)
 
                         full_charge_kwh = 0.0
-                        if need_recommended_full_charge:
+                        waiting_for_full_charge_at_99 = (
+                            self.battery_level() >= 99.0
+                            and isinstance(self.full_charge_99_since, datetime.datetime)
+                        )
+                        if need_recommended_full_charge and not waiting_for_full_charge_at_99:
                             # from the day's own level (after the earlier days' charging and driving)
                             full_charge_kwh = self.kwh_needed_for_charging(100.0, midnight_battery_level)
                             _LOGGER.info(f"Needed for full charge: {round(full_charge_kwh,1)}kWh")

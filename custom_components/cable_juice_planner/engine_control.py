@@ -501,6 +501,7 @@ class ControlMixin:
         """
         self.charger_mode = "normal"
         try:
+            self.is_battery_fully_charged()
             return self._charge_if_needed(force_recalculate)
         finally:
             self.publish_site()
@@ -975,6 +976,8 @@ class ControlMixin:
         runtime = databases.get("runtime") or {}
         for key, value in (runtime.get("sensors") or {}).items():
             self.sensor_states.setdefault(key, value)
+        full_charge_99_since = runtime.get("full_charge_99_since")
+        self.full_charge_99_since = full_charge_99_since if isinstance(full_charge_99_since, datetime.datetime) else None
         if runtime.get("last_battery_level_attributes"):
             self.sensor_attrs.setdefault("drive_efficiency_last_battery_level", {}).update(runtime["last_battery_level_attributes"])
         if isinstance(runtime.get("charging_loss"), (int, float)):

@@ -175,6 +175,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
 
         # own sensors (state and full attribute dict)
         self.sensor_states: dict[str, Any] = {}
+        self.full_charge_99_since: datetime.datetime | None = None
         self.sensor_attrs: dict[str, dict[str, Any]] = {}
 
         # runtime state (the globals of ev.py)
@@ -289,6 +290,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
         return {
             "sensors": {key: self.sensor_states.get(key) for key in keep if self.sensor_states.get(key) is not None},
             "last_battery_level_attributes": dict(self.sensor_attrs.get("drive_efficiency_last_battery_level", {})),
+            "full_charge_99_since": self.full_charge_99_since,
             "public_charging_session": self.public_charging_sessions,
             "public_charging_session_done": self.sensor_states.get("public_charging_session_done"),
             "charging_loss": self.config["charger"]["charging_loss"],
@@ -800,6 +802,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
             or self.workplan_charging_enabled()
             or self.fill_up_charging_enabled()
             or self.cheap_grid_charging_enabled()
+            or self.number_state("full_charge_recommended", error_state=0.0) > 0.0
             or self.is_calculating_charging_loss()
             or self.manual_charging_enabled()
             or self.manual_charging_solar_enabled()
@@ -1114,6 +1117,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
             "LAST_DRIVE_EFFICIENCY_DATA": self.last_drive_efficiency_data,
             "LAST_SUCCESSFUL_GRID_PRICES": self.grid_price_cache,
             "BATTERY_LEVEL": self.battery_level(),
+            "FULL_CHARGE_99_WAITING": self.full_charge_99_since is not None,
             "BATTERY_LEVEL_EXPENSES": self.battery_level_expenses,
             "SETTINGS": (
                 self.is_ev_home(),
@@ -1134,6 +1138,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
                 self.get_trip_range(),
                 self.get_trip_target_level(),
                 self.get_public_charging_session_done(),
+                self.number_state("full_charge_recommended", error_state=0.0),
                 self.is_trip_planned(),
                 self.fill_up_charging_enabled(),
                 self.workplan_charging_enabled(),
