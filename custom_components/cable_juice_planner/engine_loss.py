@@ -242,7 +242,7 @@ def _solve(matrix: list[list[float]], vector: list[float]) -> list[float] | None
 
 
 def _fit_model(segments: list[dict], fallback_share: float) -> dict:
-    """P0 (kW) and c per phase count by weighted least squares over the segments."""
+    """P0 (kW) and c per phase count by non-negative weighted least squares."""
     if not segments:
         return {"status": "no_data", "p0": 0.0, "c": {1: fallback_share, 3: fallback_share}}
     weight = lambda s: LOSS_STATISTICS_WEIGHT if s["source"] == "statistics" else 1.0  # noqa: E731
@@ -253,27 +253,42 @@ def _fit_model(segments: list[dict], fallback_share: float) -> dict:
 
     phases = sorted({s["phases"] for s in segments})
 
-    def solve(with_p0: bool):
-        columns = (["p0"] if with_p0 else []) + phases
+    def solve_non_negative():
+        columns = ["p0", *phases]
         rows = []
         for s in segments:
-            features = ([s["hours"]] if with_p0 else []) + [s["kwh"] if s["phases"] == ph else 0.0 for ph in phases]
+            features = [s["hours"]] + [s["kwh"] if s["phases"] == ph else 0.0 for ph in phases]
             rows.append((features, lost(s), weight(s)))
         size = len(columns)
         matrix = [[sum(w * f[i] * f[j] for f, _, w in rows) for j in range(size)] for i in range(size)]
         vector = [sum(w * f[i] * y for f, y, w in rows) for i in range(size)]
-        result = _solve(matrix, vector)
-        return None if result is None else dict(zip(columns, result))
 
-    result = solve(True)
-    if result is None or result["p0"] < 0.0:
-        # no fixed share in the data (or not separable): the loss is only the charger's
-        result = solve(False) or {}
-        result["p0"] = 0.0
-    c = {ph: max(result.get(ph, 0.0), 0.0) for ph in phases}
+        # There are only a few phase coefficients. Try every active set and keep the
+        # least-squares solution with all coefficients >= 0. When one reaches zero,
+        # the others are fitted again instead of retaining a biased P0.
+        best: tuple[float, list[float]] | None = None
+        for mask in range(1 << size):
+            active = [i for i in range(size) if mask & (1 << i)]
+            values = [0.0] * size
+            if active:
+                solution = _solve(
+                    [[matrix[i][j] for j in active] for i in active],
+                    [vector[i] for i in active],
+                )
+                if solution is None or any(value < -1e-9 for value in solution):
+                    continue
+                for index, value in zip(active, solution):
+                    values[index] = max(value, 0.0)
+            error = sum(w * (y - sum(x * value for x, value in zip(f, values))) ** 2 for f, y, w in rows)
+            if best is None or error < best[0]:
+                best = (error, values)
+        return dict(zip(columns, best[1] if best else [0.0] * size))
+
+    result = solve_non_negative()
+    c = {ph: result[ph] for ph in phases}
     for ph in (1, 3):
         c.setdefault(ph, c[phases[0]])
-    return {"status": "model", "p0": max(result["p0"], 0.0), "c": c}
+    return {"status": "model", "p0": result["p0"], "c": c}
 
 
 def _outlier_segments(segments: list[dict]) -> tuple[list[dict], list[dict]]:

@@ -5,7 +5,7 @@ electronics use a fixed amount while it charges, so a low power (solar on 1 phas
 than 3 × 16 A.
 
 ```
-loss = fixed use (the car's electronics) ÷ power + the charger's loss
+loss = fixed use (the car's electronics) ÷ power + percentage loss
 ```
 
 ## Measured continuously
@@ -17,7 +17,7 @@ part, as it does with solar charging, but the charging phase count must remain t
 
 - Per power group (< 2.5 kW, 2.5–4 kW, 4–7 kW, > 7 kW) the newest 10 parts are kept, reading only as far
   back as a group needs.
-- With measurements in two or more groups, the model separates the fixed use from the charger's own loss.
+- With measurements in two or more groups, the model separates the fixed use from the percentage loss.
 - When a model can be fitted across multiple power groups and there are at least six measurements, a small
   number of clear outliers (more than 5 percentage points from the fitted curve) are excluded from the model,
   group averages, and power chart. They remain available in the sensor's `rejected_segments` attribute.
@@ -31,7 +31,7 @@ part, as it does with solar charging, but the charging phase count must remain t
 **kWh from the charger per 1 %** is what the plan really needs, and it doesn't depend on the battery size:
 if the battery size is set too high or too low, only the loss percentage moves – the plan still fits.
 
-**Example:** with 300 W fixed use and 3 % charger loss, charging at 11 kW loses 0.3 ÷ 11 + 3 % ≈ 6 %, while
+**Example:** with 300 W fixed use and a percentage loss of 3 %, charging at 11 kW loses 0.3 ÷ 11 + 3 % ≈ 6 %, while
 1-phase solar charging at 1.4 kW loses 0.3 ÷ 1.4 + 3 % ≈ 24 %.
 
 The [analysis](dashboard-analysis.md#charging-loss-per-power) shows the measurements and the model per power.

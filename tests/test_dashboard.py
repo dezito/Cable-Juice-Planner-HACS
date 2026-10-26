@@ -119,6 +119,11 @@ def test_dashboard_layout() -> None:
     # the battery chart: the planned km per day, not the battery level history
     chart = next(card for card in _cards(overview) if card.get("type") == "custom:apexcharts-card")
     assert [series.get("yaxis_id") for series in chart["series"]] == ["distance", "level", "charge"]
+    for series in chart["series"]:
+        generator = series["data_generator"]
+        assert "const flow = entity.attributes.battery_forecast || [];" in generator
+        assert "return flow.map(" in generator
+    assert "day ? Number(day.km) : 0" in chart["series"][0]["data_generator"]
     # public charging only while a session waits for its cost
     conditional = next(card for card in _cards(overview) if card.get("type") == "conditional" and "Offentlig ladning" in headings(card))
     assert conditional["conditions"] == [{"condition": "state", "entity": "binary_sensor.cjp_tesla_public_charging_session_done", "state": "on"}]
@@ -161,6 +166,26 @@ def test_one_price_chart_stromligning_preferred() -> None:
     assert both == ["sensor.sl_price"]
 
 
+def test_price_chart_tooltip_series_share_one_timeline() -> None:
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.eds", "sensor.sl_price"}
+    for options in (
+        {"energidataservice_buy_entity_id": "sensor.eds"},
+        {"stromligning_buy_current_price": "sensor.sl_price"},
+    ):
+        overview = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "en", **options}), "tesla", "entry1", existing))["views"][0]
+        chart = next(card for card in _cards(overview) if card.get("type") == "custom:apexcharts-card" and card.get("series", [{}])[0].get("yaxis_id") == "price")
+        assert chart["apex_config"]["tooltip"]["enabledOnSeries"] == [0, 1, 2, 4]
+        buy, _sell, solar = chart["series"][:3]
+        assert "const hourKey = value =>" in buy["data_generator"]
+        assert "hourlyValues" in buy["data_generator"]
+        assert "return times.map(time => [time, solarByHour.get(hourKey(time)) || 0]);" in solar["data_generator"]
+        planned = chart["series"][4]
+        assert "const times = [...new Set(" in planned["data_generator"]
+        assert "return times.map(time =>" in planned["data_generator"]
+        assert planned["curve"] == "stepline"
+        assert "data.push([start, 0]" not in planned["data_generator"]
+
+
 def test_every_chart_has_a_shared_non_intersecting_tooltip() -> None:
     config = const.build_config({**OPTIONS, "language": "en"})
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price"}
@@ -173,6 +198,32 @@ def test_every_chart_has_a_shared_non_intersecting_tooltip() -> None:
         assert tooltip["intersect"] is False
 
 
+def test_price_forecast_chart_series_share_the_same_hours() -> None:
+    config = const.build_config({**OPTIONS, "language": "en"})
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    content = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))
+    chart = next(card for card in _cards(content) if card.get("graph_span") == "6d")
+    assert len(chart["series"]) == 9
+    for series in chart["series"]:
+        generator = series["data_generator"]
+        assert "const hours = ((entity.attributes.price_forecast || {}).hours || []);" in generator
+        assert "return hours.map(h =>" in generator
+        assert ".filter(" not in generator
+
+
+def test_capacity_chart_series_share_the_same_months() -> None:
+    config = const.build_config({**OPTIONS, "language": "en"})
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    content = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))
+    chart = next(card for card in _cards(content) if card.get("graph_span") == "1095d")
+    assert [series["name"] for series in chart["series"]] == ["> 7 kW", "4-7 kW", "2,5-4 kW", "< 2,5 kW"]
+    for series in chart["series"]:
+        generator = series["data_generator"]
+        assert "const months = [...new Set(rows.map(m => m.month))].sort();" in generator
+        assert "return months.map(month =>" in generator
+        assert "values.has(month) ? values.get(month) : null" in generator
+
+
 def test_charging_loss_section_on_analysis() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
@@ -180,10 +231,10 @@ def test_charging_loss_section_on_analysis() -> None:
     analysis = yaml.safe_load(text)["views"][2]
     assert "Ladetab pr. effekt" in [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
     charts = [c for c in _cards(analysis) if c.get("type") == "custom:apexcharts-card" and c.get("graph_span") == "12h"]
-    # the loss by charging power (measurements and model) and what it is made of (fixed use + charger loss)
+    # the loss by charging power (measurements and model) and what it is made of (fixed use + percentage loss)
     assert len(charts) == 2 and all(s["entity"] == "sensor.cjp_tesla_charging_loss_model" for c in charts for s in c["series"])
     assert [c["header"]["title"] for c in charts] == ["Tab mod ladeeffekt", "Hvad tabet består af"]
-    assert charts[1]["stacked"] is True and [s["name"] for s in charts[1]["series"]] == ["Laderens tab", "Fast forbrug"]
+    assert charts[1]["stacked"] is True and [s["name"] for s in charts[1]["series"]] == ["Proportionalt resttab", "Fast forbrug"]
     buttons = [row["entity"] for c in _cards(analysis) if c.get("type") == "entities" for row in c["entities"]]
     assert "button.cjp_tesla_recalculate_charging_loss" in buttons
     # without a car integration there is nothing to measure: the section is gone
