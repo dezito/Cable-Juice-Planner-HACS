@@ -1182,7 +1182,7 @@ class EnergyMixin:
             for name in ("history", "history_sell"):
                 self.kwh_avg_prices_db[name] = {h: {d: old_db[name][h].copy() for d in range(7)} for h in range(24)}
             force_save = True
-        if force_save:
+        if force_save and self.price_provider is not None:
             self.append_kwh_prices()
         self.mark_dirty("kwh_avg_prices")
         self.set_low_forecast_price()
