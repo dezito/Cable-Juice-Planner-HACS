@@ -1,6 +1,7 @@
 """Load balancing: several cars behind one main fuse (site config entry)."""
 from __future__ import annotations
 
+import asyncio
 import datetime
 from types import SimpleNamespace
 
@@ -140,6 +141,17 @@ async def test_site_order_by_priority_then_urgency(fake_site) -> None:
     site.update_from_result(cars["b"], {"reservation": {}, "request": [8, 8, 8], "urgent": True})
     assert site.order() == ["b", "a"]
     assert site.behind("b") == ["a"]
+
+
+async def test_site_signals_when_initial_calculation_is_ready(fake_site) -> None:
+    site, _cars = fake_site
+    waiter = asyncio.create_task(site.async_wait_started())
+    await asyncio.sleep(0)
+    assert not waiter.done()
+
+    await site.async_start()
+    await waiter
+    assert waiter.done()
 
 
 async def test_site_capacity_for_the_car_behind(fake_site) -> None:

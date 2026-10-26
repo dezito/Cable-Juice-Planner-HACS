@@ -1,12 +1,16 @@
 """Cable Juice Planner - EV charging planner for Home Assistant."""
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable, Coroutine
 import logging
+from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, Event, HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
@@ -133,6 +137,30 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+async def _async_run_after_home_assistant_started(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    action: Callable[[], Coroutine[Any, Any, None]],
+    name: str,
+) -> None:
+    """Run post-setup work after every integration has had its startup turn."""
+    if hass.state is CoreState.running:
+        await action()
+        return
+
+    async def _async_run() -> None:
+        # Let all other homeassistant_started listeners run before inspecting
+        # their entities. This keeps generated dashboards independent of setup order.
+        await asyncio.sleep(0)
+        await action()
+
+    @callback
+    def _started(_event: Event) -> None:
+        entry.async_create_task(hass, _async_run(), name=name)
+
+    entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _started))
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool:
     if entry.data.get(CONF_SITE):
         return await _async_setup_site(hass, entry)
@@ -142,7 +170,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     if coordinator.config.get("dashboard"):
-        await async_setup_dashboard(hass, entry, coordinator.config, coordinator.prefix)
+        await _async_run_after_home_assistant_started(
+            hass,
+            entry,
+            lambda: async_setup_dashboard(hass, entry, coordinator.config, coordinator.prefix),
+            f"cjp_{coordinator.prefix}_dashboard_startup",
+        )
     coordinator.async_start()
     return True
 
@@ -204,7 +237,7 @@ async def _async_setup_site(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             site.register(other.runtime_data)
     await hass.config_entries.async_forward_entry_setups(entry, SITE_PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_on_update))
-    await site.async_start()
+    await _async_run_after_home_assistant_started(hass, entry, site.async_start, "cjp_site_startup")
     return True
 
 
