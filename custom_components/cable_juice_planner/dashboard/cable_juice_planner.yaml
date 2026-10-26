@@ -2076,6 +2076,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 280px
         dataLabels:
@@ -2128,6 +2131,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 280px
         markers:
@@ -2207,6 +2213,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 300px
         markers:
@@ -2224,6 +2233,8 @@ views:
           tooltip:
             enabled: false
         tooltip:
+          shared: true
+          intersect: false
           x:
             formatter: |
               EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000 - 30).toFixed(1).replace('.', ',') + ' °C'; }
@@ -2315,6 +2326,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 260px
         dataLabels:
@@ -2403,6 +2417,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 260px
       series:
@@ -2477,6 +2494,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 240px
         markers:
@@ -2607,6 +2627,9 @@ views:
           legend_value: false
           in_header: false
       apex_config:
+        tooltip:
+          shared: true
+          intersect: false
         chart:
           height: 260px
         markers:
@@ -2732,7 +2755,8 @@ views:
           tooltip:
             enabled: false
         tooltip:
-          shared: false
+          shared: true
+          intersect: false
           x:
             formatter: |
               EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000).toFixed(1).replace('.', ',') + ' kW'; }
@@ -2811,6 +2835,7 @@ views:
             enabled: false
         tooltip:
           shared: true
+          intersect: false
           x:
             formatter: |
               EVAL:function (value) { const b = new Date(); b.setHours(0, 0, 0, 0); return ((value - b.getTime()) / 3600000).toFixed(1).replace('.', ',') + ' kW'; }
