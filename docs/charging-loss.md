@@ -12,12 +12,15 @@ loss = fixed use (the car's electronics) ÷ power + the charger's loss
 
 Needs an EV integration (the car's battery level). From the battery level and the charger's kWh meter in
 Home Assistant's history (the last days raw, before that the hourly statistics), CJP finds parts of a
-charge from one change of the battery level to a later one (at least 5 %), with the same power and phases
-all the way.
+charge from one change of the battery level to a later one (at least 5 %). The power may vary during a
+part, as it does with solar charging, but the charging phase count must remain the same.
 
 - Per power group (< 2.5 kW, 2.5–4 kW, 4–7 kW, > 7 kW) the newest 10 parts are kept, reading only as far
   back as a group needs.
 - With measurements in two or more groups, the model separates the fixed use from the charger's own loss.
+- When a model can be fitted across multiple power groups and there are at least six measurements, a small
+  number of clear outliers (more than 5 percentage points from the fitted curve) are excluded from the model,
+  group averages, and power chart. They remain available in the sensor's `rejected_segments` attribute.
 
 | Entity | Content |
 |---|---|
