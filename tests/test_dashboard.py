@@ -175,6 +175,15 @@ def test_price_chart_tooltip_series_share_one_timeline() -> None:
         overview = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "en", **options}), "tesla", "entry1", existing))["views"][0]
         chart = next(card for card in _cards(overview) if card.get("type") == "custom:apexcharts-card" and card.get("series", [{}])[0].get("yaxis_id") == "price")
         assert chart["apex_config"]["tooltip"]["enabledOnSeries"] == [0, 1, 2, 4]
+        assert chart["apex_config"]["tooltip"]["followCursor"] is True
+        assert chart["apex_config"]["tooltip"]["fixed"]["enabled"] is False
+        custom = chart["apex_config"]["tooltip"]["custom"]
+        assert "const indices = [0, 1, 2, 4];" in custom
+        assert custom.strip().endswith("}")
+        for index in (0, 1, 2, 4):
+            generator = chart["series"][index]["data_generator"]
+            assert "const times = [...new Set(" in generator
+            assert "return times.map(time =>" in generator
         buy, _sell, solar = chart["series"][:3]
         assert "const hourKey = value =>" in buy["data_generator"]
         assert "hourlyValues" in buy["data_generator"]

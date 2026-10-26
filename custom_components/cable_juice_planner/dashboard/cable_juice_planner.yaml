@@ -72,9 +72,9 @@ views:
         tooltip:
           shared: true
           intersect: false
+          followCursor: true
           fixed:
-            enabled: true
-            position: topLeft
+            enabled: false
           x:
             show: true
             format: ddd dd/MM HH:mm
@@ -231,9 +231,9 @@ views:
               tooltip:
                 shared: true
                 intersect: false
+                followCursor: true
                 fixed:
-                  enabled: true
-                  position: topLeft
+                  enabled: false
                 x:
                   show: true
                 enabledOnSeries:
@@ -241,6 +241,30 @@ views:
                 - 1
                 - 2
                 - 4
+                custom: |
+                  EVAL:function({ series, dataPointIndex, w }) {
+                    const indices = [0, 1, 2, 4];
+                    const xValues = w.globals.seriesX[0] || [];
+                    const time = xValues[dataPointIndex];
+                    const title = Number.isFinite(time)
+                      ? new Date(time).toLocaleString(undefined, {
+                          weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                        })
+                      : '';
+                    const rows = indices.map(index => {
+                      const values = series[index] || [];
+                      const value = values[dataPointIndex];
+                      const valid = value !== null && value !== undefined && Number.isFinite(Number(value));
+                      const suffix = index < 2 ? ' @@valuta@@' : ' kWh';
+                      const shown = valid ? Number(value).toFixed(2) + suffix : '-';
+                      const color = w.globals.colors[index] || '#888';
+                      const name = w.globals.seriesNames[index] || '';
+                      return '<div style="display:flex;align-items:center;gap:8px;padding:3px 10px;">' +
+                        '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';"></span>' +
+                        '<span>' + name + ':</span><strong style="margin-left:auto;">' + shown + '</strong></div>';
+                    }).join('');
+                    return '<div class="apexcharts-tooltip-title" style="padding:6px 10px;">' + title + '</div>' + rows;
+                  }
               stroke:
                 curve: straight
               markers:
@@ -617,9 +641,9 @@ views:
               tooltip:
                 shared: true
                 intersect: false
+                followCursor: true
                 fixed:
-                  enabled: true
-                  position: topLeft
+                  enabled: false
                 x:
                   show: true
                 enabledOnSeries:
@@ -627,6 +651,30 @@ views:
                 - 1
                 - 2
                 - 4
+                custom: |
+                  EVAL:function({ series, dataPointIndex, w }) {
+                    const indices = [0, 1, 2, 4];
+                    const xValues = w.globals.seriesX[0] || [];
+                    const time = xValues[dataPointIndex];
+                    const title = Number.isFinite(time)
+                      ? new Date(time).toLocaleString(undefined, {
+                          weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                        })
+                      : '';
+                    const rows = indices.map(index => {
+                      const values = series[index] || [];
+                      const value = values[dataPointIndex];
+                      const valid = value !== null && value !== undefined && Number.isFinite(Number(value));
+                      const suffix = index < 2 ? ' @@valuta@@' : ' kWh';
+                      const shown = valid ? Number(value).toFixed(2) + suffix : '-';
+                      const color = w.globals.colors[index] || '#888';
+                      const name = w.globals.seriesNames[index] || '';
+                      return '<div style="display:flex;align-items:center;gap:8px;padding:3px 10px;">' +
+                        '<span style="width:10px;height:10px;border-radius:50%;background:' + color + ';"></span>' +
+                        '<span>' + name + ':</span><strong style="margin-left:auto;">' + shown + '</strong></div>';
+                    }).join('');
+                    return '<div class="apexcharts-tooltip-title" style="padding:6px 10px;">' + title + '</div>' + rows;
+                  }
               stroke:
                 curve: straight
               markers:
@@ -2094,9 +2142,6 @@ views:
           legend_value: false
           in_header: false
       apex_config:
-        tooltip:
-          shared: true
-          intersect: false
         chart:
           height: 300px
         markers:
