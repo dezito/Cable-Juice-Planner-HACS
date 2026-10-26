@@ -276,6 +276,14 @@ def test_startup_saves_every_database() -> None:
     assert decode(result.db_saves["runtime"])["charging_loss"] == OPTIONS["charging_loss"]
 
 
+def test_startup_migrates_price_history_before_provider_is_available(caplog: pytest.LogCaptureFixture) -> None:
+    now = datetime.datetime.combine(DAY, datetime.time(12, 0))
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    result = engine.run_job(snapshot(now), engine.startup, {"kwh_avg_prices": {}})
+    assert result.error is None, result.error
+    assert "Can't append KWH avg prices" not in caplog.text
+
+
 def _loss_job(engine: CJPEngine, hour: int, source: str, *args, level: float, kwh: float, status: str = "charging"):
     now = datetime.datetime.combine(DAY, datetime.time(hour, 0))
     snap = snapshot(now, level=level, status=status, port="on", settings={"calculate_charging_loss": True})
