@@ -161,6 +161,18 @@ def test_one_price_chart_stromligning_preferred() -> None:
     assert both == ["sensor.sl_price"]
 
 
+def test_every_chart_has_a_shared_non_intersecting_tooltip() -> None:
+    config = const.build_config({**OPTIONS, "language": "en"})
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.price"}
+    content = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))
+    charts = [card for card in _cards(content) if card.get("type") == "custom:apexcharts-card"]
+    assert charts
+    for chart in charts:
+        tooltip = chart["apex_config"]["tooltip"]
+        assert tooltip["shared"] is True
+        assert tooltip["intersect"] is False
+
+
 def test_charging_loss_section_on_analysis() -> None:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
