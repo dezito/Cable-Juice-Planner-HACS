@@ -192,6 +192,7 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
         self.requested_circuit_amps = [0, 0, 0]
         self.site_charging_text = ""
         self.last_charging_rule_text = ""
+        self.rule_set_this_run = False
         self.charging_loss_car_begin_kwh = 0.0
         self.charging_loss_car_begin_battery_level = 0.0
         self.charging_loss_charger_begin_kwh = 0.0
@@ -596,9 +597,10 @@ class CJPEngine(PlannerMixin, ControlMixin, HistoryMixin, DistanceMixin, LossMix
     # Charging rule
     # ------------------------------------------------------------------ #
 
-    def set_charging_rule(self, text: str = "") -> None:
+    def set_charging_rule(self, text: str = "", fresh: bool = True) -> None:
         if self.restarting_charger_count >= 3:
             return
+        self.rule_set_this_run = self.rule_set_this_run or fresh
         self.last_charging_rule_text = text
         extra = f"\n🚧{self.powerwall_charging_text}" if self.powerwall_charging_text else ""
         if self.site_charging_text:
