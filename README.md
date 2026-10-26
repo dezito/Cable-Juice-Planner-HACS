@@ -193,7 +193,10 @@ every charging rule explained with examples, [charger control](docs/charger-cont
     [Meteorologisk institutt](https://www.home-assistant.io/integrations/met/),
     [AccuWeather](https://www.home-assistant.io/integrations/accuweather/) or
     [OpenWeather](https://www.home-assistant.io/integrations/openweathermap/)
-- For the dashboard (HACS frontend): `mushroom`, `apexcharts-card`, `config-template-card` and `card-mod`
+- For the dashboard (install these HACS frontend cards): [Mushroom](https://github.com/piitaya/lovelace-mushroom),
+  [ApexCharts Card](https://github.com/RomRider/apexcharts-card),
+  [Config Template Card](https://github.com/iantrich/config-template-card) and
+  [card-mod](https://github.com/thomasloven/lovelace-card-mod)
 
 ### Tested with
 

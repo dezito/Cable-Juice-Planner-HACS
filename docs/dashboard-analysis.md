@@ -4,7 +4,10 @@ With **Dashboard in the sidebar** on (default), each car gets its own dashboard,
 (without prefix) or `/cjp-tesla`. It is built on every startup from your setup: cards for things you
 haven't set up are removed.
 
-It needs the HACS frontend cards `mushroom`, `apexcharts-card`, `config-template-card` and `card-mod`.
+It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovelace-mushroom),
+[ApexCharts Card](https://github.com/RomRider/apexcharts-card),
+[Config Template Card](https://github.com/iantrich/config-template-card) and
+[card-mod](https://github.com/thomasloven/lovelace-card-mod).
 
 ## Overview
 
