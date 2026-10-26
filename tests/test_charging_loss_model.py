@@ -9,6 +9,7 @@ from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
 from custom_components.cable_juice_planner.engine_loss import (
     LOSS_GROUP_SIZE,
+    _outlier_segments,
     find_segments,
     find_statistics_segments,
     fit_model,
@@ -71,10 +72,20 @@ def test_variable_power_is_still_a_segment() -> None:
     assert any(segment["start"] < middle < segment["end"] for segment in segments)
 
 
-def test_power_below_minimum_breaks_a_segment() -> None:
+def test_isolated_low_power_outlier_does_not_break_a_segment() -> None:
     soc, meter, power = _session(1_760_000_000.0, 11.04, 3, 2)
     middle = power[len(power) // 2][0]
     power = [(start, 900.0, 500.0, 1300.0) if start == middle else (start, mean, low, high) for start, mean, low, high in power]
+    assert any(segment["start"] < middle < segment["end"] for segment in find_segments(soc, meter, power, [], BATTERY, 3))
+
+
+def test_sustained_low_power_breaks_a_segment() -> None:
+    soc, meter, power = _session(1_760_000_000.0, 11.04, 3, 2)
+    middle = power[len(power) // 2][0]
+    power = [
+        (start, 900.0, 500.0, 1300.0) if middle <= start < middle + 600 else (start, mean, low, high)
+        for start, mean, low, high in power
+    ]
     assert not any(segment["start"] < middle < segment["end"] for segment in find_segments(soc, meter, power, [], BATTERY, 3))
 
 
@@ -96,6 +107,41 @@ def test_model_finds_the_fixed_share_and_the_chargers_loss() -> None:
     assert model["p0"] == pytest.approx(P0, abs=0.05)
     assert model["c"][3] == pytest.approx(C3, abs=0.015)
     assert model["c"][1] == pytest.approx(C1, abs=0.02)
+
+
+@pytest.mark.parametrize(("outlier_index", "share_deviation"), [
+    (0, -0.35), (0, 0.35), (3, -0.35), (3, 0.35),
+    (6, -0.35), (6, 0.35), (9, -0.35), (9, 0.35),
+])
+def test_isolated_high_or_low_loss_outlier_is_ignored(outlier_index: int, share_deviation: float) -> None:
+    segments = []
+    for kw, phases in ((1.38, 1), (2.3, 1), (4.14, 3), (11.04, 3)):
+        for _ in range(3):
+            hours = 2.0
+            kwh = kw * hours
+            share = P0 / kw + (C3 if phases == 3 else C1)
+            kwh_battery = kwh * (1 - share)
+            segments.append({
+                "start": 1_760_000_000.0 + len(segments) * 86400,
+                "end": 1_760_000_000.0 + len(segments) * 86400 + hours * 3600,
+                "hours": hours, "kwh": kwh, "kwh_battery": kwh_battery,
+                "soc_delta": kwh_battery / BATTERY * 100, "kw": kw, "phases": phases,
+                "loss": share, "source": "history",
+                "group": "< 2,5 kW" if kw < 2.5 else "2,5-4 kW" if kw < 4 else "4-7 kW" if kw < 7 else "> 7 kW",
+            })
+
+    outlier = segments[outlier_index]
+    outlier["kwh_battery"] = outlier["kwh"] * (1 - outlier["loss"] - share_deviation)
+    outlier["loss"] = 1 - outlier["kwh_battery"] / outlier["kwh"]
+
+    accepted, rejected = _outlier_segments(segments)
+    model = fit_model(segments, 0.05)
+
+    assert rejected == [outlier]
+    assert len(accepted) == len(segments) - 1
+    assert model["p0"] == pytest.approx(P0, abs=0.05)
+    assert model["c"][1] == pytest.approx(C1, abs=0.02)
+    assert model["c"][3] == pytest.approx(C3, abs=0.02)
 
 
 def test_model_fallbacks() -> None:

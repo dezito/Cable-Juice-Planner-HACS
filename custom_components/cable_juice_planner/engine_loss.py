@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import statistics
 from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ LOSS_GROUP_SIZE = 10  # newest segments kept per power group
 LOSS_MIN_SOC_DELTA = 5.0  # % per segment: the car reports its level with a delay, short segments are noisy
 LOSS_MAX_SEGMENT_HOURS = 8.0
 LOSS_MIN_POWER = 1000.0  # W: below this it is not charging
+LOSS_MAX_LOW_POWER_SAMPLES = 0.1  # isolated recorder outliers are ignored; sustained dips break a segment
+LOSS_OUTLIER_MIN_SEGMENTS = 6
+LOSS_OUTLIER_MAX_FRACTION = 0.2
+LOSS_OUTLIER_MIN_RESIDUAL = 0.05
 LOSS_METER_MAX_GAP = 20 * 60  # s between the meter readings around a change of the battery level
 LOSS_POWER_MAX_GAP = 15 * 60  # s without a power value inside a segment
 LOSS_STATISTICS_WEIGHT = 0.5
@@ -93,7 +98,18 @@ def _power_continuous(power: list[tuple[float, float, float, float]], ts_from: f
     starts = [ts_from, *(row[0] for row in inside if row[0] > ts_from), ts_to]
     if max(b - a for a, b in zip(starts, starts[1:])) > LOSS_POWER_MAX_GAP:
         return False
-    return all(row[1] >= LOSS_MIN_POWER for row in inside)
+    low_power = [
+        index for index, row in enumerate(power)
+        if ts_from - 300 < row[0] < ts_to and row[1] < LOSS_MIN_POWER
+    ]
+    max_low_power = max(1, int(len(inside) * LOSS_MAX_LOW_POWER_SAMPLES))
+    if len(low_power) > max_low_power:
+        return False
+    return all(
+        (index == 0 or power[index - 1][1] >= LOSS_MIN_POWER)
+        and (index == len(power) - 1 or power[index + 1][1] >= LOSS_MIN_POWER)
+        for index in low_power
+    )
 
 
 def _segment(start: float, end: float, kwh_in: float, soc_delta: float, battery_size: float, phases: int, source: str) -> dict | None:
@@ -225,12 +241,8 @@ def _solve(matrix: list[list[float]], vector: list[float]) -> list[float] | None
     return [a[i][n] / a[i][i] for i in range(n)]
 
 
-def fit_model(segments: list[dict], fallback_share: float) -> dict:
-    """P0 (kW) and c per phase count by weighted least squares over all segments.
-
-    status: no_data (the configured loss), one_group (one measured loss for every power)
-    or model (P0 and c fitted, needs segments in at least two power groups).
-    """
+def _fit_model(segments: list[dict], fallback_share: float) -> dict:
+    """P0 (kW) and c per phase count by weighted least squares over the segments."""
     if not segments:
         return {"status": "no_data", "p0": 0.0, "c": {1: fallback_share, 3: fallback_share}}
     weight = lambda s: LOSS_STATISTICS_WEIGHT if s["source"] == "statistics" else 1.0  # noqa: E731
@@ -262,6 +274,53 @@ def fit_model(segments: list[dict], fallback_share: float) -> dict:
     for ph in (1, 3):
         c.setdefault(ph, c[phases[0]])
     return {"status": "model", "p0": max(result["p0"], 0.0), "c": c}
+
+
+def _outlier_segments(segments: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Exclude clear, isolated deviations from robust per-phase loss curves."""
+    if len(segments) < LOSS_OUTLIER_MIN_SEGMENTS:
+        return segments, []
+
+    indices = set()
+    for phases in {s["phases"] for s in segments}:
+        phase_indices = [i for i, s in enumerate(segments) if s["phases"] == phases]
+        if len(phase_indices) < 3:
+            continue
+        points = [(1 / segments[i]["kw"], segments[i]["loss"]) for i in phase_indices]
+        slopes = [
+            (y2 - y1) / (x2 - x1)
+            for index, (x1, y1) in enumerate(points)
+            for x2, y2 in points[index + 1:]
+            if x2 != x1
+        ]
+        slope = statistics.median(slopes) if slopes else 0.0
+        intercept = statistics.median(y - slope * x for x, y in points)
+        residuals = [y - (slope * x + intercept) for x, y in points]
+        center = statistics.median(residuals)
+        mad = statistics.median(abs(residual - center) for residual in residuals)
+        threshold = max(LOSS_OUTLIER_MIN_RESIDUAL, 3.5 * 1.4826 * mad)
+        indices.update(
+            segment_index for segment_index, residual in zip(phase_indices, residuals)
+            if abs(residual - center) > threshold
+        )
+
+    max_outliers = max(1, int(len(segments) * LOSS_OUTLIER_MAX_FRACTION))
+    if not indices or len(indices) > max_outliers or len(segments) - len(indices) < LOSS_OUTLIER_MIN_SEGMENTS - 1:
+        return segments, []
+    return (
+        [segment for i, segment in enumerate(segments) if i not in indices],
+        [segment for i, segment in enumerate(segments) if i in indices],
+    )
+
+
+def fit_model(segments: list[dict], fallback_share: float) -> dict:
+    """Fit the loss model, ignoring a few isolated measurements far from its curve.
+
+    status: no_data (the configured loss), one_group (one measured loss for every power)
+    or model (P0 and c fitted, needs segments in at least two power groups).
+    """
+    accepted, _ = _outlier_segments(segments)
+    return _fit_model(accepted, fallback_share)
 
 
 def loss_share(model: dict, kw: float, phases: int) -> float:
@@ -332,13 +391,15 @@ class LossMixin:
         if not self.is_ev_configured():
             return
         segments = self.charging_loss_db.get("segments", [])
-        model = fit_model(segments, self._fallback_loss_share())
+        fallback_share = self._fallback_loss_share()
+        display_segments, rejected_segments = _outlier_segments(segments)
+        model = _fit_model(display_segments, fallback_share)
         voltage = float(self.config["charger"]["power_voltage"])
         max_amps = int(self.config["charger"]["charging_max_amp"])
         configured = int(self.config["charger"]["charging_phases"])
         battery_size = float(self.config["ev_car"]["battery_size"])
-        measured_groups = {s["group"] for s in segments}
-        measured_phases = {3 if s["phases"] >= 3 else 1 for s in segments}
+        measured_groups = {s["group"] for s in display_segments}
+        measured_phases = {3 if s["phases"] >= 3 else 1 for s in display_segments}
 
         def per_percent(share: float) -> float:
             return battery_size / 100 / (1 - share) if share < 1 else 0.0
@@ -369,11 +430,17 @@ class LossMixin:
             soc = sum(s["soc_delta"] for s in group_segments)
             return round(sum(s["kwh"] for s in group_segments) / soc, 4) if soc else None
 
+        def segment_attributes(s):
+            return {
+                "time": local(s["start"]), "kw": s["kw"], "loss": s["loss"], "phases": s["phases"], "soc_delta": s["soc_delta"],
+                "kwh": s["kwh"], "kwh_per_percent": round(s["kwh"] / s["soc_delta"], 4), "source": s["source"],
+            }
+
         local = lambda ts: datetime.datetime.fromtimestamp(ts, self._snap.tz).isoformat(timespec="minutes")  # noqa: E731
         self.set_state("charging_loss_model", round(top["loss"] * 100, 1) if top else None)
         attrs = {
             "status": model["status"],
-            "kwh_per_percent": measured(segments),
+            "kwh_per_percent": measured(display_segments),
             "kwh_per_percent_configured": round(per_percent(self._fallback_loss_share()), 4),
             # what the plan uses now: the configured or (use_measured_charging_loss) the measured loss
             "plan_uses_measured": self.switch_state("use_measured_charging_loss", error_state="off") == "on" and model["status"] != "no_data",
@@ -385,15 +452,10 @@ class LossMixin:
             "battery_size": battery_size,
             "loss_low": low,
             "loss_high": top,
-            "groups": {name: sum(1 for s in segments if s["group"] == name) for _, _, name in LOSS_GROUPS},
-            "groups_kwh_per_percent": {name: measured([s for s in segments if s["group"] == name]) for _, _, name in LOSS_GROUPS},
-            "segments": [
-                {
-                    "time": local(s["start"]), "kw": s["kw"], "loss": s["loss"], "phases": s["phases"], "soc_delta": s["soc_delta"],
-                    "kwh": s["kwh"], "kwh_per_percent": round(s["kwh"] / s["soc_delta"], 4), "source": s["source"],
-                }
-                for s in segments
-            ],
+            "groups": {name: sum(1 for s in display_segments if s["group"] == name) for _, _, name in LOSS_GROUPS},
+            "groups_kwh_per_percent": {name: measured([s for s in display_segments if s["group"] == name]) for _, _, name in LOSS_GROUPS},
+            "segments": [segment_attributes(s) for s in display_segments],
+            "rejected_segments": [segment_attributes(s) for s in rejected_segments],
             "curve": curve,
             # kWh per % per month and group: rising over the years = less battery capacity
             "capacity_months": [
@@ -404,7 +466,7 @@ class LossMixin:
             "backfilled": bool(self.charging_loss_db.get("backfilled")),
             # how far back each group had to go for its measurements
             "group_oldest": {
-                name: local(min(s["start"] for s in group)) if (group := [s for s in segments if s["group"] == name]) else None
+                name: local(min(s["start"] for s in group)) if (group := [s for s in display_segments if s["group"] == name]) else None
                 for _, _, name in LOSS_GROUPS
             },
         }
