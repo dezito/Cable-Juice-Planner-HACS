@@ -1769,12 +1769,14 @@ views:
       icon: mdi:cash-clock
     - type: markdown
       content: |-
-        {% set ns = namespace(help=none) %}
-        {% set ns.help = ns.help or state_attr('switch.cjp_cheap_grid_charging', 'help') %}
-        {% set ns.help = ns.help or state_attr('sensor.cjp_charge_very_cheap_battery_level', 'help') %}
-        {% if ns.help %}<details><summary>@@read_more@@</summary>
+        {% set ns = namespace(limits_help=none, targets_help=none) %}
+        {% set ns.limits_help = state_attr('switch.cjp_cheap_grid_charging', 'help') %}
+        {% set ns.targets_help = state_attr('sensor.cjp_charge_very_cheap_battery_level', 'help') %}
+        {% if ns.limits_help or ns.targets_help %}<details><summary>@@read_more@@</summary>
 
-        {{ ns.help }}
+        {% if ns.limits_help %}{{ ns.limits_help }}{% endif %}
+
+        {% if ns.targets_help %}{{ ns.targets_help }}{% endif %}
 
         </details>{% endif %}
       grid_options: *id001
@@ -1829,12 +1831,14 @@ views:
       icon: mdi:solar-power-variant
     - type: markdown
       content: |-
-        {% set ns = namespace(help=none) %}
-        {% set ns.help = ns.help or state_attr('switch.cjp_solar_charging', 'help') %}
-        {% set ns.help = ns.help or state_attr('number.cjp_ev_charge_after_powerwall_battery_level', 'help') %}
-        {% if ns.help %}<details><summary>@@read_more@@</summary>
+        {% set ns = namespace(solar_help=none, powerwall_help=none) %}
+        {% set ns.solar_help = state_attr('switch.cjp_solar_charging', 'help') %}
+        {% set ns.powerwall_help = state_attr('number.cjp_ev_charge_after_powerwall_battery_level', 'help') %}
+        {% if ns.solar_help or ns.powerwall_help %}<details><summary>@@read_more@@</summary>
 
-        {{ ns.help }}
+        {% if ns.solar_help %}{{ ns.solar_help }}{% endif %}
+
+        {% if ns.powerwall_help %}{{ ns.powerwall_help }}{% endif %}
 
         </details>{% endif %}
       grid_options: *id001
