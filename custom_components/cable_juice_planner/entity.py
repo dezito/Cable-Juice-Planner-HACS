@@ -8,8 +8,19 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 
-from .const import DOMAIN, ENTITY_HELP_GROUPS, MANUFACTURER, TITLE, device_name, is_ev_configured, is_powerwall_configured, is_solar_configured
+from .const import (
+    DOMAIN,
+    ENTITY_HELP_GROUPS,
+    MANUFACTURER,
+    SIGNAL_HELP_VALUES_CHANGED,
+    TITLE,
+    device_name,
+    is_ev_configured,
+    is_powerwall_configured,
+    is_solar_configured,
+)
 from .coordinator import CJPCoordinator
+from .helpers import float_or_none
 
 # Platform -> helper domain used by the PyScript version (values are migrated once)
 LEGACY_DOMAINS = {
@@ -36,13 +47,24 @@ def requirement_met(coordinator: CJPCoordinator, requires: str | None) -> bool:
 
 
 class _HelpValues(dict):
+    def __init__(self, coordinator: CJPCoordinator) -> None:
+        super().__init__()
+        self.coordinator = coordinator
+
+    def __getitem__(self, key):
+        state = self.coordinator.hass.states.get(f"number.{self.coordinator.object_prefix}_{key}")
+        value = float_or_none(state.state) if state else None
+        if value is not None:
+            return int(value) if value.is_integer() else round(value, 2)
+        return super().__getitem__(key)
+
     def __missing__(self, key):
         return "?"
 
 
 def help_values(coordinator: CJPCoordinator) -> _HelpValues:
     """Current settings and sensor states for the {key} placeholders of the help texts."""
-    values = _HelpValues()
+    values = _HelpValues(coordinator)
     for key, value in {**coordinator.data, **coordinator.settings}.items():
         if isinstance(value, bool):
             value = "on" if value else "off"
@@ -127,5 +149,7 @@ class CJPUpdatingEntity(CJPEntity):
 
     @callback
     def _handle_update(self, key: Any) -> None:
-        if key == self._key:
+        if key == self._key or (
+            key == SIGNAL_HELP_VALUES_CHANGED and self._key in ENTITY_HELP_GROUPS
+        ):
             self.async_write_ha_state()

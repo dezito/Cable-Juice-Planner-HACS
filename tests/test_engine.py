@@ -16,6 +16,7 @@ from astral import Observer
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.codec import decode
+from custom_components.cable_juice_planner.engine_control import preheat_lead_time
 from custom_components.cable_juice_planner.engine import CJPEngine, Snapshot
 
 TZ = zoneinfo.ZoneInfo("Europe/Copenhagen")
@@ -43,6 +44,11 @@ OPTIONS = {
     "battery_size": 75.0,
 }
 MAX_WATT = 230 * 3 * 16
+
+
+@pytest.mark.parametrize(("thawing", "expected"), [(False, 15), (True, 30)])
+def test_preheat_lead_time_doubles_for_frost(thawing: bool, expected: int) -> None:
+    assert preheat_lead_time(15, thawing) == expected
 
 
 def _texts() -> dict[str, str]:

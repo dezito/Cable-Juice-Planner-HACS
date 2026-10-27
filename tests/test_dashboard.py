@@ -1,15 +1,28 @@
 """The generated dashboard: entities mapped to the instance, missing cards removed, texts translated."""
 from __future__ import annotations
 
-import yaml
+from types import SimpleNamespace
 
+import yaml
 from homeassistant.core import HomeAssistant
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.dashboard import render_dashboard
-from custom_components.cable_juice_planner.formatting import load_texts
+from custom_components.cable_juice_planner.entity import help_values
+from custom_components.cable_juice_planner.formatting import (
+    format_analysis_help_text,
+    format_help_text,
+    load_texts,
+)
 
-from .conftest import MOCK_OPTIONS, OBJECT_PREFIX, async_setup, async_unload_and_join, make_entry, set_source_states
+from .conftest import (
+    MOCK_OPTIONS,
+    OBJECT_PREFIX,
+    async_setup,
+    async_unload_and_join,
+    make_entry,
+    set_source_states,
+)
 from .test_engine import OPTIONS
 
 
@@ -183,6 +196,99 @@ def test_settings_read_more_includes_each_help_group() -> None:
     assert "{{ ns.solar_help }}" in solar_help and "{{ ns.powerwall_help }}" in solar_help
 
 
+def test_entity_help_uses_spaced_bold_italic_labels() -> None:
+    text = format_help_text(
+        "Group overview.\n• Charging: Uses surplus.\n  • Current target: Follows house consumption."
+    )
+
+    assert text == (
+        "Group overview.\n\n"
+        "***Charging***\nUses surplus.\n\n"
+        "***Current target***\nFollows house consumption."
+    )
+    assert format_help_text("Overview. **First metric**: one. **Second metric**: two.") == (
+        "Overview.\n\n***First metric***\none.\n\n***Second metric***\ntwo."
+    )
+    assert format_analysis_help_text("*First point. Second point.*") == "First point.\nSecond point."
+    assert format_analysis_help_text(
+        "*Hver aften kl. 23:59 gemmes planen. Gns.: gennemsnitspris. Ved bilen med kravet: dagens kørsel.*"
+    ) == (
+        "Hver aften kl. 23:59 gemmes planen.\n"
+        "**Gns.**: gennemsnitspris.\n"
+        "Ved bilen med kravet:\n"
+        "Dagens kørsel."
+    )
+    economy = format_analysis_help_text(
+        "*Gns.: gennemsnitspris. Daglig: billigst frem til afgang. Laveste: billigste timer. "
+        "Score: tæt på laveste. kr/km: al ladning inkl. offentlig divideret med kørte km. "
+        "Sammenligningen findes kun i kendte perioder.*"
+    )
+    assert economy == (
+        "**Gns.**: gennemsnitspris.\n"
+        "**Daglig**: billigst frem til afgang.\n"
+        "**Laveste**: billigste timer.\n"
+        "**Score**: tæt på laveste.\n"
+        "**kr/km**: al ladning inkl. offentlig divideret med kørte km.\n"
+        "Sammenligningen findes kun i kendte perioder."
+    )
+    assert format_analysis_help_text("Ready; next point.") == "Ready;\nNext point."
+    assert load_texts("da")["dashboard.economy_explain"].startswith("**Gns.**:")
+    assert "***Solcelleproduktion til rådighed***\n" in load_texts("da")["entity_help.solar_charging"]
+    assert "***Batteriniveau og ladegrænse***\n" in load_texts("da")["dashboard.history_explain"]
+
+
+def test_entity_help_uses_current_number_states(hass: HomeAssistant) -> None:
+    hass.states.async_set("number.cjp_tesla_min_daily_battery_level", "37.0")
+    hass.states.async_set("number.cjp_tesla_typical_daily_distance", "62.5")
+    coordinator = SimpleNamespace(
+        hass=hass,
+        object_prefix="cjp_tesla",
+        data={"min_daily_battery_level": 30.0},
+        settings={"typical_daily_distance": 50.0},
+    )
+
+    rendered = (
+        "{min_daily_battery_level} % / {typical_daily_distance} km"
+        .format_map(help_values(coordinator))
+    )
+
+    assert rendered == "37 % / 62.5 km"
+
+
+async def test_entity_help_updates_when_number_state_changes(hass: HomeAssistant, loaded_entry) -> None:
+    entity_id = "number.cjp_test_min_daily_battery_level"
+    help_entity_id = "switch.cjp_test_fill_up"
+
+    for value in (41, 47):
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True
+        )
+        await hass.async_block_till_done()
+        assert f"{value} %" in hass.states.get(help_entity_id).attributes["help"]
+
+
+def test_analysis_sections_include_controls_for_their_graphs() -> None:
+    options = {**OPTIONS, "language": "da"}
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.eds"}
+    dashboard = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))
+    sections = dashboard["views"][2]["sections"]
+
+    def section_entities(title: str) -> set[str]:
+        section = next(
+            section
+            for section in sections
+            if any(card.get("heading") == title for card in _cards(section))
+        )
+        return {node["entity"] for node in _cards(section) if isinstance(node.get("entity"), str)}
+
+    assert "switch.cjp_tesla_workplan_charging" not in section_entities("Klar til afgang")
+    assert "switch.cjp_tesla_price_forecast_correction" in section_entities("Prisprognose")
+    assert "select.cjp_tesla_forecast_type" in section_entities("Prognosens træfsikkerhed")
+    assert "switch.cjp_tesla_calculate_charging_loss" not in section_entities("Ladetab pr. effekt")
+    assert "switch.cjp_tesla_use_measured_charging_loss" in section_entities("Ladetab pr. effekt")
+    assert "button.cjp_tesla_recalculate_charging_loss" in section_entities("Ladetab pr. effekt")
+
+
 def _price_charts(options: dict) -> list[str]:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.eds", "sensor.sl_price"}
     overview = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da", **options}), "tesla", "entry1", existing))["views"][0]
@@ -275,6 +381,11 @@ def test_charging_loss_section_on_analysis() -> None:
     assert charts[1]["stacked"] is True and [s["name"] for s in charts[1]["series"]] == ["Proportionalt resttab", "Fast forbrug"]
     buttons = [row["entity"] for c in _cards(analysis) if c.get("type") == "entities" for row in c["entities"]]
     assert "button.cjp_tesla_recalculate_charging_loss" in buttons
+    assert "switch.cjp_tesla_calculate_charging_loss" not in buttons
+    analysis_help = "\n".join(
+        card.get("content", "") for card in _cards(analysis) if card.get("type") == "markdown"
+    )
+    assert "Brug målt ladetab" not in analysis_help
     # without a car integration there is nothing to measure: the section is gone
     no_ev = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": ""}), "tesla", "entry1", _own("tesla") - {"sensor.cjp_tesla_charging_loss_model", "button.cjp_tesla_recalculate_charging_loss", "switch.cjp_tesla_use_measured_charging_loss"}))
     assert "Ladetab pr. effekt" not in [c.get("heading") for c in _cards(no_ev["views"][2])]
