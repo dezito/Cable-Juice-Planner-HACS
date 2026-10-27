@@ -526,7 +526,7 @@ class CJPCoordinator:
     # ------------------------------------------------------------------ #
 
     def _register_triggers(self) -> None:
-        interval = int(self.config["cron_interval"])
+        interval = min(int(self.config["cron_interval"]), 15)
         track = partial(async_track_time_change, self.hass)
         self._unsubs.append(track(self._handle_cron, minute=f"/{interval}", second=0))
         self._unsubs.append(track(self._job_handler("hour_end", include_forecast=True), minute=59, second=0))
@@ -591,6 +591,9 @@ class CJPCoordinator:
             while time.monotonic() < deadline and int(float_or_none(self.settings.get("battery_level")) or 0) <= 0:
                 await asyncio.sleep(5)
             _LOGGER.info("Battery level input: %s", self.settings.get("battery_level"))
+            if int(float_or_none(self.settings.get("battery_level")) or 0) <= 0:
+                _LOGGER.info("Battery level was not entered within %s; skipping plug-in processing", BATTERY_LEVEL_WAIT)
+                return
         await self.async_run_job("charger_connected", value, include_forecast=True)
 
     @callback
@@ -665,8 +668,6 @@ class CJPCoordinator:
         if key == "public_charging_session_cost":
             self._background(self._async_public_cost_flow(value), "public_cost")
             return True
-        if key == "battery_level" and not self.ev_configured:
-            self._background(self.async_run_job("emulated_battery_level_changed", value, old), "battery_level")
         return False
 
     @callback
