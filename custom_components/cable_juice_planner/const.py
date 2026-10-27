@@ -695,6 +695,7 @@ PERSISTENT_SENSOR_KEYS = (
 )
 
 SIGNAL_UPDATE = "cable_juice_planner_update_{entry_id}"
+SIGNAL_HELP_VALUES_CHANGED = "help_values_changed"
 
 SERVICE_DEBUG_INFO = "debug_info"
 SERVICE_EXPORT_DEBUG = "export_debug"

@@ -2289,9 +2289,17 @@ views:
       heading: '@@section_price_forecast@@'
       icon: mdi:chart-bell-curve-cumulative
     - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@price_forecast_explain@@\n\n@@price_forecast_correction_explain@@\n\n</details>"
+      content: "<details><summary>@@read_more@@</summary>\n\n@@price_forecast_explain@@\n\n</details>"
       grid_options:
         columns: full
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: switch.cjp_price_forecast_correction
+        name:
+          type: entity
+      grid_options: *id001
     - type: markdown
       card_mod:
         style: |
@@ -2489,6 +2497,14 @@ views:
       content: "<details><summary>@@read_more@@</summary>\n\n@@forecast_explain@@\n\n</details>"
       grid_options:
         columns: full
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: select.cjp_forecast_type
+        name:
+          type: entity
+      grid_options: *id001
     - type: markdown
       card_mod:
         style: |
@@ -2619,7 +2635,7 @@ views:
       heading: '@@section_loss@@'
       icon: mdi:chart-bell-curve-cumulative
     - type: markdown
-      content: "<details><summary>@@read_more@@</summary>\n\n@@loss_explain@@\n\n</details>"
+      content: "<details><summary>@@read_more@@</summary>\n\n@@loss_analysis_explain@@\n\n</details>"
       grid_options:
         columns: full
     - type: markdown

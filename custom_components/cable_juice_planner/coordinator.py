@@ -30,42 +30,48 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_change
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_change,
+)
 from homeassistant.util import dt as dt_util
 
+from .backup import async_load_backup, async_restore_databases, pending_restores
 from .const import (
     CHARGER_CHARGING_STATUS,
     CHARGER_COMPLETED_STATUS,
     CHARGER_READY_STATUS,
     CHARGING_LOSS_METER_TIMEOUT,
-    MIGRATED_LAST_FULL_CHARGE,
+    CONF_CAR_NAME,
     CONF_ENTITY_PREFIX,
     DOMAIN,
     ENTITY_UNAVAILABLE_STATES,
     HISTORY_BUFFER_HOURS,
     HISTORY_LONG_BUFFER_HOURS,
     HISTORY_SHORT_BUFFER_HOURS,
+    MIGRATED_LAST_FULL_CHARGE,
+    NUMBER_SETTINGS,
+    SIGNAL_HELP_VALUES_CHANGED,
     SIGNAL_UPDATE,
     TITLE,
     build_config,
     default_options,
-    is_ev_configured,
-    CONF_CAR_NAME,
     instance_title,
+    is_ev_configured,
     is_solar_configured,
     normalize_language,
     normalize_prefix,
     object_prefix,
 )
+from .debug_export import DebugRecorder
 from .engine import CJPEngine, JobResult, Snapshot
-from .engine_loss import LOSS_GROUP_SIZE, as_series, resample_steps
 from .engine_energy import SOLCAST_ENDINGS, strip_forecast_suffix
+from .engine_loss import LOSS_GROUP_SIZE, as_series, resample_steps
 from .formatting import format_charging_rule, load_texts, translate
 from .helpers import float_or_none
 from .history import merge_rows
 from .prices import PRICE_SNAPSHOT_SECONDS, TARIFF_STATE_KEYS
-from .backup import async_load_backup, async_restore_databases, pending_restores
-from .debug_export import DebugRecorder
 from .storage import CJPStorage, load_legacy_databases
 
 _LOGGER = logging.getLogger(__name__)
@@ -641,6 +647,10 @@ class CJPCoordinator:
         """A setting entity changed. source: initial, user (entity) or engine (job result)."""
         old = self.settings.get(key)
         self.settings[key] = value
+        if old != value and key in NUMBER_SETTINGS:
+            self.hass.loop.call_soon(
+                async_dispatcher_send, self.hass, self.signal, SIGNAL_HELP_VALUES_CHANGED
+            )
         if source == "initial" or old == value or not self.started:
             return
         if source == "engine":
