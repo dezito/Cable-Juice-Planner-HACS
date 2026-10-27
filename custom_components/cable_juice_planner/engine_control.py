@@ -44,6 +44,11 @@ BUTTON_DOMAINS = ("button", "input_button")
 SWITCH_DOMAINS = ("switch", "input_boolean")
 
 
+def preheat_lead_time(minutes: float, thawing: bool) -> float:
+    """Double the configured preheat lead time when frost requires defrosting."""
+    return minutes * 2 if thawing else minutes
+
+
 class ControlMixin:
     """charge_if_needed and the event handlers of ev.py."""
 
@@ -756,12 +761,6 @@ class ControlMixin:
         trip_date_time_diff = abs(now - trip_date_time)
         next_drive = next_work_time if min(next_work_time_diff, trip_date_time_diff) == next_work_time_diff else trip_date_time
 
-        if 0 < minutes_between(now, next_drive, error_value=-1) <= preheat_min_before:
-            if next_drive == trip_date_time:
-                preheat = self.switch_state("trip_preheat") == "on"
-            else:
-                preheat = self.switch_state(f"preheat_{day_of_week_text(next_drive)}") == "on"
-
         outdoor_temp = 0.0
         forecast_temp = 0.0
         heating_type = t("ui.preheat_ev.preheating")
@@ -784,6 +783,13 @@ class ControlMixin:
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Cant get forecast temp: %s", err)
         thawing = outdoor_temp <= -1.0 or forecast_temp <= -1.0
+
+        preheat_lead = preheat_lead_time(preheat_min_before, thawing)
+        if 0 < minutes_between(now, next_drive, error_value=-1) <= preheat_lead:
+            if next_drive == trip_date_time:
+                preheat = self.switch_state("trip_preheat") == "on"
+            else:
+                preheat = self.switch_state(f"preheat_{day_of_week_text(next_drive)}") == "on"
 
         climate_state = self.get_state(climate_entity, error_state="unknown")
         integration = self.get_integration(climate_entity)
