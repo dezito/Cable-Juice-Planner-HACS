@@ -154,6 +154,35 @@ def test_forced_charging_shown_when_relevant() -> None:
     assert branches[0]["conditions"][0]["below"] == "number.cjp_tesla_min_daily_battery_level"
 
 
+def test_settings_read_more_includes_each_help_group() -> None:
+    options = {
+        **OPTIONS,
+        "language": "da",
+        "production_entity_id": "sensor.solar",
+        "powerwall_battery_level_entity_id": "sensor.powerwall_battery",
+    }
+    existing = _own("tesla") | {
+        "sensor.ev_battery_level",
+        "sensor.charger_status",
+        "sensor.solar",
+        "sensor.powerwall_battery",
+        "switch.cjp_tesla_solar_charging",
+        "switch.cjp_tesla_powerwall_discharge_above_needed",
+        "number.cjp_tesla_ev_charge_after_powerwall_battery_level",
+    }
+    settings = yaml.safe_load(render_dashboard(const.build_config(options), "tesla", "entry1", existing))["views"][1]
+    contents = [card["content"] for card in _cards(settings) if card.get("type") == "markdown"]
+    cheap_help = next(content for content in contents if "limits_help" in content)
+    solar_help = next(content for content in contents if "solar_help" in content)
+
+    assert "state_attr('switch.cjp_tesla_cheap_grid_charging', 'help')" in cheap_help
+    assert "state_attr('sensor.cjp_tesla_charge_very_cheap_battery_level', 'help')" in cheap_help
+    assert "{{ ns.limits_help }}" in cheap_help and "{{ ns.targets_help }}" in cheap_help
+    assert "state_attr('switch.cjp_tesla_solar_charging', 'help')" in solar_help
+    assert "state_attr('number.cjp_tesla_ev_charge_after_powerwall_battery_level', 'help')" in solar_help
+    assert "{{ ns.solar_help }}" in solar_help and "{{ ns.powerwall_help }}" in solar_help
+
+
 def _price_charts(options: dict) -> list[str]:
     existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status", "sensor.eds", "sensor.sl_price"}
     overview = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da", **options}), "tesla", "entry1", existing))["views"][0]
