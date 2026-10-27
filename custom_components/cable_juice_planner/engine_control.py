@@ -1078,6 +1078,8 @@ class ControlMixin:
         """triggers_charge_if_needed for the cron and the enforce/manual/charging loss entities."""
         if self.is_charging() and not self.other_ev_connected():
             self.wake_up_ev()
+            if not self.is_ev_configured():
+                self.charging_power_to_emulated_battery_level()
         force = var_name == "enforce_planning"
         self.charge_if_needed(force_recalculate=force)
         self.is_battery_fully_charged()
