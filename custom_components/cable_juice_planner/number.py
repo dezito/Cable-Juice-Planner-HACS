@@ -12,7 +12,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .const import NUMBER_SETTINGS
 from .coordinator import CJPCoordinator
 from .entity import CJPUpdatingEntity, requirement_met
-from .helpers import float_or_none, get_dict_value_with_path
+from .utils.helpers import float_or_none, get_dict_value_with_path
 
 # values the user changes while using the car (trip, virtual battery), the rest are configuration
 PRIMARY_NUMBERS = ("battery_level", "trip_charge_procent", "trip_range_needed", "public_charging_session_cost")

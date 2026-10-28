@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
-from custom_components.cable_juice_planner.engine_economy import average_price, fill_cheapest
+from custom_components.cable_juice_planner.engine.economy import average_price, fill_cheapest
 
 from .test_engine import DAY, OPTIONS, TEXTS, TZ, snapshot
 

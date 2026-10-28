@@ -1,4 +1,4 @@
-"""Replay a debug export (custom_components/cable_juice_planner/debug_export.py) in the engine.
+"""Replay a debug export (custom_components/cable_juice_planner/management/debug_export.py) in the engine.
 
     <venv python> tests/debug_replay.py cjp_debug_20261025_120000.json.gz [failed | planning | <index>]
 
@@ -24,10 +24,10 @@ if __package__ in (None, ""):  # started as tests/debug_replay.py: the repo root
 
 import astral
 
-from custom_components.cable_juice_planner.codec import decode
-from custom_components.cable_juice_planner.debug_export import PLANNING_JOBS
+from custom_components.cable_juice_planner.utils.codec import decode
+from custom_components.cable_juice_planner.management.debug_export import PLANNING_JOBS
 from custom_components.cable_juice_planner.engine import CJPEngine, JobResult, Snapshot
-from custom_components.cable_juice_planner.formatting import load_texts
+from custom_components.cable_juice_planner.utils.formatting import load_texts
 
 # engine attributes that are rebuilt from the configuration instead of the export
 _REBUILT = {"name", "title", "testing", "charger_configured", "solar_configured", "price_provider"}

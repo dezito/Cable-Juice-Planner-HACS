@@ -1,4 +1,4 @@
-"""Export / import of the Cable Juice Planner data (backup.py)."""
+"""Export / import of the Cable Juice Planner data (management/backup.py)."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.cable_juice_planner.backup import BACKUP_DIR
+from custom_components.cable_juice_planner.management.backup import BACKUP_DIR
 from custom_components.cable_juice_planner.const import CONF_ENTITY_PREFIX, DB_NAMES, DOMAIN
 
 from .conftest import OBJECT_PREFIX, async_unload_and_join, form_defaults

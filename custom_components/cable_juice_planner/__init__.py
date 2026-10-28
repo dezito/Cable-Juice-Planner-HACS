@@ -17,7 +17,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.restore_state import async_get as async_get_restore_data
 from homeassistant.helpers.typing import ConfigType
 
-from .backup import BACKUP_DIR, async_export, async_import
+from .management.backup import BACKUP_DIR, async_export, async_import
 from .const import (
     CONF_ENTITY_PREFIX,
     CONF_SITE,
@@ -32,10 +32,10 @@ from .const import (
 )
 from .coordinator import CJPCoordinator
 from .const import MIGRATED_LAST_FULL_CHARGE, normalize_prefix
-from .blueprint_install import async_install_blueprints
-from .dashboard import async_remove_dashboard_file, async_setup_dashboard
-from .debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
-from .helpers import float_or_none
+from .management.blueprint_install import async_install_blueprints
+from .management.dashboard_build import async_remove_dashboard_file, async_setup_dashboard
+from .management.debug_export import DEBUG_DIR, DebugDownloadView, async_export_debug, async_notify_debug, install_log_buffer
+from .utils.helpers import float_or_none
 from .site import CJPSite
 
 _LOGGER = logging.getLogger(__name__)
@@ -261,7 +261,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> bool
 async def async_remove_entry(hass: HomeAssistant, entry: CJPConfigEntry) -> None:
     if entry.data.get(CONF_SITE):
         return
-    from .storage import CJPStorage  # noqa: PLC0415
+    from .management.storage import CJPStorage  # noqa: PLC0415
 
     # the data can be imported again (config flow of a new instance, or import_data)
     try:

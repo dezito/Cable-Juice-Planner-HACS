@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
-from custom_components.cable_juice_planner.engine_loss import (
+from custom_components.cable_juice_planner.engine.loss import (
     LOSS_GROUP_SIZE,
     _outlier_segments,
     find_segments,

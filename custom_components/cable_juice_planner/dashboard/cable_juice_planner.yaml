@@ -1,5 +1,5 @@
 # The Cable Juice Planner dashboard, written for the prefix cjp and the author's car,
-# charger, price and solar entities; dashboard.py rewrites it per instance and removes
+# charger, price and solar entities; management/dashboard_build.py rewrites it per instance and removes
 # the cards of entities that do not exist (no car, no solar, ...).
 # @@key@@ = dashboard.key of texts/<language>.json. Built by a script, edit with care.
 views:
@@ -1953,7 +1953,7 @@ views:
   max_columns: 4
   dense_section_placement: true
   sections:
-  # charging economy per month (engine_economy.py)
+  # charging economy per month (engine/economy.py)
   - type: grid
     column_span: 2
     cards:
@@ -2281,7 +2281,7 @@ views:
           return (entity.attributes.planned_days || []).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.manual + d.low_battery + d.other]);
       grid_options:
         columns: full
-  # the price forecast of the price integration against the real prices (engine_analysis.py)
+  # the price forecast of the price integration against the real prices (engine/analysis)
   - type: grid
     column_span: 2
     cards:
@@ -2486,7 +2486,7 @@ views:
           return ((entity.attributes.price_forecast || {}).days || []).filter(d => d.d7 !== undefined).map(d => [new Date(d.date + 'T12:00:00').getTime(), d.d7]);
       grid_options:
         columns: full
-  # the forecast types (EMA, trend, average) against the house consumption and the @@distance_kwh@@ (engine_analysis.py)
+  # the forecast types (EMA, trend, average) against the house consumption and the @@distance_kwh@@ (engine/analysis)
   - type: grid
     column_span: 2
     cards:

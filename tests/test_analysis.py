@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.cable_juice_planner import const
 from custom_components.cable_juice_planner.engine import CJPEngine
-from custom_components.cable_juice_planner.engine_analysis import evaluate_price_day, find_drives, linear_fit, temperature_bins
+from custom_components.cable_juice_planner.engine.analysis.helpers import evaluate_price_day, find_drives, linear_fit, temperature_bins
 
 from .test_engine import DAY, OPTIONS, PLUGGED_IN, TEXTS, TZ, _price_rows, snapshot
 
