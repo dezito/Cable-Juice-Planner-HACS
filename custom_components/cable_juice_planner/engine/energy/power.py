@@ -121,7 +121,8 @@ class EnergyPower:
                 solar_production=solar_production,
                 power_consumption_without_ignored=power_consumption_without_ignored,
                 power_consumption_without_ignored_ev=power_consumption_without_ignored_ev,
-                power_consumption_without_all_exclusion=max(round(power_consumption_without_ignored_ev - powerwall_charging_consumption, 2), 0.0),
+                # the battery charging is already left out above, so it is not subtracted again
+                power_consumption_without_all_exclusion=max(power_consumption_without_ignored_ev, 0.0),
             )
         except Exception as err:  # noqa: BLE001
             message = f"Failed to get power values from {from_time_stamp} to {to_time_stamp} or period {period}: {err} {type(err)}"

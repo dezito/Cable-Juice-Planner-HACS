@@ -256,6 +256,23 @@ def test_hour_end_records_power_values_without_solar() -> None:
     assert hour["solar_production"][0][1] == 0.0
 
 
+def test_hour_end_does_not_subtract_battery_charging_twice() -> None:
+    """The consumption sensor without battery charging: the charging is not taken off the house again."""
+    now = datetime.datetime.combine(DAY, datetime.time(12, 59))
+    options = {**OPTIONS, "powerwall_watt_flow_entity_id": "sensor.battery_flow", "invert_powerwall_watt_flow_entity_id": True}
+    engine = CJPEngine(const.build_config(options), "cjp_test", TEXTS)
+    assert engine.run_job(snapshot(now), engine.startup, {}).error is None
+    hour_end = snapshot(now)
+    two_hours_ago = (now - datetime.timedelta(hours=2)).replace(tzinfo=TZ).timestamp()
+    hour_end.buffers = {"sensor.consumption": [(two_hours_ago, "1000")], "sensor.battery_flow": [(two_hours_ago, "500")]}
+    result = engine.run_job(hour_end, engine.hour_end)
+    assert result.error is None, result.error
+    hour = decode(result.db_saves["power_values"])[12]
+    assert hour["powerwall_charging_consumption"][0][1] == 500.0
+    assert hour["power_consumption_without_all_exclusion"][0][1] == hour["power_consumption_without_ignored_ev"][0][1]
+    assert hour["power_consumption_without_all_exclusion"][0][1] > 0.0
+
+
 def test_hour_end_without_consumption_entity_records_nothing() -> None:
     now = datetime.datetime.combine(DAY, datetime.time(12, 59))
     engine = CJPEngine(const.build_config({**OPTIONS, "power_consumption_entity_id": ""}), "cjp_test", TEXTS)
