@@ -1341,35 +1341,6 @@ views:
             }
       grid_options: &id001
         columns: full
-    - type: heading
-      heading: '@@section_status@@'
-      icon: mdi:car-electric
-    - type: entities
-      state_color: true
-      show_header_toggle: false
-      entities:
-      - entity: sensor.mcqueen_battery_level
-        name:
-          type: entity
-      - entity: number.cjp_battery_level
-        name:
-          type: entity
-      - entity: sensor.cjp_charging_limit
-        name:
-          type: entity
-      - entity: sensor.bil_lader_power
-        name:
-          type: entity
-      - entity: sensor.bil_lader_status
-        name:
-          type: entity
-      - entity: sensor.cjp_estimated_range
-        name:
-          type: entity
-      - entity: sensor.cjp_kwh_cost_price
-        name:
-          type: entity
-      grid_options: *id001
     # forced charging: only while the battery is under the daily minimum
     - type: conditional
       conditions:
@@ -1430,6 +1401,35 @@ views:
       grid_options: *id001
   - type: grid
     cards:
+    - type: heading
+      heading: '@@section_status@@'
+      icon: mdi:car-electric
+    - type: entities
+      state_color: true
+      show_header_toggle: false
+      entities:
+      - entity: sensor.mcqueen_battery_level
+        name:
+          type: entity
+      - entity: number.cjp_battery_level
+        name:
+          type: entity
+      - entity: sensor.cjp_charging_limit
+        name:
+          type: entity
+      - entity: sensor.bil_lader_power
+        name:
+          type: entity
+      - entity: sensor.bil_lader_status
+        name:
+          type: entity
+      - entity: sensor.cjp_estimated_range
+        name:
+          type: entity
+      - entity: sensor.cjp_kwh_cost_price
+        name:
+          type: entity
+      grid_options: *id001
     - type: heading
       heading: '@@section_trip@@'
       icon: mdi:bag-suitcase

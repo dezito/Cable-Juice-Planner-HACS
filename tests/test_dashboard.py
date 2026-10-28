@@ -125,9 +125,9 @@ def test_dashboard_layout() -> None:
     overview_ids = [row["entity"] for card in _cards(overview) if card.get("type") == "entities" for row in card["entities"] if "entity" in row]
     assert {"switch.cjp_tesla_allow_manual_charging_now", "switch.cjp_tesla_allow_manual_charging_solar"} <= set(overview_ids)
     assert "Manuel ladning" in headings(overview)
-    # manual charging below the trip, before the emoji description
+    # status above the trip, manual charging below the trip, before the emoji description
     trip_section = next(section for section in overview["sections"] if "Manuel ladning" in headings(section))
-    assert headings(trip_section)[0] == "Tur"
+    assert headings(trip_section)[:2] == ["Status", "Tur"]
     assert "emoji_description" in trip_section["cards"][-1].get("content", "")
     # the battery chart: the planned km per day, not the battery level history
     chart = next(card for card in _cards(overview) if card.get("type") == "custom:apexcharts-card")
