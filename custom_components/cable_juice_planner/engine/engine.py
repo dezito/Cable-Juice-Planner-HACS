@@ -1,0 +1,702 @@
+"""Cable Juice Planner calculation engine.
+
+The engine owns all runtime state (databases, charging plan, charging session, price
+cache, ...) and runs in the worker thread of the config entry. Each call goes through
+:meth:`CJPEngine.run_job` with a :class:`Snapshot` of Home Assistant data collected on
+the event loop. Nothing in the engine touches Home Assistant: outputs (sensor states
+and attributes, setting changes, events, notifications, database saves) are returned
+in a :class:`JobResult` and published by the coordinator.
+
+The integration does not control the charger or the car. Where the PyScript version
+sent commands, the engine sets the action entities instead (``charger_action``, the
+phase amps, ``charging_limit`` and the ``ev_request`` event), which the user's own
+automations act on.
+
+The algorithm is a port of ``ev.py`` split in parts:
+
+* :mod:`engine.planner` - the charging plan and the overview markdown
+* :mod:`engine.control`  - what to do right now, triggers, preheating, charging loss
+* :mod:`engine.history`  - charging history, battery expenses, drive efficiency
+* :mod:`engine.energy`   - power values, solar prediction, prices and the hourly databases
+"""
+from __future__ import annotations
+
+import datetime
+import logging
+import threading
+import time
+from typing import Any, Callable
+
+import astral.sun
+
+from ..utils.codec import encode
+from ..const import (
+    CHARGER_CHARGING_STATUS,
+    CHARGER_COMPLETED_STATUS,
+    CHARGER_NOT_READY_STATUS,
+    CHARGER_READY_STATUS,
+    ENTITY_UNAVAILABLE_STATES,
+    EV_PLUGGED_STATES,
+    EV_UNPLUGGED_STATES,
+    NUMBER_SETTINGS,
+    POWERWALL_CHARGING_TRIGGER,
+    POWERWALL_DISCHARGING_TRIGGER,
+    SOLAR_PRODUCTION_TRIGGER,
+    WEEKDAYS,
+    is_charger_configured,
+    is_ev_configured,
+    is_powerwall_configured,
+    is_solar_configured,
+)
+from .analysis.analysis import Analysis
+from .control.control import Control
+from .distance import Distance
+from .economy import Economy
+from .energy.energy import Energy
+from .history.charging_history import ChargingHistory
+from .loss import Loss
+from .planner.planner import Planner
+from .site import Site
+from ..utils.formatting import format_charging_rule, translate
+from ..utils.helpers import (
+    day_of_week_text,
+    end_of_day,
+    float_or_none,
+    minutes_between,
+    parse_datetime,
+    reset_datetime,
+    reset_time_to_hour,
+    start_of_day,
+)
+from .history.history import History
+from ..prices import create_price_provider
+from .state import Snapshot, JobResult
+from .battery import Battery
+from .public_charging import TripAndPublicCharging
+from .pricing import Pricing
+from .planning import Planning
+from .debug import Diagnostics
+
+_LOGGER = logging.getLogger(__name__)
+
+# How long the same notification is suppressed (my_notify always=False)
+NOTIFY_SUPPRESS = datetime.timedelta(minutes=60)
+
+
+class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Analysis, Energy, Site, Battery, Pricing, Planning, TripAndPublicCharging, Diagnostics):
+    """Holds the Cable Juice Planner state and implements the algorithm."""
+
+    def __init__(self, config: dict, prefix: str, texts: dict[str, str], title: str | None = None) -> None:
+        self.config = config
+        self.name = prefix  # start of the entity ids (cjp or cjp_<prefix>)
+        self.texts = texts  # runtime texts, see formatting.translate
+        self.testing = bool(config.get("testing_mode"))
+        self.title = title or f"Cable Juice Planner ({prefix})"
+
+        self.charger_configured = is_charger_configured(config)
+        self.solar_configured = is_solar_configured(config)
+        self.powerwall_configured = is_powerwall_configured(config)
+        self.ev_configured = is_ev_configured(config)
+
+        charger = config["charger"]
+        solar = config["solar"]
+        # init() limited the solar amps to the charger maximum
+        solar["charging_single_phase_max_amp"] = min(solar["charging_single_phase_max_amp"], charger["charging_max_amp"])
+        solar["charging_single_phase_min_amp"] = min(solar["charging_single_phase_min_amp"], charger["charging_max_amp"])
+        solar["charging_three_phase_min_amp"] = min(solar["charging_three_phase_min_amp"], charger["charging_max_amp"])
+        solar_min_amp = solar["charging_single_phase_min_amp"] if float(charger["charging_phases"]) > 1.0 else solar["charging_three_phase_min_amp"] * 3.0
+        self.solar_charging_trigger_on = abs(charger["power_voltage"] * solar_min_amp)
+        self.max_watt_charging = (charger["power_voltage"] * charger["charging_phases"]) * charger["charging_max_amp"]
+        self.max_kwh_charging = self.max_watt_charging / 1000
+
+        try:
+            self.price_provider = create_price_provider(config)
+        except ValueError as err:
+            _LOGGER.error("No price provider configured: %s", err)
+            self.price_provider = None
+
+        # databases (persisted)
+        self.charging_history_db: dict = {}
+        self.power_values_db: dict = {}
+        self.solar_available_db: dict = {}
+        self.kwh_avg_prices_db: dict = {}
+        self.drive_efficiency_db: list = []
+        self.km_kwh_efficiency_db: list = []
+
+        # own sensors (state and full attribute dict)
+        self.sensor_states: dict[str, Any] = {}
+        self.full_charge_99_since: datetime.datetime | None = None
+        self.sensor_attrs: dict[str, dict[str, Any]] = {}
+
+        # runtime state (the globals of ev.py)
+        self.preheating = False
+        self.last_hash_results: dict = {}
+        self.grid_price_cache: dict = {"using_offline_prices": False}
+        self.sell_price_cache: dict = {"using_offline_prices": False}
+        self.charging_is_beginning = False
+        self.restarting_charger = False
+        self.restarting_charger_count = 0
+        self.current_charging_amps = [0, 0, 0]
+        self.current_circuit_amps = [0, 0, 0]
+        # amps asked for before the site limit (site_limit re-applies them)
+        self.requested_charger_amps = [0, 0, 0]
+        self.requested_circuit_amps = [0, 0, 0]
+        self.site_charging_text = ""
+        self.last_charging_rule_text = ""
+        self.rule_set_this_run = False
+        self.charging_loss_car_begin_kwh = 0.0
+        self.charging_loss_car_begin_battery_level = 0.0
+        self.charging_loss_charger_begin_kwh = 0.0
+        self.charging_loss_charging_completed = False
+        self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
+        self.charging_loss_db: dict = {"segments": [], "backfilled": False}
+        self.economy_db: dict = {"windows": []}
+        self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}, "price_hours": {}, "price_days": {}}
+        self.charging_no_rule_count = 0
+        self.error_count = 0
+        self.forecast_type = "ema"
+        self.public_charging_sessions: list = []
+        self.powerwall_charging_text = ""
+        self.last_wake_up_datetime = reset_datetime()
+        self.last_trip_change_datetime = datetime.datetime.now().replace(microsecond=0)
+        self.charging_history_ending_byte_size: int | None = None
+        self.overview_history: dict = {}
+        self.battery_level_expenses: dict = {}
+        self.charging_plan: dict = {}
+        self.charge_hours: dict = {}
+        self.last_drive_efficiency_data: dict = {}
+        self.local_energy_prices: dict = {"solar_kwh_price": {}, "powerwall_kwh_price": {}}
+        self.local_energy_prediction_db: dict = {"solar_prediction": {}, "solar_prediction_timestamps": {}}
+        self.max_local_energy_available_history: dict = {}
+        self.charging_history_last_result: dict = {}
+        self.integration_offline_since: dict = {}
+        self.notify_history: dict = {}
+        self.charger_action = "stop"
+        self.charger_enabled = True
+        self.charger_mode = "normal"
+        self.reset_current_charging_session()
+
+        # per job
+        self._snap: Snapshot | None = None
+        self._out: JobResult | None = None
+        self._history: History | None = None
+        self._dirty: set[str] = set()
+        self._job_cache: dict[str, Any] = {}
+        self._changed_sensors: set[str] = set()
+
+    # ------------------------------------------------------------------ #
+    # Jobs
+    # ------------------------------------------------------------------ #
+
+    def run_job(self, snapshot: Snapshot, func: Callable, *args, **kwargs) -> JobResult:
+        """Run func with snapshot as input. Called in the (single) worker thread."""
+        started = time.perf_counter()
+        self._snap = snapshot
+        self._out = result = JobResult(worker_thread=threading.current_thread().name)
+        self._history = History(snapshot.buffers, snapshot.statistics, snapshot.units, snapshot.tz, snapshot.now)
+        self._dirty = set()
+        self._job_cache = {}
+        self._changed_sensors = set()
+        if self.price_provider is not None:
+            self.price_provider.set_now(snapshot.now)
+            if snapshot.price_data is not None:
+                self.price_provider.set_snapshot(snapshot.price_data)
+        try:
+            result.value = func(*args, **kwargs)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.exception("Cable Juice Planner job %s failed", getattr(func, "__name__", func))
+            result.error = err
+        finally:
+            for key in self._changed_sensors:
+                result.states[key] = self.sensor_states.get(key)
+                result.attributes[key] = dict(self.sensor_attrs.get(key, {}))
+            databases = self._databases()
+            for name in self._dirty:
+                result.db_saves[name] = encode(databases[name])
+            self._snap = self._out = self._history = None
+        result.duration = time.perf_counter() - started
+        return result
+
+    def _databases(self) -> dict[str, Any]:
+        return {
+            "charging_history": self.charging_history_db,
+            "power_values": {**self.power_values_db, "version": 1.0} if self.power_values_db else {},
+            "solar_available": {**self.solar_available_db, "version": 2.0} if self.solar_available_db else {},
+            "kwh_avg_prices": {**self.kwh_avg_prices_db, "version": 2.0} if self.kwh_avg_prices_db else {},
+            "drive_efficiency": self.drive_efficiency_db,
+            "km_kwh_efficiency": self.km_kwh_efficiency_db,
+            "runtime": self._runtime_state(),
+            "charging_loss": self.charging_loss_db,
+            "economy": self.economy_db,
+            "analysis": self.analysis_db,
+        }
+
+    def mark_dirty(self, name: str) -> None:
+        self._dirty.add(name)
+
+    def _runtime_state(self) -> dict:
+        """State the PyScript version kept in helpers and sensor attributes."""
+        keep = ("drive_efficiency_last_battery_level", "drive_efficiency_last_odometer", "co2_emitted", "kwh_charged_by_solar", "last_full_charge")
+        return {
+            "sensors": {key: self.sensor_states.get(key) for key in keep if self.sensor_states.get(key) is not None},
+            "last_battery_level_attributes": dict(self.sensor_attrs.get("drive_efficiency_last_battery_level", {})),
+            "full_charge_99_since": self.full_charge_99_since,
+            "public_charging_session": self.public_charging_sessions,
+            "public_charging_session_done": self.sensor_states.get("public_charging_session_done"),
+            "charging_loss": self.config["charger"]["charging_loss"],
+            "daily_odometer": dict(self.daily_odometer),
+            "charging_loss_measurement": {
+                "car_begin_battery_level": self.charging_loss_car_begin_battery_level,
+                "car_begin_kwh": self.charging_loss_car_begin_kwh,
+                "charger_begin_kwh": self.charging_loss_charger_begin_kwh,
+                "charging_completed": self.charging_loss_charging_completed,
+            },
+        }
+
+    # ------------------------------------------------------------------ #
+    # Snapshot access
+    # ------------------------------------------------------------------ #
+
+    def t(self, key: str, default: str | None = None, **fmt) -> str:
+        return translate(self.texts, key, default, **fmt)
+
+    def now(self) -> datetime.datetime:
+        return self._snap.now if self._snap else datetime.datetime.now().replace(microsecond=0)
+
+    def current_hour(self) -> datetime.datetime:
+        return reset_time_to_hour(self.now())
+
+    @property
+    def history(self) -> History:
+        return self._history
+
+    def entity_exists(self, entity_id) -> bool:
+        return bool(entity_id) and self._snap is not None and entity_id in self._snap.states
+
+    def get_state(self, entity_id=None, try_history=True, float_type=False, error_state="unknown"):
+        """hass_manager.get_state for a configured Home Assistant entity."""
+        if entity_id == "":
+            return error_state
+        output = None
+        try:
+            if entity_id is None or "." not in entity_id:
+                raise ValueError(f"Invalid entity_id: {entity_id}")
+            if not self.entity_exists(entity_id):
+                raise KeyError(f"Entity not found in Home Assistant: {entity_id}")
+            output = self._snap.states[entity_id]
+            if try_history and output in ENTITY_UNAVAILABLE_STATES:
+                output = self.history.get_last_value(entity_id, float_type=float_type, error_state=error_state)
+            if float_type:
+                output = float(output) if output not in ENTITY_UNAVAILABLE_STATES else error_state
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Can't get state for %s, output is %s: %s", entity_id, output, err)
+            return error_state
+        return output
+
+    def get_attr(self, entity_id=None, attr=None, error_state="unknown"):
+        try:
+            if not self.entity_exists(entity_id):
+                raise KeyError(f"Entity not found: {entity_id}")
+            attributes = self._snap.attributes.get(entity_id) or {}
+            return dict(attributes) if attr is None else attributes[attr]
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Can't get attribute for %s['%s']: %s", entity_id, attr, err)
+            return error_state
+
+    def own_entity_id(self, platform: str, key: str) -> str:
+        return f"{platform}.{self.name}_{key}"
+
+    def get_integration(self, entity_id):
+        return self._snap.platforms.get(entity_id) if self._snap and entity_id else None
+
+    # settings (the former input_* helpers) ----------------------------- #
+
+    def has_setting(self, key: str) -> bool:
+        return self._snap is not None and key in self._snap.settings
+
+    def setting(self, key: str, error_state=None):
+        """Raw setting value: bool, float, str, datetime.time or datetime (None = not set)."""
+        if not self.has_setting(key):
+            return error_state
+        return self._snap.settings[key]
+
+    def switch_state(self, key: str, error_state="unknown") -> str:
+        """'on'/'off' like get_state(input_boolean....)."""
+        if not self.has_setting(key):
+            return error_state
+        return "on" if self._snap.settings[key] else "off"
+
+    def number_state(self, key: str, error_state=None):
+        value = float_or_none(self.setting(key))
+        return error_state if value is None else value
+
+    def datetime_state(self, key: str, error_state=None):
+        """input_datetime value; None (not set) is the old 1900-01-01 00:00."""
+        if not self.has_setting(key):
+            return error_state
+        value = self._snap.settings[key]
+        if value is None:
+            return reset_datetime()
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value
+
+    def set_setting(self, key: str, value) -> None:
+        """Change a setting entity (published and fired as a state change by the coordinator)."""
+        if self._snap is None:
+            return
+        if isinstance(value, datetime.datetime) and value == reset_datetime():
+            value = None
+        self._snap.settings[key] = value
+        self._out.settings[key] = value
+
+    def set_setting_limit(self, key: str, maximum: float) -> None:
+        if self._out is not None:
+            self._out.setting_limits[key] = {"max": maximum}
+
+    # own sensors ------------------------------------------------------- #
+
+    def set_state(self, key: str, value) -> None:
+        self.sensor_states[key] = value
+        self._changed_sensors.add(key)
+
+    def own_state(self, key: str, float_type=False, error_state="unknown"):
+        value = self.sensor_states.get(key)
+        if value in ENTITY_UNAVAILABLE_STATES:
+            return error_state
+        if float_type:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return error_state
+        return value
+
+    def set_attr(self, key: str, attr: str, value) -> None:
+        self.sensor_attrs.setdefault(key, {})[attr] = value
+        self._changed_sensors.add(key)
+
+    def del_attr(self, key: str, attr: str) -> None:
+        if attr in self.sensor_attrs.get(key, {}):
+            del self.sensor_attrs[key][attr]
+            self._changed_sensors.add(key)
+
+    def own_attr(self, key: str, attr: str | None = None, error_state="unknown"):
+        attributes = self.sensor_attrs.get(key)
+        if attributes is None:
+            return error_state
+        if attr is None:
+            return dict(attributes)
+        return attributes.get(attr, error_state)
+
+    # notifications / events -------------------------------------------- #
+
+    def persistent_notification(self, message: str, title: str = "", notification_id: str | None = None) -> None:
+        if self._out is not None:
+            self._out.notifications.append((message, title, notification_id or f"{self.name}_notification"))
+
+    def my_notify(self, message="", title="", data=None, admin_only=False, always=False, persistent_notification=False, persistent_notification_id=None) -> None:
+        """mynotify.my_notify: notify the configured notify services (deduplicated for an hour)."""
+        now = self.now()
+        self.notify_history = {until: text for until, text in self.notify_history.items() if until > now}
+        key = f"{title} {message}"
+        if key in self.notify_history.values() and not always:
+            _LOGGER.warning("Notify message not send, because its already been send in the last hour: '%s'", key)
+            return
+        if self._out is not None:
+            self._out.mobile_notifications.append({"message": message, "title": title, "data": dict(data or {})})
+        if persistent_notification:
+            self.persistent_notification(message, title, persistent_notification_id)
+        self.notify_history[now + NOTIFY_SUPPRESS] = key
+
+    def fire_ev_request(self, request: str, **data) -> None:
+        if self._out is not None:
+            _LOGGER.info("EV request: %s %s", request, data or "")
+            self._out.events.append((request, data))
+
+    # ------------------------------------------------------------------ #
+    # Sun
+    # ------------------------------------------------------------------ #
+
+    def get_sun_events(self, dt: datetime.datetime | None = None) -> dict:
+        """hass_manager.get_sun_events: naive local dawn/sunrise/noon/sunset/midnight."""
+        dt = dt or self.now()
+        cache = self._job_cache.setdefault("sun_events", {})
+        if dt.date() in cache:
+            return cache[dt.date()]
+        output = {"dawn": None, "sunrise": None, "noon": None, "sunset": None, "midnight": None}
+        try:
+            tz = self._snap.tz
+            output = {
+                name: getattr(astral.sun, name)(self._snap.astral, dt).astimezone(tz).replace(tzinfo=None)
+                for name in output
+            }
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Can't get sun events: %s", err)
+        cache[dt.date()] = output
+        return output
+
+    def is_day(self, timestamp: datetime.datetime | None = None) -> bool:
+        """mytime.is_day: sunrise <= timestamp <= sunset.
+
+        Like the PyScript version the sun events are UTC with the timezone removed and
+        compared with the local timestamp.
+        """
+        if not timestamp:
+            timestamp = self.now()
+        cache = self._job_cache.setdefault("utc_sun", {})
+        date = timestamp.date()
+        if date not in cache:
+            events = []
+            for name in ("sunrise", "sunset"):
+                try:
+                    value = getattr(astral.sun, name)(self._snap.astral, date)
+                except ValueError:
+                    value = None
+                events.append(value.replace(tzinfo=None) if value else None)
+            cache[date] = events
+        sunrise, sunset = cache[date]
+        if not sunrise or not sunset:
+            raise ValueError(f"Could find sunrise or sunset: timestamp: {timestamp} sunrise:{sunrise}, sunset:{sunset}")
+        return sunrise <= timestamp.replace(tzinfo=None) <= sunset
+
+    # ------------------------------------------------------------------ #
+    # Configuration
+    # ------------------------------------------------------------------ #
+
+    def is_charger_configured(self) -> bool:
+        return self.charger_configured
+
+    def is_solar_configured(self) -> bool:
+        return self.solar_configured
+
+    def is_powerwall_configured(self) -> bool:
+        return self.powerwall_configured
+
+    def is_ev_configured(self) -> bool:
+        return self.ev_configured
+
+    @staticmethod
+    def is_entity_configured(entity) -> bool:
+        if isinstance(entity, str):
+            return entity.strip() != ""
+        if isinstance(entity, list):
+            return len(entity) > 0
+        _LOGGER.warning("Invalid entity type: entity %s %s", entity, type(entity))
+        return False
+
+    def is_entity_available(self, entity):
+        """Available check that warns once an integration has been offline for 30 minutes."""
+        if not self.is_entity_configured(entity):
+            return None
+        integration = self.get_integration(entity)
+        entity_state = str(self.get_state(entity, error_state="unknown"))
+        if entity_state not in ENTITY_UNAVAILABLE_STATES:
+            if integration is not None and integration in self.integration_offline_since:
+                del self.integration_offline_since[integration]
+                _LOGGER.warning("Removing %s from offline timestamp", integration)
+            return True
+        _LOGGER.warning("Entity %s not available: Entity state is %s", entity, entity_state)
+        if integration is not None:
+            if integration not in self.integration_offline_since:
+                self.integration_offline_since[integration] = self.now()
+                _LOGGER.warning("Adding %s to offline timestamp", integration)
+            if minutes_between(self.integration_offline_since[integration], self.now()) > 30:
+                fmt = {"entity": entity, "timestamp": self.integration_offline_since[integration]}
+                self.persistent_notification(
+                    f"⛔{self.t('ui.entity_unavailable.message', **fmt)}\n\n{self.t('ui.entity_unavailable.restart_integration')}",
+                    title=f"{self.title} {self.t('ui.entity_unavailable.title')}",
+                    notification_id=f"{self.name}_is_entity_available_{entity}",
+                )
+        return False
+
+    @staticmethod
+    def is_powerwall_charging(charge_watt=0.0) -> bool:
+        if not isinstance(charge_watt, (int, float)):
+            _LOGGER.error("Invalid discharge_watt value: %s", charge_watt)
+            return False
+        return charge_watt > POWERWALL_CHARGING_TRIGGER
+
+    @staticmethod
+    def is_powerwall_discharging(discharge_watt=0.0) -> bool:
+        if not isinstance(discharge_watt, (int, float)):
+            _LOGGER.error("Invalid discharge_watt value: %s", discharge_watt)
+            return False
+        return discharge_watt > POWERWALL_DISCHARGING_TRIGGER
+
+    @staticmethod
+    def is_solar_production_available(watt=0.0) -> bool:
+        if not isinstance(watt, (int, float)):
+            _LOGGER.error("Invalid watt value: %s", watt)
+            return False
+        return watt > SOLAR_PRODUCTION_TRIGGER
+
+    def configured_entity_ids(self) -> list[str]:
+        entity_ids = []
+        for value in self.config.values():
+            if not isinstance(value, dict) or "entity_ids" not in value:
+                continue
+            for entity in value["entity_ids"].values():
+                if isinstance(entity, list):
+                    entity_ids.extend(entity)
+                else:
+                    entity_ids.append(entity)
+        return entity_ids
+
+    def get_all_unavailable_entities(self) -> list[str]:
+        return [e for e in self.configured_entity_ids() if self.is_entity_configured(e) and not self.is_entity_available(e)]
+
+    # ------------------------------------------------------------------ #
+    # Charging rule
+    # ------------------------------------------------------------------ #
+
+    def set_charging_rule(self, text: str = "", fresh: bool = True) -> None:
+        if self.restarting_charger_count >= 3:
+            return
+        self.rule_set_this_run = self.rule_set_this_run or fresh
+        self.last_charging_rule_text = text
+        extra = f"\n🚧{self.powerwall_charging_text}" if self.powerwall_charging_text else ""
+        if self.site_charging_text:
+            extra += f"\n🚧{self.site_charging_text}"
+        self.set_state("current_charging_rule", format_charging_rule(text, self.testing, extra))
+
+    # ------------------------------------------------------------------ #
+    # Settings (ev.py get_* functions)
+    # ------------------------------------------------------------------ #
+
+    def _number_or_config(self, key: str, path: tuple[str, str], what: str) -> float:
+        value = self.number_state(key)
+        if value is None:
+            fallback = self.config[path[0]][path[1]]
+            _LOGGER.warning("Cant get %s, using config data %s", what, fallback)
+            return fallback
+        return float(value)
+
+    def get_entity_daily_distance(self, day_text=None, date=None, ignore_realistic_estimated_range=False):
+        try:
+            if day_text is None and date is None:
+                distance = float(self.number_state("typical_daily_distance"))
+            else:
+                day_text = day_text if day_text in WEEKDAYS else day_of_week_text(self.now() if date is None else date)
+                workday = self.switch_state(f"workday_{day_text}", error_state="off")
+                distance = float(self.number_state(f"workday_distance_needed_{day_text}", error_state=0.0))
+                if distance == 0.0 or workday == "off":
+                    distance = float(self.number_state("typical_daily_distance"))
+            if self.is_ev_configured() and not ignore_realistic_estimated_range:
+                estimated_range_attr = self.own_attr("estimated_range", error_state={})
+                if "total" in estimated_range_attr and float(estimated_range_attr["total"]) > 0.0:
+                    estimated_range_per_percent = float(estimated_range_attr["total"]) / 100
+                    daily_available_battery_level = self.get_max_recommended_charge_limit_battery_level() - self.get_min_daily_battery_level()
+                    distance = min(daily_available_battery_level * estimated_range_per_percent, distance)
+            return distance
+        except Exception as err:  # noqa: BLE001
+            fallback = self.config["ev_car"]["typical_daily_distance_non_working_day"]
+            _LOGGER.warning("Cant get daily distance, using config data %s: %s", fallback, err)
+            return fallback
+
+    def fill_up_charging_enabled(self):
+        return True if self.switch_state("fill_up") == "on" else None
+
+    def cheap_grid_charging_enabled(self):
+        return True if self.switch_state("cheap_grid_charging") == "on" else None
+
+    def workplan_charging_enabled(self):
+        return True if self.switch_state("workplan_charging") == "on" else None
+
+    def solar_charging_enabled(self):
+        return True if self.is_solar_configured() and self.switch_state("solar_charging") == "on" else None
+
+    def manual_charging_enabled(self):
+        return True if self.switch_state("allow_manual_charging_now") == "on" else None
+
+    def manual_charging_solar_enabled(self):
+        return True if self.switch_state("allow_manual_charging_solar") == "on" else None
+
+    def is_calculating_charging_loss(self) -> bool:
+        return self.switch_state("calculate_charging_loss", error_state="off") == "on"
+
+    def no_charging_modes_active(self) -> bool:
+        return not (
+            self.is_trip_planned()
+            or self.solar_charging_enabled()
+            or self.workplan_charging_enabled()
+            or self.fill_up_charging_enabled()
+            or self.cheap_grid_charging_enabled()
+            or self.number_state("full_charge_recommended", error_state=0.0) > 0.0
+            or self.is_calculating_charging_loss()
+            or self.manual_charging_enabled()
+            or self.manual_charging_solar_enabled()
+        )
+
+    # ------------------------------------------------------------------ #
+    # Battery math
+    # ------------------------------------------------------------------ #
+
+    def is_ev_home(self) -> bool:
+        current_location = "home"
+        try:
+            location_entity = self.config["ev_car"]["entity_ids"]["location_entity_id"]
+            if self.is_entity_configured(location_entity):
+                current_location = self.get_state(location_entity, error_state="home")
+            else:
+                # no location: home while the charger status or the charger cable shows the car connected,
+                # or did so within the last 15 minutes (just unplugged)
+                now = self.now()
+                charger = self.config["charger"]["entity_ids"]
+                sources = (
+                    # completed counts too: a car that finished charging hours ago is unplugged from completed
+                    (charger["status_entity_id"], CHARGER_READY_STATUS + CHARGER_CHARGING_STATUS + CHARGER_COMPLETED_STATUS, CHARGER_NOT_READY_STATUS),
+                    (charger["cable_connected_entity_id"], EV_PLUGGED_STATES, EV_UNPLUGGED_STATES),
+                )
+                configured = False
+                for entity_id, connected_states, disconnected_states in sources:
+                    if not self.is_entity_configured(entity_id):
+                        continue
+                    configured = True
+                    state = self.get_state(entity_id, error_state="unknown")
+                    if state in ENTITY_UNAVAILABLE_STATES:
+                        continue
+                    if state not in disconnected_states:
+                        break
+                    values = self.history.get_values(entity_id, now - datetime.timedelta(minutes=15), now, include_timestamps=False, error_state=[connected_states[0]])
+                    if set(connected_states) & set(values):
+                        break
+                else:
+                    if configured:
+                        current_location = "away"
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Error getting current location: %s", err)
+            current_location = "home"
+        return current_location == "home"
+
+    # ------------------------------------------------------------------ #
+    # Prices
+    # ------------------------------------------------------------------ #
+
+    # ------------------------------------------------------------------ #
+    # Skip unchanged plans
+    # ------------------------------------------------------------------ #
+
+    # ------------------------------------------------------------------ #
+    # Static entities
+    # ------------------------------------------------------------------ #
+
+    # ------------------------------------------------------------------ #
+    # Debug info
+    # ------------------------------------------------------------------ #
+
+    # ------------------------------------------------------------------ #
+    # Convenience for the parts
+    # ------------------------------------------------------------------ #
+
+    def start_of_day(self, date=None) -> datetime.datetime:
+        return start_of_day(date or self.now())
+
+    def end_of_day(self, date=None) -> datetime.datetime:
+        return end_of_day(date or self.now())
+
+    def time_plus_days(self, days: int) -> datetime.datetime:
+        return self.now() + datetime.timedelta(days=days)
+
+    @staticmethod
+    def default_number(key: str) -> float:
+        return float(NUMBER_SETTINGS[key]["default"])

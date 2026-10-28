@@ -7,11 +7,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .backup import BACKUP_DIR, async_export
+from .management.backup import BACKUP_DIR, async_export
 from .const import BUTTON_KEYS, EV_BUTTON_KEYS, is_ev_configured
 from .coordinator import CJPCoordinator
-from .dashboard import async_reset_dashboard
-from .debug_export import async_export_debug, async_notify_debug
+from .management.dashboard_build import async_reset_dashboard
+from .management.debug_export import async_export_debug, async_notify_debug
 from .entity import CJPEntity
 
 

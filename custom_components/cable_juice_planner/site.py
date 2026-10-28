@@ -30,7 +30,7 @@ from homeassistant.helpers.event import async_call_later, async_track_state_chan
 from homeassistant.util import dt as dt_util
 
 from .const import PHASE_ORDERS, SIGNAL_SITE_UPDATE, SITE_DEFAULTS, SITE_HOURS_AHEAD
-from .helpers import float_or_none
+from .utils.helpers import float_or_none
 
 if TYPE_CHECKING:
     from .coordinator import CJPCoordinator

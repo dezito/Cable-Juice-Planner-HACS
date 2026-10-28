@@ -1,4 +1,4 @@
-"""Debug export for GitHub issues (debug_export.py) and its replay (tests/debug_replay.py)."""
+"""Debug export for GitHub issues (management/debug_export.py) and its replay (tests/debug_replay.py)."""
 from __future__ import annotations
 
 import datetime
@@ -15,7 +15,7 @@ from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.cable_juice_planner.const import CONF_CAR_NAME, DOMAIN
-from custom_components.cable_juice_planner.debug_export import DEBUG_DIR
+from custom_components.cable_juice_planner.management.debug_export import DEBUG_DIR
 
 from . import debug_replay
 from .conftest import CONSUMPTION, EV_LOCATION, EV_LEVEL, OBJECT_PREFIX, make_entry

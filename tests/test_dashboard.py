@@ -7,9 +7,9 @@ import yaml
 from homeassistant.core import HomeAssistant
 
 from custom_components.cable_juice_planner import const
-from custom_components.cable_juice_planner.dashboard import render_dashboard
+from custom_components.cable_juice_planner.management.dashboard_build import render_dashboard
 from custom_components.cable_juice_planner.entity import help_values
-from custom_components.cable_juice_planner.formatting import (
+from custom_components.cable_juice_planner.utils.formatting import (
     format_analysis_help_text,
     format_help_text,
     load_texts,

@@ -13,7 +13,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import yaml as yaml_util
 
-from custom_components.cable_juice_planner.blueprint_install import SOURCE, async_install_blueprints
+from custom_components.cable_juice_planner.management.blueprint_install import SOURCE, async_install_blueprints
 from custom_components.cable_juice_planner.const import DOMAIN
 from custom_components.cable_juice_planner.repairs import async_create_fix_flow
 

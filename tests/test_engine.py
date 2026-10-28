@@ -15,8 +15,8 @@ import pytest
 from astral import Observer
 
 from custom_components.cable_juice_planner import const
-from custom_components.cable_juice_planner.codec import decode
-from custom_components.cable_juice_planner.engine_control import preheat_lead_time
+from custom_components.cable_juice_planner.utils.codec import decode
+from custom_components.cable_juice_planner.engine.control.preheat import preheat_lead_time
 from custom_components.cable_juice_planner.engine import CJPEngine, Snapshot
 
 TZ = zoneinfo.ZoneInfo("Europe/Copenhagen")

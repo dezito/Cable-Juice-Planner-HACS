@@ -14,7 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
-from custom_components.cable_juice_planner.blueprint_install import SOURCE
+from custom_components.cable_juice_planner.management.blueprint_install import SOURCE
 from custom_components.cable_juice_planner.const import DOMAIN
 
 from .conftest import async_advance
