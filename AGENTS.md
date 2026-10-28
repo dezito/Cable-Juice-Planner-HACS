@@ -37,10 +37,10 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   └── public_charging.py / distance.py Public sessions and driving-distance calculations
 ├── prices/                              Price-source adapters and factory
 ├── management/                          Storage, backups, dashboard, and blueprint setup
-├── utils/                               Shared codecs, formatting, and helpers
+├── utils/                               Shared utilities and datetime/time platform implementations
 ├── sensor.py / number.py / switch.py    Main HA entity platforms
 ├── select.py / button.py / binary_sensor.py  Other HA entity platforms
-├── datetime.py / time.py / event.py / entity.py  Time/event platforms and shared entity base
+├── datetime.py / time.py / event.py / entity.py  Platform entry points, event platform, and shared entity base
 ├── repairs.py / site.py                 Repairs and site-related entities
 ├── translations/ texts/                 HA strings and user-facing descriptions
 ├── dashboard/ blueprints/               Bundled dashboard and automation blueprint
