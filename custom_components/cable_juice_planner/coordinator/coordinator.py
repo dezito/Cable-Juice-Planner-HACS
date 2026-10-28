@@ -272,7 +272,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                     data = {"entity_id": f"notify.{name}", "message": notification["message"], "title": notification["title"]}
                     await self.hass.services.async_call("notify", "send_message", data, blocking=False)
                 else:
-                    _LOGGER.warning("Notify service notify.%s not found. Message not send: %s", name, notification["message"])
+                    _LOGGER.warning("Notify service notify.%s not found. Notification not sent", name)
             except HomeAssistantError as err:
                 _LOGGER.error("Error in service call notify.%s: %s", name, err)
 
