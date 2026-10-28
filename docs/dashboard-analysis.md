@@ -15,8 +15,9 @@ It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovela
 |---|---|
 | **Battery level** | the forecast battery level with the planned charging hours |
 | **Electricity prices** | the prices with the solar forecast and the charging plan |
-| **Status** | the current charging rule and the charger's state |
+| **Current rule** | the current charging rule |
 | **Manual / forced charging** | the switches – forced charging only while it is relevant |
+| **Status** | above the trip: battery level, charging limit, the charger's power and state, estimated range and kWh cost price |
 | **Trip** | departure, arrival, target and preheating |
 | **Public charging** | only while a charge waits for its price |
 | **Charging history** | each charge with time, reason, %, kWh, price and price/kWh, and per month km, kWh, share from solar and price |
