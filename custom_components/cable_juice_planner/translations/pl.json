@@ -52,14 +52,16 @@
       },
       "load_balancing": {
         "title": "Rozdział mocy",
-        "description": "Miejsce auta we wspólnym przyłączu.",
+        "description": "Miejsce auta we wspólnym przyłączu.\n\n**Obwód** (ładowarki ze wspólnym limitem obwodu):\n{circuit}\n\nLimit obwodu ustawia tylko automatyzacja ładowarki master – zobacz blueprint sterowania ładowarką.",
         "data": {
           "site_priority": "Priorytet",
-          "site_phase_order": "Kolejność faz ładowarki"
+          "site_phase_order": "Kolejność faz ładowarki",
+          "site_circuit": "Ładowarki w tym samym obwodzie"
         },
         "data_description": {
           "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
-          "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki."
+          "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki.",
+          "site_circuit": "Tylko dla ładowarek ze wspólnym limitem obwodu (np. ładowarki Easee za masterem). Wybierz ładowarkę tego auta i pozostałe ładowarki w obwodzie. Wybór jest wspólny: pozostałe auta w obwodzie otrzymują tę samą zmianę. Pozostaw puste, jeśli ładowarka ma własny obwód."
         }
       },
       "ev": {
@@ -375,7 +377,9 @@
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
-      "min_above_max": "Minimum nie może być większe niż maksimum."
+      "min_above_max": "Minimum nie może być większe niż maksimum.",
+      "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
+      "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
     },
     "abort": {
       "site_exists": "Wspólne przyłącze już istnieje."
@@ -448,14 +452,16 @@
       },
       "load_balancing": {
         "title": "Rozdział mocy",
-        "description": "Miejsce auta we wspólnym przyłączu.",
+        "description": "Miejsce auta we wspólnym przyłączu.\n\n**Obwód** (ładowarki ze wspólnym limitem obwodu):\n{circuit}\n\nLimit obwodu ustawia tylko automatyzacja ładowarki master – zobacz blueprint sterowania ładowarką.",
         "data": {
           "site_priority": "Priorytet",
-          "site_phase_order": "Kolejność faz ładowarki"
+          "site_phase_order": "Kolejność faz ładowarki",
+          "site_circuit": "Ładowarki w tym samym obwodzie"
         },
         "data_description": {
           "site_priority": "1 = ładuje pierwszy. Auto poniżej dziennego minimum lub z bliską podróżą zawsze idzie pierwsze.",
-          "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki."
+          "site_phase_order": "Do których faz sieci podłączone są L1/L2/L3 ładowarki. Ładowanie jednofazowe używa L1 ładowarki.",
+          "site_circuit": "Tylko dla ładowarek ze wspólnym limitem obwodu (np. ładowarki Easee za masterem). Wybierz ładowarkę tego auta i pozostałe ładowarki w obwodzie. Wybór jest wspólny: pozostałe auta w obwodzie otrzymują tę samą zmianę. Pozostaw puste, jeśli ładowarka ma własny obwód."
         }
       },
       "ev": {
@@ -746,7 +752,9 @@
       "no_price_provider": "Wybierz co najmniej jednego dostawcę cen.",
       "production_required": "Prognoza słoneczna wymaga czujnika produkcji.",
       "ev_incomplete": "Poziom baterii, zasięg i licznik muszą być wszystkie ustawione (lub wszystkie puste).",
-      "min_above_max": "Minimum nie może być większe niż maksimum."
+      "min_above_max": "Minimum nie może być większe niż maksimum.",
+      "circuit_no_charger_device": "Encje ładowarki tego auta nie należą do żadnego urządzenia, więc ładowarki nie można przypisać do obwodu.",
+      "circuit_own_charger_missing": "Wybierz także ładowarkę tego auta."
     },
     "abort": {
       "backup_exported": "Kopia zapasowa została zapisana jako **{file}**.",

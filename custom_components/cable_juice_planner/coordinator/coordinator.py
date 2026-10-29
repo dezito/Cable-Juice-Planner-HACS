@@ -219,6 +219,12 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
                 self.data[key] = result.states[key]
             if key in result.attributes:
                 self.attributes[key] = result.attributes[key]
+        if self.site is not None:
+            if result.site is not None:
+                self.site.update_from_result(self, result.site)
+            # a shared circuit: its sum replaces the own circuit limit before the action is published
+            if self.site.circuit_patch(self):
+                keys.add("charger_action")
         self.last_job = {
             "job": job_name,
             "worker_thread": result.worker_thread,
@@ -255,8 +261,6 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         if "charging_loss" in result.config_updates:
             self.ignore_next_update = True
             self.hass.config_entries.async_update_entry(self.entry, options={**self.entry.options, "charging_loss": result.config_updates["charging_loss"]})
-        if result.site is not None and self.site is not None:
-            self.site.update_from_result(self, result.site)
         if result.request_reload:
             self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 

@@ -8,7 +8,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.cable_juice_planner.const import CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN
+from custom_components.cable_juice_planner.const import CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN
 
 from .conftest import (
     CHARGER_OPTIONS,
@@ -16,11 +16,13 @@ from .conftest import (
     EV_LEVEL,
     EV_ODOMETER,
     EV_RANGE,
+    MOCK_OPTIONS,
     PRICE,
     async_setup,
     form_defaults,
     make_entry,
     make_site_entry,
+    register_charger,
     set_source_states,
 )
 
@@ -197,3 +199,61 @@ async def test_site_options_flow(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     assert site.options["fuse_l2"] == 35.0
     await hass.config_entries.async_unload(site.entry_id)
+
+
+async def _load_balancing_page(hass: HomeAssistant, entry_id: str):
+    result = await hass.config_entries.options.async_init(entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "menu_charger"})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form_defaults(result))
+    assert result["step_id"] == "load_balancing"
+    return result
+
+
+async def test_chargers_on_one_circuit_are_shared_by_the_cars(hass: HomeAssistant) -> None:
+    """The circuit is chosen on one car's page and stored once, so the other car shows and changes the same."""
+    easee_a = register_charger(hass, "sensor.easee_a_status", "Easee A")
+    easee_b = register_charger(hass, "sensor.easee_b_status", "Easee B")
+    site = make_site_entry(fuse_l1=25, **{CONF_CIRCUITS: [["other_1", "other_2", "other_3"]]})
+    site.add_to_hass(hass)
+    car_a = make_entry("tesla", {**MOCK_OPTIONS, "status_entity_id": "sensor.easee_a_status"})
+    car_b = make_entry("citroen", {**MOCK_OPTIONS, "status_entity_id": "sensor.easee_b_status"})
+    car_a.add_to_hass(hass)
+    car_b.add_to_hass(hass)
+
+    result = await _load_balancing_page(hass, car_a.entry_id)
+    assert result["description_placeholders"]["circuit"] == "–"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), CONF_CIRCUIT: [easee_b]})
+    assert result["errors"] == {CONF_CIRCUIT: "circuit_own_charger_missing"}
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), CONF_CIRCUIT: [easee_a, easee_b, "other_1"]})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    # other_1 moved to this circuit; the rest of the old circuit stays
+    assert site.options[CONF_CIRCUITS] == [["other_2", "other_3"], [easee_a, easee_b, "other_1"]]
+    assert site.options["fuse_l1"] == 25.0
+    assert CONF_CIRCUIT not in car_a.options
+
+    result = await _load_balancing_page(hass, car_b.entry_id)
+    assert form_defaults(result)[CONF_CIRCUIT] == [easee_a, easee_b, "other_1"]
+    assert result["description_placeholders"]["circuit"] == "- Easee A: cjp_tesla\n- Easee B: cjp_citroen\n- other_1: –"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), CONF_CIRCUIT: []})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert site.options[CONF_CIRCUITS] == [["other_2", "other_3"]]
+
+
+async def test_circuit_needs_a_charger_device(hass: HomeAssistant) -> None:
+    make_site_entry().add_to_hass(hass)
+    car = make_entry("dumb", MOCK_OPTIONS)  # charger entities without a device
+    car.add_to_hass(hass)
+    result = await _load_balancing_page(hass, car.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), CONF_CIRCUIT: ["some_device"]})
+    assert result["errors"] == {CONF_CIRCUIT: "circuit_no_charger_device"}
+
+
+async def test_site_options_flow_keeps_the_circuits(hass: HomeAssistant) -> None:
+    site = make_site_entry(**{CONF_CIRCUITS: [["a", "b"]]})
+    site.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(site.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**form_defaults(result), "fuse_l2": 35})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert site.options[CONF_CIRCUITS] == [["a", "b"]]
+    assert site.options["fuse_l2"] == 35.0

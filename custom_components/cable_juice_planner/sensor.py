@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import MATCH_ALL, UnitOfElectricCurrent
@@ -76,10 +77,35 @@ class CJPSensor(CJPUpdatingEntity, SensorEntity):
         return value
 
 
+def charger_decision(action: Any, attributes: dict) -> str:
+    """Everything the charger control blueprint acts on, in one attribute of the charger action.
+
+    The blueprint triggers on this alone, so a calculation that changes the action, the amps
+    of all phases and the circuit at once gives one automation run (one trace), not one per
+    attribute. Readable, as it is shown in the trace.
+    """
+
+    def amps(prefix: str) -> str:
+        return "/".join(str(attributes.get(f"{prefix}phase_{i}_amps", 0)) for i in (1, 2, 3))
+
+    enabled = "enabled" if attributes.get("charger_enabled", True) else "disabled"
+    return (
+        f"{action}, {enabled}, mode {attributes.get('mode')}, {amps('')} A, "
+        f"circuit {amps('circuit_')} A, limit {attributes.get('charging_limit')} %"
+    )
+
+
 class CJPActionSensor(CJPSensor):
     """charger_action: the heartbeat attribute changes every calculation, keep it out of the recorder."""
 
     _unrecorded_attributes = frozenset({"updated", "description", "help"})
+
+    @property
+    def extra_state_attributes(self):
+        attributes = super().extra_state_attributes
+        if attributes and self.coordinator.attributes.get(self._key):
+            attributes["decision"] = charger_decision(self.native_value, attributes)
+        return attributes
 
 
 class CJPUnrecordedSensor(CJPSensor):
@@ -139,5 +165,6 @@ class CJPSiteSensor(SensorEntity):
                 "request": [round(a, 1) for a in self.site.requests.get(entry_id, [0.0, 0.0, 0.0])],
                 "available": [round(a, 1) for a in self.site.available_now.get(entry_id, [0.0, 0.0, 0.0])],
                 "reserved_hours": len(self.site.reservations.get(entry_id, {})),
+                "circuit": [self.site.members[other].prefix for other in self.site.circuit_members(entry_id)],
             })
         return {"cars": cars, "fuse": self.site.fuse(), "phase_sensors": self.site.has_phase_sensors}

@@ -120,7 +120,8 @@ every charging rule explained with examples, [charger control](docs/charger-cont
   [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) and/or own history
 - **Home battery (optional):** charge the home battery to a certain level first, and charge the car from
   the home battery above a minimum
-- **Multiple cars on the same main fuse:** [load balancing](docs/load-balancing.md) with priority and phase order
+- **Multiple cars on the same main fuse:** [load balancing](docs/load-balancing.md) with priority and phase order,
+  and chargers sharing one circuit limit (e.g. an Easee master)
 - **House consumption** is estimated from own history (excluding car, home battery and ignored consumers)
 - **Price providers:** [Energi Data Service](https://github.com/MTrab/energidataservice) and/or
   [Strømligning](https://github.com/MTrab/stromligning), incl. sell price, tariffs and electricity tax refund;
@@ -239,7 +240,8 @@ Setup is done in the UI, split into pages with help texts:
    `tesla` they are named `sensor.cjp_tesla_overview`. Use one prefix per car.
 2. **Charger:** status, power, kWh meters, on/off, cable and CO₂, as well as voltage, phases,
    max. amps and charging loss
-3. **Load balancing:** priority and phase order (only with a [shared grid connection](docs/load-balancing.md))
+3. **Load balancing:** priority, phase order and the chargers on the same circuit (only with a
+   [shared grid connection](docs/load-balancing.md))
 4. **EV:** battery level, range, odometer, charge port/cable, charge limit,
    location, update time and climate, as well as battery size. Skip the page if you don't have
    an EV integration (virtual EV).
@@ -284,7 +286,9 @@ have edited the file yourself), a repair shows up after restart under *Settings 
 If several cars charge on the same grid connection, add one **Shared grid connection**
 (**Add integration → Cable Juice Planner → Shared grid connection**) with the main fuse per phase and
 optionally the house's phase sensors. Each car gets a priority and a phase order, and together they never
-use more current per phase than the fuse. See [Multiple cars](docs/load-balancing.md).
+use more current per phase than the fuse. Chargers sharing one circuit limit (e.g. Easee chargers behind a
+master) can be linked, so the master's automation sets the circuit for all of them. See
+[Multiple cars](docs/load-balancing.md).
 
 ---
 

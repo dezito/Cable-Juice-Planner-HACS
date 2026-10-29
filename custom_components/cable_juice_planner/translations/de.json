@@ -52,14 +52,16 @@
       },
       "load_balancing": {
         "title": "Lastverteilung",
-        "description": "Der Platz des Autos im gemeinsamen Netzanschluss.",
+        "description": "Der Platz des Autos im gemeinsamen Netzanschluss.\n\n**Stromkreis** (Ladegeräte mit gemeinsamer Stromkreisgrenze):\n{circuit}\n\nNur die Automation des Master-Ladegeräts setzt die Stromkreisgrenze – siehe den Blueprint zur Ladersteuerung.",
         "data": {
           "site_priority": "Priorität",
-          "site_phase_order": "Phasenfolge des Ladegeräts"
+          "site_phase_order": "Phasenfolge des Ladegeräts",
+          "site_circuit": "Ladegeräte am selben Stromkreis"
         },
         "data_description": {
           "site_priority": "1 = lädt zuerst. Ein Auto unter dem täglichen Minimum oder mit einer baldigen Fahrt geht immer vor.",
-          "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts."
+          "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts.",
+          "site_circuit": "Nur für Ladegeräte mit gemeinsamer Stromkreisgrenze (z. B. Easee-Ladegeräte hinter einem Master). Wähle das Ladegerät dieses Autos und die anderen Ladegeräte des Stromkreises. Die Auswahl ist gemeinsam: Die anderen Autos des Stromkreises erhalten dieselbe Änderung. Leer lassen, wenn das Ladegerät einen eigenen Stromkreis hat."
         }
       },
       "ev": {
@@ -375,7 +377,9 @@
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
-      "min_above_max": "Das Minimum darf nicht über dem Maximum liegen."
+      "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
+      "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
+      "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos."
     },
     "abort": {
       "site_exists": "Es gibt bereits einen gemeinsamen Netzanschluss."
@@ -448,14 +452,16 @@
       },
       "load_balancing": {
         "title": "Lastverteilung",
-        "description": "Der Platz des Autos im gemeinsamen Netzanschluss.",
+        "description": "Der Platz des Autos im gemeinsamen Netzanschluss.\n\n**Stromkreis** (Ladegeräte mit gemeinsamer Stromkreisgrenze):\n{circuit}\n\nNur die Automation des Master-Ladegeräts setzt die Stromkreisgrenze – siehe den Blueprint zur Ladersteuerung.",
         "data": {
           "site_priority": "Priorität",
-          "site_phase_order": "Phasenfolge des Ladegeräts"
+          "site_phase_order": "Phasenfolge des Ladegeräts",
+          "site_circuit": "Ladegeräte am selben Stromkreis"
         },
         "data_description": {
           "site_priority": "1 = lädt zuerst. Ein Auto unter dem täglichen Minimum oder mit einer baldigen Fahrt geht immer vor.",
-          "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts."
+          "site_phase_order": "An welchen Netzphasen L1/L2/L3 des Ladegeräts angeschlossen sind. Einphasiges Laden belastet L1 des Ladegeräts.",
+          "site_circuit": "Nur für Ladegeräte mit gemeinsamer Stromkreisgrenze (z. B. Easee-Ladegeräte hinter einem Master). Wähle das Ladegerät dieses Autos und die anderen Ladegeräte des Stromkreises. Die Auswahl ist gemeinsam: Die anderen Autos des Stromkreises erhalten dieselbe Änderung. Leer lassen, wenn das Ladegerät einen eigenen Stromkreis hat."
         }
       },
       "ev": {
@@ -746,7 +752,9 @@
       "no_price_provider": "Wähle mindestens einen Preisanbieter.",
       "production_required": "Eine Solarprognose benötigt einen Solarproduktions-Sensor.",
       "ev_incomplete": "Batteriestand, Reichweite und Kilometerzähler müssen alle gesetzt (oder alle leer) sein.",
-      "min_above_max": "Das Minimum darf nicht über dem Maximum liegen."
+      "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
+      "circuit_no_charger_device": "Die Ladegerät-Entitäten des Autos gehören zu keinem Gerät, daher kann das Ladegerät keinem Stromkreis zugeordnet werden.",
+      "circuit_own_charger_missing": "Wähle auch das Ladegerät dieses Autos."
     },
     "abort": {
       "backup_exported": "Das Backup wurde als **{file}** gespeichert.",

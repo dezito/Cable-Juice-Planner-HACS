@@ -9,6 +9,8 @@ import pytest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
@@ -160,6 +162,20 @@ def make_entry(prefix: str = PREFIX, options: dict[str, Any] | None = None) -> M
 
 def make_site_entry(**options: Any) -> MockConfigEntry:
     return MockConfigEntry(domain=DOMAIN, version=2, title="site", data={CONF_SITE: True}, options={**SITE_DEFAULTS, **options})
+
+
+def register_charger(hass: HomeAssistant, entity_id: str, name: str) -> str:
+    """A charger device (like an Easee charger) owning the entity; returns the device id.
+
+    Register before the entity gets a state, else the registry picks another entity id.
+    """
+    source = MockConfigEntry(domain="easee", title=name)
+    source.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(config_entry_id=source.entry_id, identifiers={("easee", name)}, name=name)
+    domain, object_id = entity_id.split(".")
+    entry = er.async_get(hass).async_get_or_create(domain, "easee", object_id, suggested_object_id=object_id, config_entry=source, device_id=device.id)
+    assert entry.entity_id == entity_id
+    return device.id
 
 
 @pytest.fixture
