@@ -112,7 +112,8 @@ SENSOR_DEFS: dict[str, tuple[str | None, str | None, str | None, str | None]] = 
     # this month's saving compared with daily charging, the months in the attributes
     "economy": ("{valuta}", None, None, None),
     # the share of the last 30 departures with the required battery level, the analysis in the attributes
-    "analysis": ("%", None, None, "ev"),
+    # (also without a car: the price forecast, house consumption forecast and planned days)
+    "analysis": ("%", None, None, None),
 }
 # Sensor states kept across restarts (the PyScript helpers were input_numbers or
 # template sensors that kept their state while PyScript reloaded)

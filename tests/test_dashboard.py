@@ -410,6 +410,20 @@ def test_analysis_sections() -> None:
         assert heading in headings
 
 
+def test_analysis_sections_without_a_car() -> None:
+    """The price and house consumption forecasts and the plan need no car; the drives and departures do."""
+    no_ev_entities = {f"sensor.cjp_tesla_{key}" for key, info in const.SENSOR_DEFS.items() if info[3] == "ev"}
+    existing = (_own("tesla") - no_ev_entities) | {"sensor.charger_status", "sensor.eds"}
+    config = const.build_config({**OPTIONS, "language": "da", "usable_battery_level_entity_id": "", "energidataservice_buy_entity_id": "sensor.eds"})
+    analysis = yaml.safe_load(render_dashboard(config, "tesla", "entry1", existing))["views"][2]
+    headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
+    for heading in ("Prisprognose", "Prognosens træfsikkerhed", "Planlagt mod faktisk ladet"):
+        assert heading in headings
+    assert "Kørsel og temperatur" not in headings and "Klar til afgang" not in headings
+    contents = [c.get("content", "") for c in _cards(analysis) if c.get("type") == "markdown"]
+    assert any("attributes.forecast or {}" in content and "Husets forbrug pr. time i kWh" in content for content in contents)
+
+
 async def test_sidebar_dashboard_can_be_edited_and_reset(hass: HomeAssistant, hass_ws_client, tmp_path) -> None:
     hass.config.config_dir = str(tmp_path)
     set_source_states(hass)

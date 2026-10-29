@@ -231,3 +231,17 @@ def test_forecast_types_are_judged_against_the_measurements() -> None:
     assert (drives["drives"], drives["actual"]) == (1, 5.25)
     assert drives["average"]["forecast"] == 5.5 and drives["average"]["mae"] == 0.25
     assert forecast["drives"]["best"] == min(("ema", "trend", "average"), key=lambda kind: drives[kind]["mae"])
+
+
+def test_forecast_published_at_startup_without_a_car() -> None:
+    """The house consumption forecast does not need a car: published at startup, before the first hour end."""
+    engine = CJPEngine(const.build_config({**OPTIONS, "usable_battery_level_entity_id": ""}), "cjp_test", TEXTS)
+    assert not engine.is_ev_configured()
+    yesterday = (DAY - datetime.timedelta(days=1)).isoformat()
+    analysis = {"drives": [], "consumption_days": {yesterday: {"hours": 2, "use": 1.0, **{kind: [0.2, 0.1] for kind in ("ema", "trend", "average")}}}}
+    snap = snapshot(datetime.datetime.combine(DAY, datetime.time(12, 0)))
+    result = engine.run_job(snap, engine.startup, {"analysis": analysis})
+    assert result.error is None, result.error
+    forecast = result.attributes["analysis"]["forecast"]
+    assert (forecast["consumption"]["last_30"]["hours"], forecast["consumption"]["last_30"]["actual"]) == (2, 0.5)
+    assert forecast["drives"]["all"] is None
