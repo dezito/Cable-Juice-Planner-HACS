@@ -138,6 +138,28 @@ async def test_car_waits_for_the_charger(hass: HomeAssistant, calls: list[str]) 
     assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
 
 
+async def _run_loop(hass: HomeAssistant) -> None:
+    """Let the automation run until it waits (async_block_till_done would sit out the real delay)."""
+    for _ in range(50):
+        await asyncio.sleep(0)
+
+
+async def test_charger_commands_wait_for_each_other(hass: HomeAssistant, calls: list[str]) -> None:
+    """Wait between charger commands: a pause between two charger commands, none before the car."""
+    _set_action(hass, "stop", circuit=[0, 0, 0])
+    await _setup(hass, command_delay=5, circuit_actions=_service("circuit"), car_amps_actions=_service("car_amps"))
+    hass.services.async_register("test", "car_amps", lambda call: calls.append(call.service))
+    calls.clear()
+
+    _set_action(hass, "charge", circuit=[16, 0, 0])
+    await _run_loop(hass)
+    assert calls == ["enable"]  # waiting before the next charger command
+
+    # (firing the time also runs the later pauses' timers)
+    await async_advance(hass, 20)
+    assert calls == ["enable", "circuit", "fail_amps", "car_amps", "charger_start", "car_start"]
+
+
 def _service(name: str) -> list[dict[str, Any]]:
     return [{"action": f"test.{name}"}]
 

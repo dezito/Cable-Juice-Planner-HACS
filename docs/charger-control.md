@@ -43,13 +43,16 @@ and the charge limit in the car).
 
 | Section | Inputs |
 |---|---|
-| Charger | Start charging, Stop charging, Set charging current, Set circuit current (master only), Enable the charger, Disable the charger |
+| Charger | Start charging, Stop charging, Set charging current, Set circuit current (master only), Enable the charger, Disable the charger, Wait between charger commands |
 | Car | Start charging in the car, Wait before starting the car, Stop charging in the car, Set charging current in the car, Set charge limit in the car |
 
 On start: charge limit in the car → enable the charger → circuit limit → current in the charger → current in
 the car → start the charger → start the car. On stop, both are stopped. If the car must wait until the charger
-is ready, set **Wait before starting the car** (seconds). If one action fails (e.g. the charger's cloud doesn't
-answer), the error is logged and the remaining actions still run.
+is ready, set **Wait before starting the car** (seconds). If the charger or its cloud shouldn't get commands right
+after each other, set **Wait between charger commands** (seconds, e.g. 2–5 for Easee): it pauses between two
+charger commands in the same run (enable/disable, circuit current, charging current, start/stop) – not before the
+first one, and not for the car's commands. If one action fails (e.g. the charger's cloud doesn't answer), the
+error is logged and the remaining actions still run.
 
 The automation runs **once per change** of the decision (the `decision` attribute), however much changed:
 a new action runs the whole start or stop, otherwise only what changed is sent (current, circuit, charge
