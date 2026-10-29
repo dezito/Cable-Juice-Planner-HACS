@@ -461,7 +461,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
         # plain data for the dashboard charts: the planned hours and the expected battery level;
         # end = when the hour's kWh are charged at the hour's capacity (at most the end of the hour)
         self.set_attr("current_charging_rule", "charge_plan", [
-            {"time": timestamp.isoformat(), "end": self.charge_plan_end(timestamp, value["kWh"]).isoformat(), "kwh": value["kWh"], "battery_level": value["battery_level"], "price": value["Price"], "emoji": emoji_parse(value)}
+            {"time": timestamp.isoformat(), "end": self.charge_plan_end(timestamp, value["kWh"]).isoformat(), "kwh": value["kWh"], "battery_level": value["battery_level"], "price": value["Price"], "cost": value["Cost"], "emoji": emoji_parse(value)}
             for timestamp, value in sorted((k, v) for k, v in chargeHours.items() if isinstance(k, datetime.datetime))
         ])
         battery_forecast = [{"time": now.isoformat(), "battery_level": round(self.battery_level(), 1)}]
