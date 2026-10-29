@@ -13,10 +13,23 @@ blueprint:
     current, the blueprint just starts and stops charging.
 
 
-    **Order on start:** enable the charger → charging current in the charger → charging
-    current in the car → start the charger → (optional wait) → start the car. On stop, both the
-    charger and the car are stopped. If one action fails (e.g. the charger's cloud does not
-    answer), the error is logged and the rest still run, so the car is still told to charge.
+    **Order on start:** enable the charger → circuit limit → charging current in the charger →
+    charging current in the car → start the charger → (optional wait) → start the car. On stop,
+    both the charger and the car are stopped. If one action fails (e.g. the charger's cloud does
+    not answer), the error is logged and the rest still run, so the car is still told to charge.
+
+
+    **One run per change:** the automation runs once each time Cable Juice Planner changes its
+    decision, and carries out everything that changed (the `changed` variable in the trace,
+    e.g. `['action', 'amps', 'circuit']`), so each trace shows one whole decision.
+
+
+    **Circuit limit (optional, e.g. an Easee master):** if several chargers share one circuit
+    limit, fill in "Set circuit current" **only in the automation of the car whose charger is
+    the master** (the charger the circuit is controlled from). Leave it empty in the other
+    cars' automations. Link the chargers under the car's *Load balancing* settings (Chargers
+    on the same circuit); every car of the circuit then gets the sum per phase of all the
+    circuit's chargers, so the master's automation sets the right limit for all of them.
 
 
     **Fail-safe:** if `charger_action` is unavailable, or no new plan has been calculated for
@@ -39,9 +52,10 @@ blueprint:
 
 
     In the actions you can use the variables `phase_1`, `phase_2`, `phase_3` (amps),
-    `max_phase` (highest phase), `phases` (number of phases in use), `charging_limit` (the
-    car's charge limit in %), `charger_enabled`, `fail_safe` (true in fail-safe) and `message`
-    (in the notification).
+    `max_phase` (highest phase), `phases` (number of phases in use), `circuit_phase_1`,
+    `circuit_phase_2`, `circuit_phase_3` (circuit limit in amps), `charging_limit` (the car's
+    charge limit in %), `charger_enabled`, `fail_safe` (true in fail-safe) and `message` (in the
+    notification).
   domain: automation
   source_url: https://github.com/dezito/Cable-Juice-Planner-HACS/blob/main/custom_components/cable_juice_planner/blueprints/charger_control.yaml
   input:
@@ -54,7 +68,8 @@ blueprint:
           description: >
             The car's sensor.cjp_<prefix>_charger_action. The charging current per phase and
             the charge limit are read from its attributes (phase_1_amps, phase_2_amps,
-            phase_3_amps, charging_limit).
+            phase_3_amps, charging_limit). The automation runs when its decision attribute
+            changes: once per change, with everything that changed in that run.
           selector:
             entity:
               filter:
@@ -92,6 +107,22 @@ blueprint:
             charger takes the current per phase, use "{{ phase_1 }}", "{{ phase_2 }}" and
             "{{ phase_3 }}" (0 = the phase is not used). Run when the current changes and
             before start.
+          default: []
+          selector:
+            action: {}
+        circuit_actions:
+          name: Set circuit current (master only)
+          description: >
+            Only for chargers controlled through a circuit limit (e.g. an Easee master), and
+            **only in the automation of the car whose charger is the master** – leave it empty
+            in the other cars' automations on the same circuit, the master's automation sets
+            the circuit for all of them. E.g. easee.set_circuit_dynamic_limit with current_p1:
+            "{{ circuit_phase_1 }}", current_p2: "{{ circuit_phase_2 }}" and current_p3:
+            "{{ circuit_phase_3 }}". With chargers linked under Load balancing (Chargers on the
+            same circuit) it is the sum per grid phase of all the circuit's chargers (0 when
+            none of them charges); without, it is this charger's own circuit limit. In
+            fail-safe it is the fail-safe current, shared by the circuit's chargers. Run when
+            the circuit limit changes and before start.
           default: []
           selector:
             action: {}
@@ -314,34 +345,12 @@ mode: queued
 max: 10
 
 triggers:
+  # the decision attribute holds the action, enabled, mode, amps, circuit and charge limit:
+  # one run per change, however many of them changed (the changed variable tells which)
   - trigger: state
     entity_id: !input action_sensor
-    to: ~
-    id: action
-  - trigger: state
-    entity_id: !input action_sensor
-    attribute: charger_enabled
-    id: enabled
-  - trigger: state
-    entity_id: !input action_sensor
-    attribute: mode
-    id: mode
-  - trigger: state
-    entity_id: !input action_sensor
-    attribute: phase_1_amps
-    id: amps
-  - trigger: state
-    entity_id: !input action_sensor
-    attribute: phase_2_amps
-    id: amps
-  - trigger: state
-    entity_id: !input action_sensor
-    attribute: phase_3_amps
-    id: amps
-  - trigger: state
-    entity_id: !input action_sensor
-    attribute: charging_limit
-    id: limit
+    attribute: decision
+    id: change
   - trigger: state
     entity_id: !input action_sensor
     to: [unavailable, unknown]
@@ -370,7 +379,10 @@ variables:
   fail_safe_phases: !input fail_safe_phases
   action: "{{ states(action_sensor) }}"
   charger_mode: "{{ state_attr(action_sensor, 'mode') or 'normal' }}"
-  charger_enabled: "{{ state_attr(action_sensor, 'charger_enabled') | default(true, true) | bool }}"
+  # missing = enabled; default(true, true) would also turn false into true
+  charger_enabled: >
+    {% set enabled = state_attr(action_sensor, 'charger_enabled') %}
+    {{ enabled is none or enabled | bool(true) }}
   charging_limit: "{{ state_attr(action_sensor, 'charging_limit') | int(0) }}"
   fail_safe: >
     {% set s = states[action_sensor] %}
@@ -397,6 +409,35 @@ variables:
   phase_3: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 3 else 0 if fail_safe else state_attr(action_sensor, 'phase_3_amps')) | int(0) }}"
   max_phase: "{{ [phase_1, phase_2, phase_3] | max }}"
   phases: "{{ [phase_1, phase_2, phase_3] | select('gt', 0) | list | count }}"
+  # circuit limit (sum of the circuit's chargers when they are linked under Load balancing)
+  circuit_phase_1: "{{ phase_1 if fail_safe else state_attr(action_sensor, 'circuit_phase_1_amps') | int(0) }}"
+  circuit_phase_2: "{{ phase_2 if fail_safe else state_attr(action_sensor, 'circuit_phase_2_amps') | int(0) }}"
+  circuit_phase_3: "{{ phase_3 if fail_safe else state_attr(action_sensor, 'circuit_phase_3_amps') | int(0) }}"
+  # what this change changed: action, enabled, mode, amps, circuit and/or limit
+  changed: >
+    {% set ns = namespace(items=[]) %}
+    {% if trigger.id == 'change' and trigger.to_state %}
+      {% set before = trigger.from_state.attributes if trigger.from_state else {} %}
+      {% set after = trigger.to_state.attributes %}
+      {% if not trigger.from_state or trigger.from_state.state != trigger.to_state.state %}
+        {% set ns.items = ns.items + ['action'] %}
+      {% endif %}
+      {% for name, keys in [
+           ('enabled', ['charger_enabled']),
+           ('mode', ['mode']),
+           ('amps', ['phase_1_amps', 'phase_2_amps', 'phase_3_amps']),
+           ('circuit', ['circuit_phase_1_amps', 'circuit_phase_2_amps', 'circuit_phase_3_amps']),
+           ('limit', ['charging_limit'])] %}
+        {% set diff = namespace(found=false) %}
+        {% for key in keys %}
+          {% if before.get(key) != after.get(key) %}{% set diff.found = true %}{% endif %}
+        {% endfor %}
+        {% if diff.found %}{% set ns.items = ns.items + [name] %}{% endif %}
+      {% endfor %}
+    {% endif %}
+    {{ ns.items }}
+  # a new action (or Home Assistant start / back from unavailable): the whole start or stop
+  whole_decision: "{{ trigger.id in ['start', 'fail_safe'] or 'action' in changed }}"
 
 actions:
   - choose:
@@ -417,6 +458,8 @@ actions:
                     {{ fail_safe_amps }} A on {{ fail_safe_phases }} phase(s).
               - continue_on_error: true
                 sequence: !input enable_actions
+              - continue_on_error: true
+                sequence: !input circuit_actions
               - continue_on_error: true
                 sequence: !input amps_actions
               - continue_on_error: true
@@ -460,6 +503,8 @@ actions:
           - continue_on_error: true
             sequence: !input enable_actions
           - continue_on_error: true
+            sequence: !input circuit_actions
+          - continue_on_error: true
             sequence: !input amps_actions
           - if:
               - condition: template
@@ -479,7 +524,7 @@ actions:
       # ---- the integration reports an error (it already asks for max amps) ----
       - conditions:
           - condition: template
-            value_template: "{{ trigger.id == 'mode' and charger_mode == 'error' }}"
+            value_template: "{{ 'mode' in changed and charger_mode == 'error' }}"
         sequence:
           - variables:
               message: >
@@ -487,6 +532,8 @@ actions:
                 with max current. See the notifications in Home Assistant.
           - continue_on_error: true
             sequence: !input notify_actions
+          - continue_on_error: true
+            sequence: !input circuit_actions
           - continue_on_error: true
             sequence: !input amps_actions
           - if:
@@ -508,84 +555,100 @@ actions:
                   - delay: "{{ car_start_delay }}"
               - continue_on_error: true
                 sequence: !input car_start_actions
-      # ---- normal operation ----
+      # ---- normal operation: everything this change changed, in one run ----
       - conditions:
           - condition: template
-            value_template: "{{ trigger.id == 'enabled' }}"
+            value_template: "{{ (whole_decision or changed | count > 0) and action in ['charge', 'stop'] }}"
         sequence:
+          # enabled on its own (with a new action the start below enables the charger)
           - if:
               - condition: template
-                value_template: "{{ charger_enabled }}"
+                value_template: "{{ 'enabled' in changed and not charger_enabled }}"
             then:
-              - continue_on_error: true
-                sequence: !input enable_actions
-            else:
               - continue_on_error: true
                 sequence: !input disable_actions
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'limit' and charging_limit > 0 }}"
-        sequence:
-          - continue_on_error: true
-            sequence: !input car_limit_actions
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'amps' and action in ['charge', 'stop'] }}"
-        sequence:
-          - continue_on_error: true
-            sequence: !input amps_actions
           - if:
               - condition: template
-                value_template: "{{ max_phase > 0 }}"
-            then:
-              - continue_on_error: true
-                sequence: !input car_amps_actions
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id in ['action', 'start', 'fail_safe'] and action in ['charge', 'stop'] }}"
-        sequence:
-          - if:
-              - condition: template
-                value_template: "{{ charger_enabled }}"
+                value_template: "{{ 'enabled' in changed and charger_enabled and not whole_decision }}"
             then:
               - continue_on_error: true
                 sequence: !input enable_actions
           - if:
               - condition: template
-                value_template: "{{ action == 'charge' }}"
+                value_template: "{{ whole_decision }}"
             then:
               - if:
                   - condition: template
-                    value_template: "{{ charging_limit > 0 }}"
+                    value_template: "{{ charger_enabled }}"
+                then:
+                  - continue_on_error: true
+                    sequence: !input enable_actions
+              - if:
+                  - condition: template
+                    value_template: "{{ action == 'charge' }}"
+                then:
+                  - if:
+                      - condition: template
+                        value_template: "{{ charging_limit > 0 }}"
+                    then:
+                      - continue_on_error: true
+                        sequence: !input car_limit_actions
+                  - continue_on_error: true
+                    sequence: !input circuit_actions
+                  - continue_on_error: true
+                    sequence: !input amps_actions
+                  - if:
+                      - condition: template
+                        value_template: "{{ max_phase > 0 }}"
+                    then:
+                      - continue_on_error: true
+                        sequence: !input car_amps_actions
+                  # a new charge decision always starts; after a restart only when not charging/done
+                  - if:
+                      - condition: template
+                        value_template: "{{ 'action' in changed or not (already_charging or charger_done) }}"
+                    then:
+                      - continue_on_error: true
+                        sequence: !input start_actions
+                      - if:
+                          - condition: template
+                            value_template: "{{ car_start_delay > 0 }}"
+                        then:
+                          - delay: "{{ car_start_delay }}"
+                      - continue_on_error: true
+                        sequence: !input car_start_actions
+                else:
+                  - continue_on_error: true
+                    sequence: !input stop_actions
+                  - continue_on_error: true
+                    sequence: !input car_stop_actions
+                  - continue_on_error: true
+                    sequence: !input amps_actions
+                  - continue_on_error: true
+                    sequence: !input circuit_actions
+            # the same action: only what changed
+            else:
+              - if:
+                  - condition: template
+                    value_template: "{{ 'limit' in changed and charging_limit > 0 }}"
                 then:
                   - continue_on_error: true
                     sequence: !input car_limit_actions
-              - continue_on_error: true
-                sequence: !input amps_actions
               - if:
                   - condition: template
-                    value_template: "{{ max_phase > 0 }}"
+                    value_template: "{{ 'circuit' in changed }}"
                 then:
                   - continue_on_error: true
-                    sequence: !input car_amps_actions
-              # a new charge decision always starts; after a restart only when not charging/done
+                    sequence: !input circuit_actions
               - if:
                   - condition: template
-                    value_template: "{{ trigger.id == 'action' or not (already_charging or charger_done) }}"
+                    value_template: "{{ 'amps' in changed }}"
                 then:
                   - continue_on_error: true
-                    sequence: !input start_actions
+                    sequence: !input amps_actions
                   - if:
                       - condition: template
-                        value_template: "{{ car_start_delay > 0 }}"
+                        value_template: "{{ max_phase > 0 }}"
                     then:
-                      - delay: "{{ car_start_delay }}"
-                  - continue_on_error: true
-                    sequence: !input car_start_actions
-            else:
-              - continue_on_error: true
-                sequence: !input stop_actions
-              - continue_on_error: true
-                sequence: !input car_stop_actions
-              - continue_on_error: true
-                sequence: !input amps_actions
+                      - continue_on_error: true
+                        sequence: !input car_amps_actions
