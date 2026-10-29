@@ -6,6 +6,8 @@ Only active when a site config entry exists; the snapshot then carries ``site``:
   car in that hour (fuse - forecast house consumption - reservations of the cars ahead)
 * ``live``: amps available per charger phase right now
 * ``urgent_hours``: a trip within this many hours puts the car first
+* ``circuit_phases``: on a shared circuit, the phases the charging car ahead uses (the
+  circuit limit switches all its chargers), None otherwise
 
 The planner asks :meth:`hour_kwh_capacity` instead of using the charger maximum, so an
 hour with less capacity is charged with fewer amps and the rest is planned in other
@@ -35,11 +37,12 @@ class Site:
     # Capacity -> amps
     # ------------------------------------------------------------------ #
 
-    def _site_amps(self, capacity, max_watt: float | None = None) -> tuple[int, int]:
+    def _site_amps(self, capacity, max_watt: float | None = None, only_phases: int | None = None) -> tuple[int, int]:
         """(amps, phases) for the most power within capacity (amps per charger phase).
 
         Uses the same watt -> amps/phases table as the solar charging (charging_power_dict),
         so it switches between 1 phase and all phases with the configured min/max amps.
+        ``only_phases`` keeps it to that number of phases (a shared circuit).
         """
         capacity = [max(float(value), 0.0) for value in capacity] + [0.0] * 3
         power_dict = self.charging_power_dict()
@@ -48,6 +51,8 @@ class Site:
             if max_watt is not None and watt > max_watt + 0.5:
                 continue
             amps, phases = entry["amp"], int(entry["phase"])
+            if only_phases and phases != only_phases:
+                continue
             if amps > 0 and all(capacity[i] >= amps for i in range(phases)):
                 return int(amps), phases
         return 0, int(self.config["charger"]["charging_phases"])
@@ -84,7 +89,9 @@ class Site:
             return list(amps)
         # the most power within the live capacity, never more than requested
         requested_watt = sum(float(a) for a in amps) * self.config["charger"]["power_voltage"]
-        allowed, phases = self._site_amps(live, max_watt=requested_watt)
+        # a car that only charges on one phase is not switched by the circuit
+        only_phases = self._site().get("circuit_phases") if int(self.config["charger"]["charging_phases"]) > 1 else None
+        allowed, phases = self._site_amps(live, max_watt=requested_watt, only_phases=only_phases)
         if allowed <= 0:
             return [0, 0, 0]
         return [allowed if i < phases else 0 for i in range(3)]

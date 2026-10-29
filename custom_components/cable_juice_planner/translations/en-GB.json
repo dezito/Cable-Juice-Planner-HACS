@@ -52,14 +52,16 @@
       },
       "load_balancing": {
         "title": "Load balancing",
-        "description": "The place of the car in the shared grid connection.",
+        "description": "The place of the car in the shared grid connection.\n\n**Circuit** (chargers sharing one circuit limit):\n{circuit}\n\nOnly the automation of the master charger sets the circuit limit – see the charger control blueprint.",
         "data": {
           "site_priority": "Priority",
-          "site_phase_order": "Charger phase order"
+          "site_phase_order": "Charger phase order",
+          "site_circuit": "Chargers on the same circuit"
         },
         "data_description": {
           "site_priority": "1 = charges first. A car under the daily minimum or with a trip soon always goes first.",
-          "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1."
+          "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1.",
+          "site_circuit": "Only for chargers sharing one circuit limit (e.g. Easee chargers behind a master). Select this car's charger and the other chargers on the circuit. The selection is shared: the other cars of the circuit get the same change. Leave empty if the charger has its own circuit."
         }
       },
       "ev": {
@@ -375,7 +377,9 @@
       "no_price_provider": "Choose at least one price provider.",
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
-      "min_above_max": "The minimum cannot be above the maximum."
+      "min_above_max": "The minimum cannot be above the maximum.",
+      "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
+      "circuit_own_charger_missing": "Select this car's charger as well."
     },
     "abort": {
       "site_exists": "A shared grid connection already exists."
@@ -448,14 +452,16 @@
       },
       "load_balancing": {
         "title": "Load balancing",
-        "description": "The place of the car in the shared grid connection.",
+        "description": "The place of the car in the shared grid connection.\n\n**Circuit** (chargers sharing one circuit limit):\n{circuit}\n\nOnly the automation of the master charger sets the circuit limit – see the charger control blueprint.",
         "data": {
           "site_priority": "Priority",
-          "site_phase_order": "Charger phase order"
+          "site_phase_order": "Charger phase order",
+          "site_circuit": "Chargers on the same circuit"
         },
         "data_description": {
           "site_priority": "1 = charges first. A car under the daily minimum or with a trip soon always goes first.",
-          "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1."
+          "site_phase_order": "Which grid phases the charger L1/L2/L3 are connected to (L2-L3-L1 = charger L1 is house L2). Single phase charging uses charger L1.",
+          "site_circuit": "Only for chargers sharing one circuit limit (e.g. Easee chargers behind a master). Select this car's charger and the other chargers on the circuit. The selection is shared: the other cars of the circuit get the same change. Leave empty if the charger has its own circuit."
         }
       },
       "ev": {
@@ -746,7 +752,9 @@
       "no_price_provider": "Choose at least one price provider.",
       "production_required": "A solar forecast needs a solar production sensor.",
       "ev_incomplete": "Battery level, range and odometer must all be set (or all be empty).",
-      "min_above_max": "The minimum cannot be above the maximum."
+      "min_above_max": "The minimum cannot be above the maximum.",
+      "circuit_no_charger_device": "The car's charger entities belong to no device, so the charger cannot be linked to a circuit.",
+      "circuit_own_charger_missing": "Select this car's charger as well."
     },
     "abort": {
       "backup_exported": "The backup was saved as **{file}**.",
@@ -920,7 +928,7 @@
         "name": "Trip charging to"
       },
       "trip_range_needed": {
-        "name": "Trip distance needed"
+        "name": "Trip {distance} needed"
       },
       "full_charge_recommended": {
         "name": "Recommended full charge every"

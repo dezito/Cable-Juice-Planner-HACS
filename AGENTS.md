@@ -213,6 +213,20 @@ private agent memory). Update or remove a note when it stops being true.
 - `site.update_from_result` recalculates all cars incl. the one that turned
   urgent; a changed live request recalculates the cars behind only when
   something changed (no ping-pong). Covered by `tests/test_site.py`.
+- Shared circuit (Easee master): user choices: chargers are picked as HA
+  devices on each car's load balancing page; the circuit is stored once in the
+  site options (`circuits`), so a change from one car applies to all of it; a
+  car joins through the devices of its charger entities. Circuit limit = sum
+  per grid phase of the circuit cars' requests (not the max), patched onto
+  every circuit car's `charger_action` by the site before publishing; the first
+  charging car ahead decides 1/3 phases (`circuit_phases` in `site_clamp`).
+  Only the master's blueprint automation fills in "Set circuit current".
+- User choice: the blueprint runs once per decision change, doing everything
+  that changed, so each trace is one whole decision. It triggers only on the
+  `decision` attribute (built in `CJPActionSensor`, `charger_decision` in
+  `sensor.py`, from the attributes actually written, incl. the site's circuit
+  patch) and compares from/to state into the `changed` variable. Not
+  `mode: restart` + delay: a restart can cancel a start and lose what changed.
 
 ### PyScript import
 

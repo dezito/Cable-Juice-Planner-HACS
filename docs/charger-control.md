@@ -10,7 +10,9 @@ entities, and your automation does it – easiest with the blueprint that comes 
 | `sensor.cjp_<prefix>_charger_action` | `charge` or `stop`: whether the charger should charge now |
 | ↳ attribute `charger_enabled` | whether the charger should be enabled |
 | ↳ attributes `phase_1_amps`, `phase_2_amps`, `phase_3_amps` | the charging current per phase in A (0 = phase not used) – so an automation only needs `charger_action` |
-| ↳ attributes `circuit_phase_1_amps` … `_3_amps` | the circuit's limit per phase (e.g. Easee's circuit limit) |
+| ↳ attributes `circuit_phase_1_amps` … `_3_amps` | the circuit's limit per phase (e.g. Easee's circuit limit); on a [shared circuit](load-balancing.md#shared-circuit-eg-easee-master) the sum per grid phase of all its chargers |
+| ↳ attribute `decision` | the action, enabled, mode, amps, circuit and charge limit in one text, e.g. `charge, enabled, mode normal, 16/16/16 A, circuit 24/24/24 A, limit 80 %` – trigger on it to run once per change |
+| ↳ attribute `circuit_chargers` | only on a shared circuit: the prefixes of the cars on it |
 | ↳ attribute `charging_limit` | the charge limit for the car in % |
 | ↳ attribute `mode` | `normal` or `error` (the calculation failed) |
 | ↳ attribute `updated` | the time of the latest calculation (heartbeat) |
@@ -41,17 +43,22 @@ and the charge limit in the car).
 
 | Section | Inputs |
 |---|---|
-| Charger | Start charging, Stop charging, Set charging current, Enable the charger, Disable the charger |
+| Charger | Start charging, Stop charging, Set charging current, Set circuit current (master only), Enable the charger, Disable the charger |
 | Car | Start charging in the car, Wait before starting the car, Stop charging in the car, Set charging current in the car, Set charge limit in the car |
 
-On start: charge limit in the car → enable the charger → current in the charger → current in the car →
-start the charger → start the car. On stop, both are stopped. If the car must wait until the charger is
-ready, set **Wait before starting the car** (seconds). If one action fails (e.g. the charger's cloud doesn't
+On start: charge limit in the car → enable the charger → circuit limit → current in the charger → current in
+the car → start the charger → start the car. On stop, both are stopped. If the car must wait until the charger
+is ready, set **Wait before starting the car** (seconds). If one action fails (e.g. the charger's cloud doesn't
 answer), the error is logged and the remaining actions still run.
 
+The automation runs **once per change** of the decision (the `decision` attribute), however much changed:
+a new action runs the whole start or stop, otherwise only what changed is sent (current, circuit, charge
+limit, enable/disable). The trace's `changed` variable shows what it was, e.g. `['amps', 'circuit']`, so each
+trace under *Traces* is one whole decision. A calculation that changes nothing doesn't run it.
+
 In your actions you can use the variables `phase_1`, `phase_2`, `phase_3`, `max_phase`, `phases`,
-`charging_limit`, `charger_enabled`, `fail_safe` and `message`. Use them rather than reading the sensors
-yourself – in fail-safe they hold the fail-safe current.
+`circuit_phase_1`, `circuit_phase_2`, `circuit_phase_3`, `charging_limit`, `charger_enabled`, `fail_safe` and
+`message`. Use them rather than reading the sensors yourself – in fail-safe they hold the fail-safe current.
 
 **Typical setups**
 
@@ -73,6 +80,28 @@ and *States*:
 
 If neither the charger nor the car can set the current, the blueprint only starts and stops charging –
 solar surplus charging and load balancing then can't regulate the current.
+
+### Shared circuit
+
+For chargers controlled through a circuit limit, e.g. Easee chargers behind a master. Fill in **Set circuit
+current (master only)** **only in the automation of the car whose charger is the master**, and leave it empty in
+the other cars' automations – otherwise several automations set the same circuit. Example for Easee:
+
+```yaml
+action: easee.set_circuit_dynamic_limit
+data:
+  device_id: <the master charger>
+  current_p1: "{{ circuit_phase_1 }}"
+  current_p2: "{{ circuit_phase_2 }}"
+  current_p3: "{{ circuit_phase_3 }}"
+```
+
+Link the chargers under each car's *Load balancing* page (**Chargers on the same circuit**, see
+[Shared circuit](load-balancing.md#shared-circuit-eg-easee-master)). Every car of the circuit then gets the sum
+per grid phase of all the circuit's chargers, and the master's automation runs when it changes – also when
+another car on the circuit starts or stops. The charging current of each charger (**Set charging current**) is
+still set in each car's own automation. Without linked chargers the values are the car's own circuit limit. In
+fail-safe the circuit gets the fail-safe current, which the circuit's chargers share.
 
 ### Charging state
 

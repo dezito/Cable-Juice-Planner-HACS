@@ -25,6 +25,19 @@ SITE_DEFAULTS: dict[str, Any] = {
     "urgent_trip_hours": 12,
 }
 SITE_FIELDS = list(SITE_DEFAULTS)
+# chargers sharing one circuit limit (e.g. an Easee master): lists of HA device ids in the
+# site options, chosen on each car's load balancing page
+CONF_CIRCUITS = "circuits"
+CONF_CIRCUIT = "site_circuit"
+# the car's charger entities; their devices tell which charger the car uses
+CIRCUIT_ENTITY_KEYS = (
+    "status_entity_id",
+    "power_consumtion_entity_id",
+    "kwh_meter_entity_id",
+    "lifetime_kwh_meter_entity_id",
+    "enabled_entity_id",
+    "cable_connected_entity_id",
+)
 SITE_HOURS_AHEAD = 24 * 8
 SITE_SENSORS = ("site_available_l1", "site_available_l2", "site_available_l3", "site_house_l1", "site_house_l2", "site_house_l3")
 SIGNAL_SITE_UPDATE = "cable_juice_planner_site_update"

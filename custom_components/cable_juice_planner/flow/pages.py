@@ -5,10 +5,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
-from ..const import CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS
+from ..const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUIT, CONF_CIRCUITS, CONF_ENTITY_PREFIX, CONF_SITE, DOMAIN, FLOW_STEPS, PRICE_PROVIDER_KEYS, object_prefix
+from ..site import charger_devices, circuit_of, update_circuits
 from .schema import ENERGIDATASERVICE_URL, PRICE_PROVIDERS, build_schema, normalize_input, validate_step
 
 
@@ -22,9 +25,18 @@ class CJPFlowPages:
     _options: dict[str, Any]
     _queue: list[str]
     _providers: list[str]
+    # chargers on the car's circuit from the load balancing page, saved in the site entry on finish
+    _circuit: list[str] | None = None
 
     def _site_exists(self) -> bool:
-        return any(entry.data.get(CONF_SITE) for entry in self.hass.config_entries.async_entries(DOMAIN))  # type: ignore[attr-defined]
+        return self._site_entry() is not None
+
+    def _site_entry(self) -> ConfigEntry | None:
+        return next((entry for entry in self.hass.config_entries.async_entries(DOMAIN) if entry.data.get(CONF_SITE)), None)  # type: ignore[attr-defined]
+
+    def _this_entry_id(self) -> str | None:
+        """The entry being changed (None while a new car is set up)."""
+        return None
 
     def _page_enabled(self, step: str) -> bool:
         if step == "load_balancing":
@@ -111,7 +123,85 @@ class CJPFlowPages:
         return await self._async_page("charger_specs", user_input)
 
     async def async_step_load_balancing(self, user_input=None) -> ConfigFlowResult:
-        return await self._async_page("load_balancing", user_input)
+        """Priority, phase order and the chargers sharing the car's circuit."""
+        keys = FLOW_STEPS["load_balancing"]
+        own = self._own_charger_devices()
+        site = self._site_entry()
+        current = self._circuit if self._circuit is not None else circuit_of(site.options.get(CONF_CIRCUITS) if site else [], own)
+        errors: dict[str, str] = {}
+        values_for_form = dict(self._options)
+        if user_input is not None:
+            values = normalize_input(keys, user_input)
+            selected = [device for device in user_input.get(CONF_CIRCUIT) or [] if device]
+            if selected and not own:
+                errors[CONF_CIRCUIT] = "circuit_no_charger_device"
+            elif selected and not own & set(selected):
+                errors[CONF_CIRCUIT] = "circuit_own_charger_missing"
+            if not errors:
+                self._options.update(values)
+                self._circuit = selected
+                return await self._async_next()
+            values_for_form.update(values)
+            current = selected
+        schema = build_schema(keys, values_for_form).extend(
+            {vol.Optional(CONF_CIRCUIT, description={"suggested_value": current}): self._circuit_selector()}
+        )
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="load_balancing",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={**self._placeholders(), "circuit": self._circuit_text(current, own)},
+        )
+
+    def _own_charger_devices(self) -> set[str]:
+        return charger_devices(self.hass, [self._options.get(key) for key in CIRCUIT_ENTITY_KEYS])  # type: ignore[attr-defined]
+
+    def _circuit_selector(self) -> selector.DeviceSelector:
+        """Devices of the integrations the car's charger entities come from (all without)."""
+        ent_reg = er.async_get(self.hass)  # type: ignore[attr-defined]
+        integrations = []
+        for key in CIRCUIT_ENTITY_KEYS:
+            entity_id = self._options.get(key)
+            entry = ent_reg.async_get(entity_id) if entity_id else None
+            if entry is not None and entry.device_id and entry.platform not in integrations:
+                integrations.append(entry.platform)
+        config: dict[str, Any] = {"multiple": True}
+        if integrations:
+            config["filter"] = [{"integration": integration} for integration in integrations]
+        return selector.DeviceSelector(selector.DeviceSelectorConfig(**config))
+
+    def _circuit_text(self, devices: list[str], own: set[str]) -> str:
+        """Each charger of the circuit and the cars using it (shown in the page description)."""
+        if not devices:
+            return "–"
+        users: dict[str, list[str]] = {device: [] for device in devices}
+        this_entry = self._this_entry_id()
+        for device in own:
+            if device in users:
+                users[device].append(object_prefix(self._placeholders().get("prefix")))
+        for entry in self.hass.config_entries.async_entries(DOMAIN):  # type: ignore[attr-defined]
+            if entry.data.get(CONF_SITE) or entry.entry_id == this_entry:
+                continue
+            for device in charger_devices(self.hass, [entry.options.get(key) for key in CIRCUIT_ENTITY_KEYS]):  # type: ignore[attr-defined]
+                if device in users:
+                    users[device].append(object_prefix(entry.data.get(CONF_ENTITY_PREFIX)))
+        dev_reg = dr.async_get(self.hass)  # type: ignore[attr-defined]
+        lines = []
+        for device, prefixes in users.items():
+            info = dev_reg.async_get(device)
+            name = (info.name_by_user or info.name) if info is not None else device
+            lines.append(f"- {name}: {', '.join(prefixes) or '–'}")
+        return "\n".join(lines)
+
+    def _save_circuit(self) -> None:
+        """The circuit is kept once in the site entry, so a change from one car applies to all of it."""
+        site = self._site_entry()
+        if self._circuit is None or site is None:
+            return
+        old = site.options.get(CONF_CIRCUITS) or []
+        circuits = update_circuits(old, self._own_charger_devices(), self._circuit)
+        if circuits != old:
+            self.hass.config_entries.async_update_entry(site, options={**site.options, CONF_CIRCUITS: circuits})  # type: ignore[attr-defined]
 
     async def async_step_ev(self, user_input=None) -> ConfigFlowResult:
         return await self._async_page("ev", user_input)

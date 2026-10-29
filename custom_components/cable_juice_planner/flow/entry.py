@@ -164,6 +164,7 @@ class CJPConfigFlow(CJPFlowPages, ConfigFlow, domain=DOMAIN):
 
     async def _async_finish(self) -> ConfigFlowResult:
         title = instance_title(self._prefix, self._car_name)
+        self._save_circuit()
         return self.async_create_entry(
             title=title,
             data={

@@ -10,7 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from ..management.backup import BACKUP_DIR, async_export, async_import, backup_dir, list_backups
-from ..const import CONF_ENTITY_PREFIX, SITE_DEFAULTS, OPTIONS_MENU, default_options, object_prefix, normalize_language
+from ..const import CONF_CIRCUITS, CONF_ENTITY_PREFIX, SITE_DEFAULTS, OPTIONS_MENU, default_options, object_prefix, normalize_language
 from .schema import BACKUP_EXPORT, providers_from_options, site_options, site_schema
 from .pages import CJPFlowPages
 
@@ -25,6 +25,9 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
 
     def _placeholders(self) -> dict[str, str]:
         return {"prefix": self.config_entry.data.get(CONF_ENTITY_PREFIX, "")}
+
+    def _this_entry_id(self) -> str | None:
+        return self.config_entry.entry_id
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         self._options = {**default_options(), **self.config_entry.options}
@@ -91,6 +94,7 @@ class CJPOptionsFlow(CJPFlowPages, OptionsFlow):
         return await self._async_menu("advanced")
 
     async def _async_finish(self) -> ConfigFlowResult:
+        self._save_circuit()
         return self.async_create_entry(data=self._options)
 
 
@@ -102,5 +106,7 @@ class CJPSiteOptionsFlow(OptionsFlow):
 
     async def async_step_site(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(data=site_options(user_input))
+            # the circuits are chosen on the cars' pages, keep them
+            circuits = self.config_entry.options.get(CONF_CIRCUITS)
+            return self.async_create_entry(data={**site_options(user_input), **({CONF_CIRCUITS: circuits} if circuits else {})})
         return self.async_show_form(step_id="site", data_schema=site_schema({**SITE_DEFAULTS, **self.config_entry.options}))

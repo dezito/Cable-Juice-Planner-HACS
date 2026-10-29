@@ -13,6 +13,12 @@ here and asks for its capacity before each job (event loop, no I/O):
 Phases are grid phases here; every car maps its charger L1/L2/L3 onto them with its
 phase order. When a car ahead changes its plan, the cars behind it are recalculated.
 With phase sensors an overloaded phase immediately limits the last charging car.
+
+Circuits: chargers sharing one circuit limit (e.g. Easee chargers behind a master) are
+lists of HA devices in the site options. A car belongs to a circuit through the devices
+of its charger entities. Every car of a circuit publishes the circuit limit as the sum of
+what the circuit's cars charge with per grid phase, and the first charging car decides
+1 or 3 phases for the cars behind it (the circuit limit switches the phases of all).
 """
 from __future__ import annotations
 
@@ -25,11 +31,12 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_change
 from homeassistant.util import dt as dt_util
 
-from .const import PHASE_ORDERS, SIGNAL_SITE_UPDATE, SITE_DEFAULTS, SITE_HOURS_AHEAD
+from .const import CIRCUIT_ENTITY_KEYS, CONF_CIRCUITS, PHASE_ORDERS, SIGNAL_SITE_UPDATE, SITE_DEFAULTS, SITE_HOURS_AHEAD
 from .utils.helpers import float_or_none
 
 if TYPE_CHECKING:
@@ -41,6 +48,51 @@ RECALCULATE_DELAY = 15  # s, the cars behind a changed plan are recalculated aft
 OVERLOAD_THROTTLE = 20  # s between two overload reactions for the same car
 FORECAST_DAYS = 7
 POWER_UNITS = {"W": 1.0, "kW": 1000.0}
+
+
+def charger_devices(hass: HomeAssistant, entity_ids) -> set[str]:
+    """The HA devices of a car's charger entities."""
+    ent_reg = er.async_get(hass)
+    devices = set()
+    for entity_id in entity_ids:
+        if entity_id and (entry := ent_reg.async_get(entity_id)) is not None and entry.device_id:
+            devices.add(entry.device_id)
+    return devices
+
+
+def circuit_of(circuits, own: set[str]) -> list[str]:
+    """The circuit (device ids) with one of the car's own charger devices, else []."""
+    for group in circuits or []:
+        if own & set(group):
+            return list(group)
+    return []
+
+
+def update_circuits(circuits, own: set[str], selected) -> list[list[str]]:
+    """The circuits after a car chose ``selected`` as the chargers of its circuit.
+
+    The car's previous circuit is replaced, so a change made from one car applies to all
+    cars of the circuit. A device is in one circuit only; a circuit needs two devices.
+    """
+    selected = list(dict.fromkeys(device for device in selected or [] if device))
+    result = []
+    for group in circuits or []:
+        if own & set(group):
+            continue
+        group = [device for device in group if device not in selected]
+        if len(group) > 1:
+            result.append(group)
+    if len(selected) > 1:
+        result.append(selected)
+    return result
+
+
+def _charger_entities(coordinator: CJPCoordinator) -> list[str]:
+    config = getattr(coordinator, "config", None)
+    if not config:
+        return []
+    entity_ids = config["charger"]["entity_ids"]
+    return [entity_ids.get(key) or "" for key in CIRCUIT_ENTITY_KEYS]
 
 
 class CJPSite:
@@ -57,6 +109,8 @@ class CJPSite:
         self.house_forecast: dict[int, list[float]] = {}  # hour of day -> grid phases
         self.house_now: list[float] = [0.0, 0.0, 0.0]
         self.available_now: dict[str, list[float]] = {}
+        self.circuits: list[list[str]] = [list(group) for group in entry.options.get(CONF_CIRCUITS) or [] if isinstance(group, list)]
+        self.devices: dict[str, set[str]] = {}  # entry id -> charger devices
         self._unsubs: list = []
         self._pending: dict[str, Any] = {}
         self._last_overload: dict[str, float] = {}
@@ -106,10 +160,12 @@ class CJPSite:
 
     def register(self, coordinator: CJPCoordinator) -> None:
         self.members[coordinator.entry.entry_id] = coordinator
+        self.devices[coordinator.entry.entry_id] = charger_devices(self.hass, _charger_entities(coordinator))
         _LOGGER.info("Site: %s joined (priority %s, phase order %s)", coordinator.prefix, coordinator.site_priority, coordinator.site_phase_order)
 
     def unregister(self, entry_id: str) -> None:
         self.members.pop(entry_id, None)
+        self.devices.pop(entry_id, None)
         self.reservations.pop(entry_id, None)
         self.requests.pop(entry_id, None)
         self.urgent.pop(entry_id, None)
@@ -145,6 +201,52 @@ class CJPSite:
 
     def to_charger(self, coordinator: CJPCoordinator, grid: list) -> list[float]:
         return [round(float(grid[grid_phase]), 1) for grid_phase in self._order(coordinator)]
+
+    # ------------------------------------------------------------------ #
+    # Circuits (chargers sharing one circuit limit)
+    # ------------------------------------------------------------------ #
+
+    def circuit_members(self, entry_id: str) -> list[str]:
+        """The cars on the circuit of this car (incl. itself), [] without a shared circuit."""
+        group = set(circuit_of(self.circuits, self.devices.get(entry_id) or set()))
+        if not group:
+            return []
+        members = [other for other in self.order() if self.devices.get(other, set()) & group]
+        return members if len(members) > 1 else []
+
+    def circuit_amps(self, members: list[str]) -> list[int]:
+        """Circuit limit per grid phase: the sum of what the circuit's cars charge with."""
+        total = [0.0, 0.0, 0.0]
+        for entry_id in members:
+            total = [a + b for a, b in zip(total, self.requests.get(entry_id) or [0.0, 0.0, 0.0])]
+        return [int(round(value)) for value in total]
+
+    def circuit_phases(self, entry_id: str) -> int | None:
+        """Phases the circuit allows this car: those of the first charging car ahead on it.
+
+        The circuit limit decides 1 or 3 phases for every charger on it, so a car behind
+        cannot charge on other phases than the car ahead. Cars that only charge on one phase
+        anyway do not decide it.
+        """
+        members = self.circuit_members(entry_id)
+        for other in self.ahead(entry_id):
+            if other not in members or int(self.members[other].config["charger"]["charging_phases"]) <= 1:
+                continue
+            if phases := sum(1 for value in self.requests.get(other) or [] if value > 0):
+                return phases
+        return None
+
+    def circuit_patch(self, coordinator: CJPCoordinator) -> bool:
+        """Put the circuit's sum on the car's charger action; True when it changed."""
+        members = self.circuit_members(coordinator.entry.entry_id)
+        if not members:
+            return False
+        values: dict[str, Any] = {f"circuit_phase_{i}_amps": amps for i, amps in enumerate(self.circuit_amps(members), start=1)}
+        values["circuit_chargers"] = [self.members[entry_id].prefix for entry_id in members]
+        attributes = coordinator.attributes.setdefault("charger_action", {})
+        changed = any(attributes.get(key) != value for key, value in values.items())
+        attributes.update(values)
+        return changed
 
     # ------------------------------------------------------------------ #
     # Measurements
@@ -221,6 +323,7 @@ class CJPSite:
             "live": self.to_charger(coordinator, live),
             "hour_capacity": hour_capacity,
             "urgent_hours": float(self.config.get("urgent_trip_hours") or 12),
+            "circuit_phases": self.circuit_phases(entry_id),
         }
 
     @callback
@@ -236,6 +339,10 @@ class CJPSite:
         self.reservations[entry_id] = reservation
         self.requests[entry_id] = request
         self.urgent[entry_id] = urgent
+        # the other cars of the circuit publish the new sum at once (the master may be one of them)
+        for other in self.circuit_members(entry_id):
+            if other != entry_id and self.circuit_patch(self.members[other]):
+                async_dispatcher_send(self.hass, self.members[other].signal, "charger_action")
         if changed_order:
             _LOGGER.info("Site: %s is %s", coordinator.prefix, "urgent, charging first" if urgent else "no longer urgent")
             # every car incl. this one: its result was calculated with its old place in the order

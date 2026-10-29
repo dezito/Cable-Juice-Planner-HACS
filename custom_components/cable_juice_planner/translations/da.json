@@ -52,14 +52,16 @@
       },
       "load_balancing": {
         "title": "Lastfordeling",
-        "description": "Bilens plads i den fælles el-tilslutning.",
+        "description": "Bilens plads i den fælles el-tilslutning.\n\n**Kreds** (ladere, der deler én kredsgrænse):\n{circuit}\n\nKun automationen for master-laderen sætter kredsgrænsen – se blueprintet til laderstyring.",
         "data": {
           "site_priority": "Prioritet",
-          "site_phase_order": "Laderens fasefølge"
+          "site_phase_order": "Laderens fasefølge",
+          "site_circuit": "Ladere på samme kreds"
         },
         "data_description": {
           "site_priority": "1 = lader først. En bil under dagligt minimum eller med en tur snart går altid forrest.",
-          "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1."
+          "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1.",
+          "site_circuit": "Kun for ladere, der deler én kredsgrænse (f.eks. Easee-ladere bag en master). Vælg denne bils lader og de andre ladere på kredsen. Valget er fælles: de andre biler på kredsen får samme ændring. Lad feltet være tomt, hvis laderen har sin egen kreds."
         }
       },
       "ev": {
@@ -375,7 +377,9 @@
       "no_price_provider": "Vælg mindst én prisleverandør.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
-      "min_above_max": "Minimum må ikke være større end maksimum."
+      "min_above_max": "Minimum må ikke være større end maksimum.",
+      "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
+      "circuit_own_charger_missing": "Vælg også denne bils lader."
     },
     "abort": {
       "site_exists": "Der findes allerede en fælles el-tilslutning."
@@ -448,14 +452,16 @@
       },
       "load_balancing": {
         "title": "Lastfordeling",
-        "description": "Bilens plads i den fælles el-tilslutning.",
+        "description": "Bilens plads i den fælles el-tilslutning.\n\n**Kreds** (ladere, der deler én kredsgrænse):\n{circuit}\n\nKun automationen for master-laderen sætter kredsgrænsen – se blueprintet til laderstyring.",
         "data": {
           "site_priority": "Prioritet",
-          "site_phase_order": "Laderens fasefølge"
+          "site_phase_order": "Laderens fasefølge",
+          "site_circuit": "Ladere på samme kreds"
         },
         "data_description": {
           "site_priority": "1 = lader først. En bil under dagligt minimum eller med en tur snart går altid forrest.",
-          "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1."
+          "site_phase_order": "Hvilke net-faser laderens L1/L2/L3 sidder på (L2-L3-L1 = laderens L1 er husets L2). 1-fase-ladning belaster laderens L1.",
+          "site_circuit": "Kun for ladere, der deler én kredsgrænse (f.eks. Easee-ladere bag en master). Vælg denne bils lader og de andre ladere på kredsen. Valget er fælles: de andre biler på kredsen får samme ændring. Lad feltet være tomt, hvis laderen har sin egen kreds."
         }
       },
       "ev": {
@@ -746,7 +752,9 @@
       "no_price_provider": "Vælg mindst én prisleverandør.",
       "production_required": "En solprognose kræver en solproduktions-sensor.",
       "ev_incomplete": "Batteriniveau, rækkevidde og kilometertæller skal alle sættes (eller alle være tomme).",
-      "min_above_max": "Minimum må ikke være større end maksimum."
+      "min_above_max": "Minimum må ikke være større end maksimum.",
+      "circuit_no_charger_device": "Bilens lader-entiteter hører ikke til nogen enhed, så laderen kan ikke kobles på en kreds.",
+      "circuit_own_charger_missing": "Vælg også denne bils lader."
     },
     "abort": {
       "backup_exported": "Backuppen blev gemt som **{file}**.",
