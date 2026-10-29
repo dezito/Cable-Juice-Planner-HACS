@@ -9,7 +9,7 @@ entities. At setup it is rewritten for this config entry:
   configured ones; extra car entities (frunk, sentry mode, ...) are derived from the
   name of the car's battery level entity
 * cards bound to an entity that does not exist are removed, and a heading left
-  without settings below it
+  without settings below it; without a car also the analysis sections with only its data
 * ``@@key@@`` placeholders -> ``dashboard.key`` of texts/<language>.json
 
 The result is written to .storage and served as a Lovelace dashboard that can be edited in
@@ -58,6 +58,8 @@ _CAR_EXTRAS = (
 )
 _DROP = object()
 PREHEAT_ENTITIES = (("switch", "trip_preheat"), ("number", "preheat_minutes_before"), *(("switch", f"preheat_{day}") for day in WEEKDAYS))
+# analysis sections with only the car's data (sensor.cjp_analysis also exists without a car)
+EV_SECTIONS = ("@@section_drive_temperature@@", "@@section_departures@@")
 
 
 def dashboard_url(prefix: str) -> str:
@@ -227,6 +229,18 @@ def _prune(node: Any, missing: set[str]) -> Any:
     return node
 
 
+def _drop_sections(node: Any, headings: tuple[str, ...]) -> Any:
+    """Remove the sections (grids) with one of the headings."""
+    if isinstance(node, list):
+        return [_drop_sections(item, headings) for item in node if not (
+            isinstance(item, dict) and item.get("type") == "grid"
+            and any(isinstance(card, dict) and card.get("heading") in headings for card in item.get("cards") or ())
+        )]
+    if isinstance(node, dict):
+        return {key: _drop_sections(value, headings) for key, value in node.items()}
+    return node
+
+
 def _drop_empty_headings(node: Any) -> Any:
     """In a section: a heading with nothing but read more texts or fixed explanations left below it is removed with them."""
     if isinstance(node, list):
@@ -322,6 +336,8 @@ def render_dashboard(
     if not (is_ev_configured(config) and config["ev_car"]["entity_ids"]["climate_entity_id"]):
         # preheating needs the car integration and its climate entity
         missing |= {f"{platform}.{own}_{key}" for platform, key in PREHEAT_ENTITIES}
+    if not is_ev_configured(config):
+        template = _drop_sections(template, EV_SECTIONS)
     texts = load_texts(normalize_language(config.get("language")), currency, distance)
     template = _translate(_drop_empty_headings(_prune(template, missing)), texts)
     return yaml.dump(template, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=1000)

@@ -41,6 +41,9 @@ Everything is calculated from Home Assistant's history and CJP's own data, and r
 comparisons need plug-in times and hourly prices, which the recorder has for its `purge_keep_days` – the
 longer, the more there is from the first day (e.g. 30 days). After that CJP saves the prices every hour itself.
 
+Without a car integration, *Driving and temperature*, *Ready at departure*, *Battery capacity* and *Charging
+loss per power* are left out, and *Forecast accuracy* shows only the house consumption.
+
 ### Economy
 
 Per month: kWh per source (grid, solar, home battery, public), what it cost and kr/km. And what the same kWh

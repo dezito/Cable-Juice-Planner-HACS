@@ -112,8 +112,7 @@ class ControlEvents:
         self.load_economy_db(databases.get("economy"))
         self.publish_economy()
         self.load_analysis_db(databases.get("analysis"))
-        if self.is_ev_configured():
-            self.publish_analysis()
+        self.publish_analysis()
         self.publish_charging_loss_model()
 
         self.solar_charged_percentage()
