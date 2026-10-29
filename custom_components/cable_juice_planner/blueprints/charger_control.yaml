@@ -14,7 +14,8 @@ blueprint:
 
 
     **Order on start:** enable the charger → circuit limit → charging current in the charger →
-    charging current in the car → start the charger → (optional wait) → start the car. On stop,
+    charging current in the car → start the charger → (optional wait) → start the car, with an
+    optional pause between two charger commands (Wait between charger commands). On stop,
     both the charger and the car are stopped. If one action fails (e.g. the charger's cloud does
     not answer), the error is logged and the rest still run, so the car is still told to charge.
 
@@ -142,6 +143,22 @@ blueprint:
           default: []
           selector:
             action: {}
+        command_delay:
+          name: Wait between charger commands
+          description: >
+            Seconds between two commands to the charger in the same run (enable/disable,
+            circuit current, charging current, start/stop), for a charger or cloud that should
+            not get commands right after each other (e.g. 2–5 s for Easee). There is no wait
+            before the first command, and the car's commands are not delayed by it (see Wait
+            before starting the car). 0 = no wait.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 30
+              step: 1
+              unit_of_measurement: s
+              mode: box
     car:
       name: Car
       icon: mdi:car-electric
@@ -376,6 +393,7 @@ variables:
   fail_safe_minutes: !input fail_safe_minutes
   fail_safe_amps: !input fail_safe_amps
   car_start_delay: !input car_start_delay
+  command_delay: !input command_delay
   fail_safe_phases: !input fail_safe_phases
   action: "{{ states(action_sensor) }}"
   charger_mode: "{{ state_attr(action_sensor, 'mode') or 'normal' }}"
@@ -458,12 +476,21 @@ actions:
                     {{ fail_safe_amps }} A on {{ fail_safe_phases }} phase(s).
               - continue_on_error: true
                 sequence: !input enable_actions
+              # pause between two charger commands (Wait between charger commands), reused below
+              - &pause
+                if:
+                  - condition: template
+                    value_template: "{{ command_delay > 0 }}"
+                then:
+                  - delay: "{{ command_delay }}"
               - continue_on_error: true
                 sequence: !input circuit_actions
+              - *pause
               - continue_on_error: true
                 sequence: !input amps_actions
               - continue_on_error: true
                 sequence: !input car_amps_actions
+              - *pause
               - continue_on_error: true
                 sequence: !input start_actions
               - if:
@@ -502,8 +529,10 @@ actions:
           - delay: 60
           - continue_on_error: true
             sequence: !input enable_actions
+          - *pause
           - continue_on_error: true
             sequence: !input circuit_actions
+          - *pause
           - continue_on_error: true
             sequence: !input amps_actions
           - if:
@@ -512,6 +541,7 @@ actions:
             then:
               - continue_on_error: true
                 sequence: !input car_amps_actions
+          - *pause
           - continue_on_error: true
             sequence: !input start_actions
           - if:
@@ -534,6 +564,7 @@ actions:
             sequence: !input notify_actions
           - continue_on_error: true
             sequence: !input circuit_actions
+          - *pause
           - continue_on_error: true
             sequence: !input amps_actions
           - if:
@@ -546,6 +577,7 @@ actions:
               - condition: template
                 value_template: "{{ not charger_done }}"
             then:
+              - *pause
               - continue_on_error: true
                 sequence: !input start_actions
               - if:
@@ -567,12 +599,23 @@ actions:
             then:
               - continue_on_error: true
                 sequence: !input disable_actions
+              # pause when more charger commands follow
+              - if:
+                  - condition: template
+                    value_template: "{{ command_delay > 0 and (whole_decision or 'circuit' in changed or 'amps' in changed) }}"
+                then:
+                  - delay: "{{ command_delay }}"
           - if:
               - condition: template
                 value_template: "{{ 'enabled' in changed and charger_enabled and not whole_decision }}"
             then:
               - continue_on_error: true
                 sequence: !input enable_actions
+              - if:
+                  - condition: template
+                    value_template: "{{ command_delay > 0 and ('circuit' in changed or 'amps' in changed) }}"
+                then:
+                  - delay: "{{ command_delay }}"
           - if:
               - condition: template
                 value_template: "{{ whole_decision }}"
@@ -583,6 +626,7 @@ actions:
                 then:
                   - continue_on_error: true
                     sequence: !input enable_actions
+                  - *pause
               - if:
                   - condition: template
                     value_template: "{{ action == 'charge' }}"
@@ -595,6 +639,7 @@ actions:
                         sequence: !input car_limit_actions
                   - continue_on_error: true
                     sequence: !input circuit_actions
+                  - *pause
                   - continue_on_error: true
                     sequence: !input amps_actions
                   - if:
@@ -608,6 +653,7 @@ actions:
                       - condition: template
                         value_template: "{{ 'action' in changed or not (already_charging or charger_done) }}"
                     then:
+                      - *pause
                       - continue_on_error: true
                         sequence: !input start_actions
                       - if:
@@ -622,8 +668,10 @@ actions:
                     sequence: !input stop_actions
                   - continue_on_error: true
                     sequence: !input car_stop_actions
+                  - *pause
                   - continue_on_error: true
                     sequence: !input amps_actions
+                  - *pause
                   - continue_on_error: true
                     sequence: !input circuit_actions
             # the same action: only what changed
@@ -640,6 +688,11 @@ actions:
                 then:
                   - continue_on_error: true
                     sequence: !input circuit_actions
+                  - if:
+                      - condition: template
+                        value_template: "{{ command_delay > 0 and 'amps' in changed }}"
+                    then:
+                      - delay: "{{ command_delay }}"
               - if:
                   - condition: template
                     value_template: "{{ 'amps' in changed }}"
