@@ -214,6 +214,8 @@ def test_workday_departure_plans_before_departure() -> None:
     friday = [d for d in plan["distance_forecast"] if d["time"].startswith(str(DAY + datetime.timedelta(days=1)))]
     assert [d["km"] for d in friday] == [150]
     assert all(p["end"] > p["time"] for p in plan["charge_plan"])
+    # BattMind reads the cost of each planned hour (its "Elbiler i perioden" table)
+    assert sum(p["cost"] for p in plan["charge_plan"]) == pytest.approx(engine.charge_hours["total_cost"], abs=0.05)
 
 
 def test_site_live_capacity_limits_amps() -> None:
