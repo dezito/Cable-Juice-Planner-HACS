@@ -466,25 +466,13 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             {"time": timestamp.isoformat(), "end": self.charge_plan_end(timestamp, value["kWh"]).isoformat(), "kwh": value["kWh"], "battery_level": value["battery_level"], "price": value["Price"], "cost": value["Cost"], "emoji": emoji_parse(value)}
             for timestamp, value in sorted((k, v) for k, v in chargeHours.items() if isinstance(k, datetime.datetime))
         ])
-        self.set_attr("current_charging_rule", "battery_forecast", self.battery_forecast_flow(charging_plan, chargeHours, now))
-
-        # the planned driving for the dashboard chart: work and trip while away (departure to
-        # homecoming), fill up over the whole day (it has no departure time)
-        distance_forecast = []
-        for day in sorted(key for key in charging_plan if isinstance(key, int)):
-            plan_day = charging_plan[day]
-            drives = []
-            if plan_day["workday"]:
-                drives.append((plan_day["work_goto"], plan_day["work_homecoming"], plan_day["work_range_needed"]))
-            if plan_day["trip"] and trip_range:
-                drives.append((plan_day["trip_goto"], plan_day["trip_homecoming"] or plan_day["end_of_day"], trip_range))
-            if plan_day["offday"]:
-                drives.append((plan_day["start_of_day"], plan_day["end_of_day"], plan_day["offday_range_needed"]))
-            for start, end, km in drives:
-                start = max(start, now)
-                if end > start and km > 0.0:
-                    distance_forecast.append({"time": start.isoformat(), "end": end.isoformat(), "km": round(km, 0)})
-        self.set_attr("current_charging_rule", "distance_forecast", distance_forecast)
+        driving = self.planned_driving(charging_plan, now)
+        self.set_attr("current_charging_rule", "battery_forecast", self.battery_forecast_flow(charging_plan, chargeHours, now, driving))
+        # the planned driving for the chart's bars, overlapping driving is added up there
+        self.set_attr("current_charging_rule", "distance_forecast", [
+            {"time": max(planned["start"], now).isoformat(), "end": planned["end"].isoformat(), "km": round(planned["km"], 0)}
+            for planned in driving if planned["end"] > max(planned["start"], now) and planned["km"] > 0.0
+        ])
 
         old_charge_hours = deepcopy(self.charge_hours)
 
