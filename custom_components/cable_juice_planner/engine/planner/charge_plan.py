@@ -341,27 +341,24 @@ class ChargePlan:
         return min(timestamp + datetime.timedelta(hours=kwh / capacity), hour_end)
 
     def planned_driving(self, charging_plan, now):
-        """The driving the dashboard chart shows, for the bars and the battery level alike: work
-        and trip from departure to homecoming (a trip set as a battery level is shown as the
-        distance of that level), and the typical daily distance spread over each day without
-        work, also on top of a trip that day. Today only the part of the day that is left."""
+        """The driving of every active rule for the dashboard chart, for the bars and the battery
+        level alike, added up when more are active the same day: fill up's typical daily
+        distance spread over the day (today only the part that is left), the work plan and the
+        trip from departure to homecoming (a trip set as a battery level is shown as the
+        distance of that level)."""
         trip_range = self.get_trip_range()
-        workplan_today = self.workplan_charging_enabled() and self.switch_state(f"workday_{charging_plan[0]['day_text']}") == "on"
-        trips = [(plan_day["trip_goto"], plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"]))
-                 for day, plan_day in charging_plan.items() if isinstance(day, int) and plan_day["trip"]]
+        typical_distance = self.get_entity_daily_distance() if self.fill_up_charging_enabled() else 0.0
         driving = []
         for day in sorted(key for key in charging_plan if isinstance(key, int)):
             plan_day = charging_plan[day]
             start, end = max(plan_day["start_of_day"], now), plan_day["end_of_day"]
+            if typical_distance > 0.0 and end > start:
+                part = (end - start) / (end - plan_day["start_of_day"])
+                driving.append({"start": start, "end": end, "km": typical_distance * part,
+                                "battery_level": self.calc_distance_to_battery_level(typical_distance) * part, "away": False, "spread": True})
             if plan_day["workday"]:
                 driving.append({"start": plan_day["work_goto"], "end": plan_day["work_homecoming"], "km": plan_day["work_range_needed"],
                                 "battery_level": plan_day["work_battery_level_needed"], "away": plan_day["work_away"], "spread": False})
-            elif not (day == 0 and workplan_today) and not any(goto <= plan_day["start_of_day"] and end <= homecoming for goto, homecoming in trips) and end > start:
-                # whole days on a trip drive the trip; a workday of today that is over drove its work
-                km = plan_day["offday_range_needed"] if plan_day["offday"] else self.get_entity_daily_distance()
-                part = (end - start) / (end - plan_day["start_of_day"])
-                driving.append({"start": start, "end": end, "km": km * part,
-                                "battery_level": self.calc_distance_to_battery_level(km) * part, "away": False, "spread": True})
             if plan_day["trip"]:
                 used = max(plan_day["trip_battery_level_needed"] + plan_day["trip_battery_level_above_max"] - self.get_min_trip_battery_level(), 0.0)
                 driving.append({"start": plan_day["trip_goto"], "end": plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"]),

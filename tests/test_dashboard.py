@@ -406,8 +406,22 @@ def test_analysis_sections() -> None:
     text = render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing)
     assert "@@" not in text
     headings = [c["heading"] for c in _cards(yaml.safe_load(text)["views"][2]) if c.get("type") == "heading"]
-    for heading in ("Kørsel og temperatur", "Klar til afgang", "Planlagt mod faktisk ladet", "Batterikapacitet"):
+    for heading in ("Kørsel og temperatur", "Klar til afgang", "Lært kørselsafstand", "Planlagt mod faktisk ladet", "Batterikapacitet"):
         assert heading in headings
+
+
+def test_learned_distance_section_shows_weekday_names() -> None:
+    """Entered against learned distance per weekday name (not dates), plus the typical daily distance."""
+    existing = _own("tesla") | {"sensor.ev_battery_level", "sensor.charger_status"}
+    analysis = yaml.safe_load(render_dashboard(const.build_config({**OPTIONS, "language": "da"}), "tesla", "entry1", existing))["views"][2]
+    section = next(s for s in analysis["sections"] if any(c.get("heading") == "Lært kørselsafstand" for c in s["cards"]))
+    table = section["cards"][2]["content"]
+    for day in ("Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag", "Typisk daglig afstand"):
+        assert day in table
+    assert "number.cjp_tesla_workday_distance_needed_" in table and "number.cjp_tesla_typical_daily_distance" in table
+    assert "switch.cjp_tesla_learn_driving_distance" in table and "'learned_distance'" in table
+    assert "Indtastet (km)" in table and "Lært (km)" in table
+    assert "**Dage**: antal målte dage" in section["cards"][1]["content"]
 
 
 def test_analysis_sections_without_a_car() -> None:
@@ -419,7 +433,7 @@ def test_analysis_sections_without_a_car() -> None:
     headings = [c["heading"] for c in _cards(analysis) if c.get("type") == "heading"]
     for heading in ("Prisprognose", "Prognosens træfsikkerhed", "Planlagt mod faktisk ladet"):
         assert heading in headings
-    assert "Kørsel og temperatur" not in headings and "Klar til afgang" not in headings
+    assert "Kørsel og temperatur" not in headings and "Klar til afgang" not in headings and "Lært kørselsafstand" not in headings
     contents = [c.get("content", "") for c in _cards(analysis) if c.get("type") == "markdown"]
     assert any("attributes.forecast or {}" in content and "Husets forbrug pr. time i kWh" in content for content in contents)
 

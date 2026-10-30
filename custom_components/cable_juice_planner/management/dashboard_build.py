@@ -59,7 +59,7 @@ _CAR_EXTRAS = (
 _DROP = object()
 PREHEAT_ENTITIES = (("switch", "trip_preheat"), ("number", "preheat_minutes_before"), *(("switch", f"preheat_{day}") for day in WEEKDAYS))
 # analysis sections with only the car's data (sensor.cjp_analysis also exists without a car)
-EV_SECTIONS = ("@@section_drive_temperature@@", "@@section_departures@@")
+EV_SECTIONS = ("@@section_drive_temperature@@", "@@section_departures@@", "@@section_learn_distance@@")
 
 
 def dashboard_url(prefix: str) -> str:

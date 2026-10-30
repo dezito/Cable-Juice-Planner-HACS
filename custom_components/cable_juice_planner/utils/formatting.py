@@ -9,7 +9,7 @@ from ..const import CHARGING_TYPES, currency_symbol
 
 _EMOJI_PRIORITY = {entry["emoji"]: float(entry["priority"]) for entry in CHARGING_TYPES.values()}
 _HELP_ITEM = re.compile(r"^(?P<indent>\s*)[*•-]\s+(?P<label>.+?):\s*(?P<description>.*)$")
-_ANALYSIS_HELP_KEYS = {"departures_explain", "economy_explain", "forecast_explain", "planned_explain", "drive_temperature_explain"}
+_ANALYSIS_HELP_KEYS = {"departures_explain", "economy_explain", "forecast_explain", "planned_explain", "drive_temperature_explain", "learn_distance_explain"}
 _ABBREVIATIONS = re.compile(
     r"\b(?:[a-zæøåäöü]\.)+[a-zæøåäöü]\.|\b(?:avg|bl|ca|dvs|gns|inkl|kl|max|min|nr|pr)\.",
     re.IGNORECASE,
