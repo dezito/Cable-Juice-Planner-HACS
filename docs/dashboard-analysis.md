@@ -41,8 +41,9 @@ Everything is calculated from Home Assistant's history and CJP's own data, and r
 comparisons need plug-in times and hourly prices, which the recorder has for its `purge_keep_days` – the
 longer, the more there is from the first day (e.g. 30 days). After that CJP saves the prices every hour itself.
 
-Without a car integration, *Driving and temperature*, *Ready at departure*, *Battery capacity* and *Charging
-loss per power* are left out, and *Forecast accuracy* shows only the house consumption.
+Without a car integration, *Driving and temperature*, *Ready at departure*, *Learned driving distance*,
+*Battery capacity* and *Charging loss per power* are left out, and *Forecast accuracy* shows only the house
+consumption.
 
 ### Economy
 
@@ -72,6 +73,21 @@ temperature's statistics – and how much more energy per km the car uses at 0 �
 
 Whether the car had the battery level it needed at each work plan departure, saved at every departure from
 the first start. `sensor.cjp_<prefix>_analysis` is the share of the last 30 departures that were ready.
+
+### Learned driving distance
+
+Per weekday (Monday to Sunday) and for the typical daily distance: what is entered in the settings against
+what CJP has [learned](learn-distance.md) from the odometer.
+
+| Column | Meaning |
+|---|---|
+| Workday | ✅ when the weekday is a workday in the work plan |
+| Entered | the number in the settings, which the plan uses |
+| Learned | the suggestion: the median of the weekday, or the 75th percentile of all days for the typical daily distance |
+| Days | measured days the last 8 weeks. ⏳ = too few to be used (3 of the weekday, 14 in total) |
+
+Above the table it says whether *Learn driving distance* is on, so the entered numbers follow the learned ones.
+The first distance comes the evening after the first start.
 
 ### Planned against actually charged
 

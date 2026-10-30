@@ -237,7 +237,6 @@ def test_battery_forecast_follows_the_plan_hour_by_hour() -> None:
         "workplan_charging": True,
         "workday_friday": True,
         "workday_distance_needed_friday": 150.0,
-        "typical_daily_distance": 0.0,
     }
     engine, result = run(12, level=20, settings=settings, **PLUGGED_IN)
     flow = _forecast(result)
@@ -264,7 +263,7 @@ TRIP_HOMECOMING = datetime.datetime.combine(DAY + datetime.timedelta(days=1), da
 
 @pytest.mark.parametrize("trip", [{"trip_range_needed": 300.0}, {"trip_charge_procent": 80.0}])
 def test_battery_forecast_shows_charging_for_a_trip_tomorrow(trip: dict) -> None:
-    settings = {"trip_date_time": TRIP_GOTO, "trip_homecoming_date_time": TRIP_HOMECOMING, "typical_daily_distance": 0.0, **trip}
+    settings = {"trip_date_time": TRIP_GOTO, "trip_homecoming_date_time": TRIP_HOMECOMING, **trip}
     engine, result = run(12, level=30, settings=settings, **PLUGGED_IN)
     flow = _forecast(result)
     plan_day = engine.charging_plan[1]
@@ -280,30 +279,36 @@ def test_battery_forecast_shows_charging_for_a_trip_tomorrow(trip: dict) -> None
     assert result.attributes["current_charging_rule"]["distance_forecast"] == [{"time": TRIP_GOTO.isoformat(), "end": TRIP_HOMECOMING.isoformat(), "km": km}]
 
 
-def test_planned_driving_adds_the_typical_daily_distance() -> None:
-    """Days without work drive the typical daily distance over the day, on top of a trip that day;
-    today only the part that is left."""
+@pytest.mark.parametrize("fill_up", [True, False])
+@pytest.mark.parametrize("trip_day", [1, 3])
+def test_planned_driving_shows_every_active_rule(fill_up: bool, trip_day: int) -> None:
+    """Every active rule, added up on the same day: fill up's typical daily distance over each day
+    (today only the part that is left), the work plan and the trip (on a day off or a workday)."""
+    trip_goto = TRIP_GOTO + datetime.timedelta(days=trip_day - 1)
+    trip_homecoming = TRIP_HOMECOMING + datetime.timedelta(days=trip_day - 1)
     settings = {
-        "trip_date_time": TRIP_GOTO, "trip_homecoming_date_time": TRIP_HOMECOMING, "trip_range_needed": 300.0,
-        "typical_daily_distance": 40.0,
+        "trip_date_time": trip_goto, "trip_homecoming_date_time": trip_homecoming, "trip_range_needed": 300.0,
+        "typical_daily_distance": 40.0, "fill_up": fill_up,
         "workplan_charging": True, "workday_saturday": True, "workday_distance_needed_saturday": 100.0,
+        "workday_sunday": True, "workday_distance_needed_sunday": 60.0,
     }
     engine, result = run(12, level=30, settings=settings, **PLUGGED_IN)
-    drives = result.attributes["current_charging_rule"]["distance_forecast"]
     now = datetime.datetime.combine(DAY, datetime.time(12, 30))
-    today_end = engine.charging_plan[0]["end_of_day"]
-    part = (today_end - now) / (today_end - engine.charging_plan[0]["start_of_day"])
-    friday, saturday, sunday = (engine.charging_plan[day] for day in (1, 2, 3))
-    assert drives[:5] == [
-        {"time": now.isoformat(), "end": today_end.isoformat(), "km": round(40.0 * part, 0)},
-        {"time": friday["start_of_day"].isoformat(), "end": friday["end_of_day"].isoformat(), "km": 40.0},
-        {"time": TRIP_GOTO.isoformat(), "end": TRIP_HOMECOMING.isoformat(), "km": 300.0},
-        {"time": saturday["work_goto"].isoformat(), "end": saturday["work_homecoming"].isoformat(), "km": 100.0},
-        {"time": sunday["start_of_day"].isoformat(), "end": sunday["end_of_day"].isoformat(), "km": 40.0},
-    ]
+    today = engine.charging_plan[0]
+    part = (today["end_of_day"] - now) / (today["end_of_day"] - today["start_of_day"])
+    expected = []
+    for day in range(8):  # Thursday to Thursday, Saturday and Sunday are workdays
+        plan_day = engine.charging_plan[day]
+        if fill_up:
+            expected.append({"time": max(plan_day["start_of_day"], now).isoformat(), "end": plan_day["end_of_day"].isoformat(), "km": round(40.0 * (part if day == 0 else 1.0), 0)})
+        if day in (2, 3):
+            expected.append({"time": plan_day["work_goto"].isoformat(), "end": plan_day["work_homecoming"].isoformat(), "km": 100.0 if day == 2 else 60.0})
+        if day == trip_day:
+            expected.append({"time": trip_goto.isoformat(), "end": trip_homecoming.isoformat(), "km": 300.0})
+    assert result.attributes["current_charging_rule"]["distance_forecast"] == expected
     # the battery level drives today's part before tonight's charging
     flow = _forecast(result)
-    assert flow[today_end] == pytest.approx(30.0 - engine.calc_distance_to_battery_level(40.0) * part, abs=0.1)
+    assert flow[engine.charging_plan[1]["start_of_day"]] == pytest.approx(30.0 - (engine.calc_distance_to_battery_level(40.0) * part if fill_up else 0.0), abs=0.1)
 
 
 @pytest.mark.parametrize("hour", [6, 12])

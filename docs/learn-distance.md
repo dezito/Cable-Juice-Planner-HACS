@@ -18,6 +18,8 @@ Instead of guessing the km per workday, CJP can learn them from the odometer.
   number entities – also with the switch off.
 - With **Learn driving distance** on, the numbers are set to the suggestions once there are enough days
   (at least 14 days, and 3 of each weekday).
+- *Analysis → Learned driving distance* on the dashboard shows the entered and the learned distance per
+  weekday side by side, with the number of measured days – see [Dashboard](dashboard-analysis.md#learned-driving-distance).
 
 **Example:** the last 8 Tuesdays were 42, 44, 43, 120, 41, 45, 44 and 43 km. The median is 43.5 km, so
 Tuesday's *km needed* becomes 45 km – the 120 km trip doesn't count.

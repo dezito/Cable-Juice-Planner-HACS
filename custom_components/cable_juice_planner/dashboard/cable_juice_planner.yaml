@@ -2216,6 +2216,42 @@ views:
         {%- endif %}
       grid_options:
         columns: full
+  # learned driving distance per weekday (engine/distance.py): entered number against the learned_distance attribute
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: '@@section_learn_distance@@'
+      icon: mdi:map-marker-distance
+    - type: markdown
+      content: "<details><summary>@@read_more@@</summary>\n\n@@learn_distance_explain@@\n\n</details>"
+      grid_options:
+        columns: full
+    - type: markdown
+      content: |-
+        {% set days = [('monday', '@@monday@@'), ('tuesday', '@@tuesday@@'), ('wednesday', '@@wednesday@@'), ('thursday', '@@thursday@@'), ('friday', '@@friday@@'), ('saturday', '@@saturday@@'), ('sunday', '@@sunday@@')] -%}
+        {% set typical = 'number.cjp_typical_daily_distance' -%}
+        {% if is_state('switch.cjp_learn_driving_distance', 'on') %}@@learn_distance_on@@{% else %}@@learn_distance_off@@{% endif %}
+
+        {% if (state_attr(typical, 'learned_days') or 0) == 0 -%}
+        <ha-alert alert-type="info">@@learn_distance_no_data@@</ha-alert>
+
+        {% endif -%}
+        | @@learn_distance_day@@ | @@learn_distance_workday@@ | @@learn_distance_entered@@ | @@learn_distance_learned@@ | @@learn_distance_days@@ |
+        |:---|:---:|---:|---:|---:|
+        {% for key, name in days -%}
+        {% set number = 'number.cjp_workday_distance_needed_' ~ key -%}
+        {% set entered = states(number) | float(none) -%}
+        {% set learned = state_attr(number, 'learned_distance') -%}
+        {% set count = state_attr(number, 'learned_days') or 0 -%}
+        | **{{ name }}** | {{ '✅' if is_state('switch.cjp_workday_' ~ key, 'on') else '–' }} | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 3 else '' }} |
+        {% endfor -%}
+        {% set entered = states(typical) | float(none) -%}
+        {% set learned = state_attr(typical, 'learned_distance') -%}
+        {% set count = state_attr(typical, 'learned_days') or 0 -%}
+        | **@@learn_distance_typical@@** | | {{ entered | round(0) | int if entered is not none else '–' }} | {{ learned | round(0) | int if learned is not none else '–' }} | {{ count }}{{ ' ⏳' if count < 14 else '' }} |
+      grid_options:
+        columns: full
   # planned against actually charged
   - type: grid
     column_span: 2
