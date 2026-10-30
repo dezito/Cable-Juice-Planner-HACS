@@ -94,11 +94,13 @@ views:
         float_precision: 0
         data_generator: |
           const flow = entity.attributes.battery_forecast || [];
-          const days = entity.attributes.distance_forecast || [];
+          const drives = entity.attributes.distance_forecast || [];
           return flow.map(p => {
             const time = new Date(p.time).getTime();
-            const day = days.find(d => time >= new Date(d.time).getTime() && time < new Date(d.end).getTime());
-            return [time, day ? Number(day.km) : 0];
+            const km = drives
+              .filter(d => time >= new Date(d.time).getTime() && time < new Date(d.end).getTime())
+              .reduce((sum, d) => sum + Number(d.km), 0);
+            return [time, km];
           });
         show:
           in_brush: true

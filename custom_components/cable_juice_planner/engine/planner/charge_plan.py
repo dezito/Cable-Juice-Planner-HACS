@@ -11,6 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 FUNC_NAME = "cheap_grid_charge_hours"
 FILL_UP_PRICE_FRACTION = 0.3  # fill up to the max level only in the cheapest 30 % of the known hours
 FILL_UP_LOOK_AHEAD_TOLERANCE = 0.1  # ... and only when no hour until the end of the next day is more than 10 % cheaper
+FORECAST_DRIVE_TIME = datetime.timedelta(minutes=30)  # dashboard chart only: one way to work or on a trip
 
 
 class ChargePlan:
@@ -338,3 +339,79 @@ class ChargePlan:
         if capacity <= 0.0:
             return hour_end
         return min(timestamp + datetime.timedelta(hours=kwh / capacity), hour_end)
+
+    def battery_forecast_flow(self, charging_plan, chargeHours, now):
+        """The expected battery level for the dashboard chart: a point every hour (and where a
+        change starts or ends) from the current level, the planned charging over each hour's
+        charging time, the solar prediction over the daylight at home, and the driving: half
+        on the way out and half on the way home (all on the way home when the car is already away)."""
+        days = [charging_plan[day] for day in sorted(key for key in charging_plan if isinstance(key, int))]
+        horizon = max(plan_day["end_of_day"] for plan_day in days)
+        changes = []  # (start, end, percentage) spread evenly from start to end
+
+        def add(start, end, percentage):
+            start = max(start, now)
+            if percentage and end > start:
+                changes.append((start, min(end, horizon), percentage))
+
+        def drive(goto, homecoming, percentage, away=False):
+            if percentage <= 0.0:
+                return
+            homecoming = homecoming or end_of_day(goto)
+            drive_time = min(FORECAST_DRIVE_TIME, max(homecoming - goto, datetime.timedelta(minutes=2)) / 2)
+            if not away:
+                # already gone: the way out is in the current battery level
+                if goto > now:
+                    add(goto, goto + drive_time, -percentage / 2)
+                percentage /= 2
+            add(homecoming - drive_time, homecoming, -percentage)
+
+        for timestamp, value in chargeHours.items():
+            if not isinstance(timestamp, datetime.datetime):
+                continue
+            end = self.charge_plan_end(timestamp, value["kWh"])
+            if end <= now:
+                # this hour's charging takes longer than planned: the rest of the hour
+                end = reset_time_to_hour(timestamp) + datetime.timedelta(hours=1)
+            add(timestamp, end, value["battery_level"])
+
+        away = []
+        for plan_day in days:
+            if plan_day["workday"]:
+                drive(plan_day["work_goto"], plan_day["work_homecoming"], plan_day["work_battery_level_needed"], plan_day["work_away"])
+                away.append((plan_day["work_goto"], plan_day["work_homecoming"]))
+            if plan_day["trip"]:
+                trip_used = plan_day["trip_battery_level_needed"] + plan_day["trip_battery_level_above_max"] - self.get_min_trip_battery_level()
+                drive(plan_day["trip_goto"], plan_day["trip_homecoming"], trip_used)
+                away.append((plan_day["trip_goto"], plan_day["trip_homecoming"] or end_of_day(plan_day["trip_goto"])))
+            if plan_day["offday"]:
+                # no departure time: spread over the day
+                add(plan_day["start_of_day"], plan_day["end_of_day"], -plan_day["offday_battery_level_needed"])
+
+        if self.solar_charging_enabled():
+            for plan_day in days:
+                solar = sum(plan_day["solar_prediction"])
+                sun_events = self.get_sun_events(plan_day["start_of_day"])
+                if solar <= 0.0 or not sun_events["sunrise"] or not sun_events["sunset"]:
+                    continue
+                home = [(max(sun_events["sunrise"], now), sun_events["sunset"])]
+                for away_start, away_end in away:
+                    home = [part for start, end in home for part in ((start, min(end, away_start)), (max(start, away_end), end))]
+                home = [(start, end) for start, end in home if end > start]
+                daylight = sum((end - start for start, end in home), datetime.timedelta())
+                for start, end in home:
+                    add(start, end, solar * ((end - start) / daylight))
+
+        times = {now, horizon}
+        hour = reset_time_to_hour(now) + datetime.timedelta(hours=1)
+        while hour < horizon:
+            times.add(hour)
+            hour += datetime.timedelta(hours=1)
+        times.update(time for start, end, _ in changes for time in (start, end))
+
+        start_level = self.battery_level()
+        flow = []
+        for time in sorted(times):
+            level = start_level + sum(percentage * min(max((time - start) / (end - start), 0.0), 1.0) for start, end, percentage in changes)
+            flow.append({"time": time.isoformat(), "battery_level": round(min(max(level, 0.0), 100.0), 1)})
+        return flow

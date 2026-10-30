@@ -164,6 +164,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
                 "work_kwh_needed": 0.0,
                 "work_goto": None,
                 "work_homecoming": None,
+                "work_away": False,
                 "work_last_charging": None,
                 "work_total_cost": 0.0,
                 "total_needed_battery_level": 0.0,
@@ -202,6 +203,7 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
 
                     charging_plan[day]['work_goto'] = work_goto
                     charging_plan[day]['work_homecoming'] = work_homecoming
+                    charging_plan[day]['work_away'] = away_on_workday
 
                     hour_buffer = int(self.config['ev_car']['last_charging_hour_before_departure_buffer']) if isinstance(self.config['ev_car']['last_charging_hour_before_departure_buffer'], (float, int)) else 2
                     hours_before = max(1, min(hour_buffer, hours_between(now, charging_plan[day]['work_goto'])))
@@ -464,33 +466,24 @@ class Planner(PriceLevels, HoursPlan, ChargePlan, FutureCharging):
             {"time": timestamp.isoformat(), "end": self.charge_plan_end(timestamp, value["kWh"]).isoformat(), "kwh": value["kWh"], "battery_level": value["battery_level"], "price": value["Price"], "cost": value["Cost"], "emoji": emoji_parse(value)}
             for timestamp, value in sorted((k, v) for k, v in chargeHours.items() if isinstance(k, datetime.datetime))
         ])
-        battery_forecast = [{"time": now.isoformat(), "battery_level": round(self.battery_level(), 1)}]
-        for day in sorted(key for key in charging_plan if isinstance(key, int)):
-            plan_day = charging_plan[day]
-            points = []
-            if plan_day["workday"]:
-                points.append((plan_day["work_goto"], plan_day["battery_level_before_work_sum"]))
-                points.append((plan_day["work_homecoming"], plan_day["battery_level_after_work_sum"]))
-            points.append((plan_day["end_of_day"], plan_day["battery_level_at_midnight_sum"]))
-            for time, level in points:
-                if time > now:
-                    battery_forecast.append({"time": time.isoformat(), "battery_level": round(min(max(level, 0.0), 100.0), 1)})
-        self.set_attr("current_charging_rule", "battery_forecast", battery_forecast)
+        self.set_attr("current_charging_rule", "battery_forecast", self.battery_forecast_flow(charging_plan, chargeHours, now))
 
-        # the planned distance per day (work, trip and fill up together) for the dashboard chart
+        # the planned driving for the dashboard chart: work and trip while away (departure to
+        # homecoming), fill up over the whole day (it has no departure time)
         distance_forecast = []
         for day in sorted(key for key in charging_plan if isinstance(key, int)):
             plan_day = charging_plan[day]
-            km = 0.0
+            drives = []
             if plan_day["workday"]:
-                km += plan_day["work_range_needed"]
+                drives.append((plan_day["work_goto"], plan_day["work_homecoming"], plan_day["work_range_needed"]))
             if plan_day["trip"] and trip_range:
-                km += trip_range
+                drives.append((plan_day["trip_goto"], plan_day["trip_homecoming"] or plan_day["end_of_day"], trip_range))
             if plan_day["offday"]:
-                km += plan_day["offday_range_needed"]
-            start = max(plan_day["start_of_day"], now)
-            if plan_day["end_of_day"] > start:
-                distance_forecast.append({"time": start.isoformat(), "end": plan_day["end_of_day"].isoformat(), "km": round(km, 0)})
+                drives.append((plan_day["start_of_day"], plan_day["end_of_day"], plan_day["offday_range_needed"]))
+            for start, end, km in drives:
+                start = max(start, now)
+                if end > start and km > 0.0:
+                    distance_forecast.append({"time": start.isoformat(), "end": end.isoformat(), "km": round(km, 0)})
         self.set_attr("current_charging_rule", "distance_forecast", distance_forecast)
 
         old_charge_hours = deepcopy(self.charge_hours)

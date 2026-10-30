@@ -529,7 +529,7 @@
     "view_overview": "Огляд",
     "view_settings": "Налаштування",
     "view_analysis": "Аналіз",
-    "distance_per_day": "{distance} на день",
+    "distance_per_day": "Запланована поїздка ({distance})",
     "battery_forecast": "Прогноз батареї",
     "battery_chart_title": "Батарея і план заряджання",
     "battery_level": "Рівень батареї",

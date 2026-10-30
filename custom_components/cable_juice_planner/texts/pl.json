@@ -529,7 +529,7 @@
     "view_overview": "Przegląd",
     "view_settings": "Ustawienia",
     "view_analysis": "Analiza",
-    "distance_per_day": "{distance} na dzień",
+    "distance_per_day": "Planowana jazda ({distance})",
     "battery_forecast": "Prognoza baterii",
     "battery_chart_title": "Bateria i plan ładowania",
     "battery_level": "Poziom baterii",

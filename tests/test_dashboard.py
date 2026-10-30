@@ -136,7 +136,7 @@ def test_dashboard_layout() -> None:
         generator = series["data_generator"]
         assert "const flow = entity.attributes.battery_forecast || [];" in generator
         assert "return flow.map(" in generator
-    assert "day ? Number(day.km) : 0" in chart["series"][0]["data_generator"]
+    assert "sum + Number(d.km)" in chart["series"][0]["data_generator"]
     # public charging only while a session waits for its cost
     conditional = next(card for card in _cards(overview) if card.get("type") == "conditional" and "Offentlig ladning" in headings(card))
     assert conditional["conditions"] == [{"condition": "state", "entity": "binary_sensor.cjp_tesla_public_charging_session_done", "state": "on"}]
