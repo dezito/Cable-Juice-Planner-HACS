@@ -218,6 +218,80 @@ def test_workday_departure_plans_before_departure() -> None:
     assert sum(p["cost"] for p in plan["charge_plan"]) == pytest.approx(engine.charge_hours["total_cost"], abs=0.05)
 
 
+def _forecast(result) -> dict[datetime.datetime, float]:
+    flow = result.attributes["current_charging_rule"]["battery_forecast"]
+    return {datetime.datetime.fromisoformat(p["time"]): p["battery_level"] for p in flow}
+
+
+def _assert_drive_halves(flow: dict, goto: datetime.datetime, homecoming: datetime.datetime, used: float) -> None:
+    """Half the driving on the way out, the level stays while away, the other half on the way home."""
+    half_hour = datetime.timedelta(minutes=30)
+    assert flow[goto] - flow[goto + half_hour] == pytest.approx(used / 2, abs=0.2)
+    assert flow[homecoming - half_hour] == pytest.approx(flow[goto + half_hour], abs=0.1)
+    assert flow[homecoming - half_hour] - flow[homecoming] == pytest.approx(used / 2, abs=0.2)
+
+
+def test_battery_forecast_follows_the_plan_hour_by_hour() -> None:
+    """The chart: a point every hour, charging up before the departure and the driving split in two."""
+    settings = {
+        "workplan_charging": True,
+        "workday_friday": True,
+        "workday_distance_needed_friday": 150.0,
+    }
+    engine, result = run(12, level=20, settings=settings, **PLUGGED_IN)
+    flow = _forecast(result)
+    times = sorted(flow)
+    assert times[0] == datetime.datetime.combine(DAY, datetime.time(12, 30))
+    assert flow[times[0]] == 20.0
+    assert all(later - earlier <= datetime.timedelta(hours=1) for earlier, later in zip(times, times[1:]))
+    friday = engine.charging_plan[1]
+    # charged up to the planner's level before work, then the 150 km half out and half home
+    assert flow[friday["work_goto"]] == pytest.approx(friday["battery_level_before_work_sum"], abs=0.5)
+    _assert_drive_halves(flow, friday["work_goto"], friday["work_homecoming"], friday["work_battery_level_needed"])
+    plan = result.attributes["current_charging_rule"]
+    # the bars start and end at the plan's times: a point at each charging start/end and drive
+    for entry in plan["charge_plan"] + plan["distance_forecast"]:
+        for key in ("time", "end"):
+            time = datetime.datetime.fromisoformat(entry[key])
+            assert time < times[0] or time in flow
+    assert [(d["time"], d["end"]) for d in plan["distance_forecast"]] == [(friday["work_goto"].isoformat(), friday["work_homecoming"].isoformat())]
+
+
+def test_battery_forecast_shows_charging_for_a_trip_tomorrow() -> None:
+    tomorrow = DAY + datetime.timedelta(days=1)
+    goto = datetime.datetime.combine(tomorrow, datetime.time(9))
+    homecoming = datetime.datetime.combine(tomorrow, datetime.time(18))
+    settings = {"trip_date_time": goto, "trip_homecoming_date_time": homecoming, "trip_range_needed": 300.0}
+    engine, result = run(12, level=30, settings=settings, **PLUGGED_IN)
+    flow = _forecast(result)
+    trip = engine.charging_plan[1]
+    assert trip["trip"]
+    used = trip["trip_battery_level_needed"] + trip["trip_battery_level_above_max"] - engine.get_min_trip_battery_level()
+    assert used > 0.0
+    # charged up to the trip before leaving, not only at the end of the day
+    assert flow[goto] == pytest.approx(min(trip["trip_battery_level_needed"] + trip["trip_battery_level_above_max"], 100.0), abs=1.0)
+    assert flow[goto] > 30.0
+    _assert_drive_halves(flow, goto, homecoming, used)
+
+
+@pytest.mark.parametrize("hour", [6, 12])
+def test_battery_forecast_away_on_a_workday_only_drives_home(hour: int) -> None:
+    """Away from home: the way out is already in the battery level, the rest comes on the way home."""
+    now = datetime.datetime.combine(DAY, datetime.time(hour, 30))
+    settings = {"workplan_charging": True, "workday_thursday": True, "workday_distance_needed_thursday": 100.0}
+    snap = snapshot(now, level=60, settings=settings)
+    snap.states["device_tracker.ev"] = "not_home"
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+    result = engine.run_job(snap, engine.charge_if_needed, True)
+    assert result.error is None
+    flow = _forecast(result)
+    today = engine.charging_plan[0]
+    homecoming = today["work_homecoming"]
+    assert flow[homecoming - datetime.timedelta(minutes=30)] == 60.0
+    assert flow[homecoming] == pytest.approx(60.0 - today["work_battery_level_needed"], abs=0.1)
+
+
 def test_site_live_capacity_limits_amps() -> None:
     """Load balancing: only 10 A per phase left on the grid connection."""
     site = {"live": [10.0, 10.0, 10.0], "hour_capacity": {}, "urgent_hours": 12.0}

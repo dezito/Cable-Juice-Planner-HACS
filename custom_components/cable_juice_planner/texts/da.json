@@ -529,7 +529,7 @@
     "view_overview": "Oversigt",
     "view_settings": "Indstillinger",
     "view_analysis": "Analyse",
-    "distance_per_day": "{distance} pr. dag",
+    "distance_per_day": "Planlagt kørsel ({distance})",
     "battery_forecast": "Batteri prognose",
     "battery_chart_title": "Batteri og ladeplan",
     "battery_level": "Batteriniveau",
