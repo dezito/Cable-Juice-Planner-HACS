@@ -9,7 +9,7 @@
           "language": "Język"
         },
         "data_description": {
-          "language": "Język przeglądu, historii ładowania, reguły ładowania i powiadomień."
+          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień."
         }
       },
       "charger": {
@@ -326,7 +326,7 @@
         "data_description": {
           "name": "Opcjonalnie, np. Tesla. Używana jako nazwa urządzenia i w powiadomieniach.",
           "entity_prefix": "Opcjonalnie. Wszystkie encje zaczynają się od cjp_, prefiks jest dalej: tesla daje sensor.cjp_tesla_overview, puste daje sensor.cjp_overview. Inny prefiks dla każdego auta.",
-          "language": "Język przeglądu, historii ładowania, reguły ładowania i powiadomień."
+          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień."
         }
       },
       "site": {
@@ -409,7 +409,7 @@
           "language": "Język"
         },
         "data_description": {
-          "language": "Język przeglądu, historii ładowania, reguły ładowania i powiadomień."
+          "language": "Język nazw encji, przeglądu, historii ładowania, reguły ładowania i powiadomień."
         }
       },
       "charger": {

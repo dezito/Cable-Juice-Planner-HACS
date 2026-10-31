@@ -8,8 +8,10 @@ difference to the reading the evening before. From the last weeks:
 - typical_daily_distance: the 75th percentile of all days, a buffer above the normal day.
 
 The suggestions are always shown as the ``learned_distance`` attribute of the number
-entities. With switch.<prefix>_learn_driving_distance on, the numbers are set to them
-once there are enough days. Extra driving in a week is covered by min_daily_battery_level.
+entities. With switch.<prefix>_learn_driving_distance on, the plan uses the higher of the
+entered number and the suggestion once there are enough days; the numbers are never changed,
+so a higher distance entered for a single day still counts. Extra driving in a week is
+covered by min_daily_battery_level.
 """
 from __future__ import annotations
 
@@ -83,11 +85,16 @@ class Distance:
                 distances[date] = value - previous
         return distances
 
+    def with_learned_distance(self, key: str, entered: float) -> float:
+        """The entered distance of a number, with learning on the learned one when that is higher."""
+        learned = self.learned_distances.get(key) if self.learn_driving_distance_enabled() else None
+        return entered if learned is None else max(entered, learned)
+
     def update_learned_distances(self) -> None:
         if not self.is_ev_configured():
             return
         distances = self.daily_distances()
-        learn = self.learn_driving_distance_enabled()
+        learned = {}  # only the suggestions with enough days, used by with_learned_distance
 
         for day in WEEKDAYS:
             samples = [distance for date, distance in distances.items() if WEEKDAYS[date.weekday()] == day]
@@ -95,14 +102,13 @@ class Distance:
             suggestion = _round_up_to_step(_median(samples)) if samples else None
             self.set_attr(key, "learned_distance", suggestion)
             self.set_attr(key, "learned_days", len(samples))
-            if learn and suggestion is not None and len(samples) >= DISTANCE_MIN_WEEKDAY_SAMPLES and self.number_state(key) != suggestion:
-                _LOGGER.info("Learned driving distance %s: %s", day, suggestion)
-                self.set_setting(key, suggestion)
+            if suggestion is not None and len(samples) >= DISTANCE_MIN_WEEKDAY_SAMPLES:
+                learned[key] = suggestion
 
         samples = list(distances.values())
         suggestion = _round_up_to_step(_percentile(samples, DISTANCE_PERCENTILE)) if samples else None
         self.set_attr("typical_daily_distance", "learned_distance", suggestion)
         self.set_attr("typical_daily_distance", "learned_days", len(samples))
-        if learn and suggestion is not None and len(samples) >= DISTANCE_MIN_DAYS and self.number_state("typical_daily_distance") != suggestion:
-            _LOGGER.info("Learned typical daily distance: %s", suggestion)
-            self.set_setting("typical_daily_distance", suggestion)
+        if suggestion is not None and len(samples) >= DISTANCE_MIN_DAYS:
+            learned["typical_daily_distance"] = suggestion
+        self.learned_distances = learned

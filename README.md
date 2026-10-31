@@ -142,7 +142,8 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - **[Learn driving distance](docs/learn-distance.md)**
   - the odometer is read every evening, and from the last 8 weeks CJP suggests the **km per workday** in the work plan
     (the median per weekday) and the **typical daily distance** for optimal weekly charging (75th percentile)
-  - the suggestions are always shown, and with **Learn driving distance** on, the numbers are set automatically
+  - the suggestions are always shown, and with **Learn driving distance** on, the plan uses the higher of the
+    entered and the learned km – the entered numbers are not changed
   - the analysis shows entered against learned distance per weekday
 - **[Analysis](docs/dashboard-analysis.md#analysis)**
   - economy per month: kWh per source (grid, solar, home battery, public), cost and price/km

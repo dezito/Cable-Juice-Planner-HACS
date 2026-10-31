@@ -131,9 +131,15 @@ class Battery:
         output = 3.0
         if not self.is_ev_configured():
             try:
-                output = round(self.get_estimated_total_range() / 100, 2)
+                calc = round(self.get_estimated_total_range() / 100, 2)
+                if calc <= 0.0:
+                    # number.<prefix>_estimated_total_range is 0 until the user enters the car's range
+                    raise ValueError(f"estimated_total_range is not set: {calc * 100}")
+                output = calc
             except Exception as err:  # noqa: BLE001
-                _LOGGER.error(err)
+                if not self._job_cache.get("distance_per_percentage_warned"):
+                    self._job_cache["distance_per_percentage_warned"] = True
+                    _LOGGER.warning("Using default value 3.0: %s", err)
         else:
             try:
                 if self.km_kwh_efficiency_db == {}:

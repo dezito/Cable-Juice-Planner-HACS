@@ -15,10 +15,11 @@ from homeassistant.core import CoreState, Event, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import translation
 from homeassistant.util import dt as dt_util
 
 from ..management.backup import async_load_backup, async_restore_databases, pending_restores
-from ..const import ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, TITLE, normalize_language
+from ..const import DOMAIN, ENTITY_UNAVAILABLE_STATES, MIGRATED_LAST_FULL_CHARGE, TITLE, normalize_language
 from ..engine import CJPEngine
 from ..utils.formatting import load_texts
 from ..utils.helpers import float_or_none
@@ -33,6 +34,15 @@ class CoordinatorLifecycle:
     async def async_setup(self) -> None:
         language = normalize_language(self.config.get("language"), normalize_language(self.hass.config.language))
         self.texts = await self.hass.async_add_executor_job(load_texts, language, self.hass.config.currency, self.distance_unit)
+        # entity names in the same language (HA would name translation_key entities in its own UI
+        # language), English is the fallback for missing keys
+        translations = await translation.async_get_translations(self.hass, language, "entity", {DOMAIN})
+        self.entity_names = {
+            key.removeprefix(f"component.{DOMAIN}.entity.").removesuffix(".name"): name
+            for key, name in translations.items()
+            # component.<domain>.entity.<platform>.<key>.name (not state or state_attributes names)
+            if key.startswith(f"component.{DOMAIN}.entity.") and key.endswith(".name") and key.count(".") == 5
+        }
         self.engine = CJPEngine(self.config, self.object_prefix, self.texts, title=self.title)
         if self.site is not None:
             self.site.register(self)

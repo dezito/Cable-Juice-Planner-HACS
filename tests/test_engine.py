@@ -539,11 +539,12 @@ def test_learned_distance_is_only_suggested_by_default() -> None:
     assert not result.settings
 
 
-def test_learned_distance_sets_the_numbers_when_enabled() -> None:
+def test_learned_distance_never_changes_the_numbers() -> None:
     engine = _distance_engine({0: 42, 1: 42, 2: 42, 3: 42, 4: 120, 5: 10, 6: 0})
     result = _distance_run(engine, {"learn_driving_distance": True})
-    assert result.settings["workday_distance_needed_friday"] == 120
-    assert result.settings["typical_daily_distance"] == 45
+    assert not result.settings
+    assert engine.learned_distances["workday_distance_needed_friday"] == 120
+    assert engine.learned_distances["typical_daily_distance"] == 45
 
 
 def test_learned_distance_median_ignores_one_long_trip() -> None:
@@ -561,8 +562,23 @@ def test_learned_distance_needs_enough_days() -> None:
     engine = _distance_engine({0: 42}, weeks=1)
     result = _distance_run(engine, {"learn_driving_distance": True})
     assert result.attributes["workday_distance_needed_monday"]["learned_days"] == 1
-    assert "workday_distance_needed_monday" not in result.settings
-    assert "typical_daily_distance" not in result.settings
+    assert engine.learned_distances == {}
+
+
+@pytest.mark.parametrize(("learn", "entered", "expected"), [(True, 50.0, 120), (True, 150.0, 150), (False, 50.0, 50)])
+def test_plan_uses_the_higher_of_entered_and_learned_distance(learn: bool, entered: float, expected: float) -> None:
+    """Regression: the chart showed the entered km with learning on; a higher entered day still counts."""
+    settings = {"workplan_charging": True, "workday_friday": True, "workday_distance_needed_friday": entered}
+    engine, _ = run(12, level=20, settings=settings, **PLUGGED_IN)
+    engine.daily_odometer = _distance_engine({4: 120}).daily_odometer
+    now = datetime.datetime.combine(DAY, datetime.time(12, 30))
+    assert engine.run_job(snapshot(now, level=20, settings=settings, **PLUGGED_IN), engine.update_learned_distances).error is None
+    # turning the switch on recalculates the plan
+    result = engine.run_job(snapshot(now, level=20, settings={**settings, "learn_driving_distance": learn}, **PLUGGED_IN), engine.recalculate)
+    assert result.error is None, result.error
+    assert "workday_distance_needed_friday" not in result.settings
+    friday = [d for d in result.attributes["current_charging_rule"]["distance_forecast"] if d["time"].startswith(str(DAY + datetime.timedelta(days=1)))]
+    assert [d["km"] for d in friday] == [expected]
 
 
 def test_daily_odometer_is_recorded_at_the_end_of_the_day() -> None:

@@ -9,7 +9,7 @@
           "language": "Sprog"
         },
         "data_description": {
-          "language": "Sprog i oversigten, ladehistorikken, ladereglen og notifikationer."
+          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer."
         }
       },
       "charger": {
@@ -326,7 +326,7 @@
         "data_description": {
           "name": "Valgfri, f.eks. Tesla eller Familiebilen. Vises som enhedens navn (entiteterne hedder f.eks. Tesla Oversigt) og i notifikationerne.",
           "entity_prefix": "Valgfri. Alle entiteter starter med cjp_, prefixet kommer bagefter: tesla giver sensor.cjp_tesla_overview, tomt giver sensor.cjp_overview. Brug et forskelligt prefix til hver bil. Kan ikke ændres bagefter.",
-          "language": "Sprog i oversigten, ladehistorikken, ladereglen og notifikationer."
+          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer."
         }
       },
       "site": {
@@ -409,7 +409,7 @@
           "language": "Sprog"
         },
         "data_description": {
-          "language": "Sprog i oversigten, ladehistorikken, ladereglen og notifikationer."
+          "language": "Sprog i entitetsnavne, oversigten, ladehistorikken, ladereglen og notifikationer."
         }
       },
       "charger": {

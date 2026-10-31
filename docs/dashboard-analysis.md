@@ -82,11 +82,12 @@ what CJP has [learned](learn-distance.md) from the odometer.
 | Column | Meaning |
 |---|---|
 | Workday | ✅ when the weekday is a workday in the work plan |
-| Entered | the number in the settings, which the plan uses |
+| Entered | the number in the settings, which the plan uses (with learning on: the higher of this and *Learned*) |
 | Learned | the suggestion: the median of the weekday, or the 75th percentile of all days for the typical daily distance |
 | Days | measured days the last 8 weeks. ⏳ = too few to be used (3 of the weekday, 14 in total) |
 
-Above the table it says whether *Learn driving distance* is on, so the entered numbers follow the learned ones.
+Above the table it says whether *Learn driving distance* is on, so the plan uses the higher of the entered and
+the learned distance (the entered numbers are not changed).
 The first distance comes the evening after the first start.
 
 ### Planned against actually charged

@@ -78,6 +78,34 @@ async def test_post_setup_work_waits_until_home_assistant_started(hass: HomeAssi
     action.assert_awaited_once_with()
 
 
+async def test_unload_removes_the_startup_listener_only_once(hass: HomeAssistant, mock_entry, caplog) -> None:
+    """A reload after startup must not remove the fired one-time listener again (HA logs an error)."""
+    action = AsyncMock()
+    hass.set_state(CoreState.starting)
+    with patch.object(mock_entry, "async_on_unload") as on_unload:
+        await _async_run_after_home_assistant_started(hass, mock_entry, action, "cjp_test_startup")
+    hass.set_state(CoreState.running)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+    await hass.async_block_till_done()
+    action.assert_awaited_once_with()
+
+    on_unload.call_args.args[0]()
+    assert "Unable to remove unknown job listener" not in caplog.text
+
+
+async def test_unload_before_startup_cancels_the_work(hass: HomeAssistant, mock_entry) -> None:
+    action = AsyncMock()
+    hass.set_state(CoreState.starting)
+    with patch.object(mock_entry, "async_on_unload") as on_unload:
+        await _async_run_after_home_assistant_started(hass, mock_entry, action, "cjp_test_startup")
+    on_unload.call_args.args[0]()
+
+    hass.set_state(CoreState.running)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+    await hass.async_block_till_done()
+    action.assert_not_awaited()
+
+
 async def test_setup_creates_entities(hass: HomeAssistant, loaded_entry) -> None:
     assert loaded_entry.state is ConfigEntryState.LOADED
     coordinator = loaded_entry.runtime_data
@@ -212,6 +240,36 @@ async def test_settings_and_databases_survive_reload(hass: HomeAssistant, loaded
     assert loaded_entry.runtime_data is not old_coordinator
     assert _state(hass, "switch", "workplan_charging") == "on"
     assert _state(hass, "time", "workday_departure_monday") == "06:15:00"
+
+
+async def test_entity_names_follow_the_language_of_the_entry(hass: HomeAssistant, loaded_entry) -> None:
+    """HA names translation_key entities in its UI language (en), CJP in the entry's (da, then en)."""
+    assert hass.config.language == "en"
+    entity_id = f"number.{OBJECT_PREFIX}_trip_range_needed"
+    # {distance} is filled in like HA does for its own translations
+    assert er.async_get(hass).async_get(entity_id).original_name == "Tur km forbrug"
+
+    old_coordinator = loaded_entry.runtime_data
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "language": "en"})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
+
+    assert loaded_entry.runtime_data is not old_coordinator
+    assert er.async_get(hass).async_get(entity_id).original_name == "Trip km needed"
+    assert hass.states.get(entity_id).attributes["friendly_name"].endswith("Trip km needed")
+
+
+async def test_charger_only_instance_without_total_range(hass: HomeAssistant, caplog) -> None:
+    """number.cjp_<prefix>_estimated_total_range is 0 until entered: 3 km per % is used, not a division by zero."""
+    set_source_states(hass, ev=False)
+    entry = make_entry(options=MOCK_OPTIONS_NO_EV)
+    await async_setup(hass, entry)
+    coordinator = entry.runtime_data
+    assert float(_state(hass, "number", "estimated_total_range")) == 0.0
+    assert coordinator.engine.charger_mode != "error"
+    assert "division by zero" not in caplog.text
+    assert "Error running charge_if_needed" not in caplog.text
+    await async_unload_and_join(hass, entry)
 
 
 async def test_charger_only_instance(hass: HomeAssistant) -> None:
