@@ -149,6 +149,7 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
         self.charging_loss_charger_begin_kwh = 0.0
         self.charging_loss_charging_completed = False
         self.daily_odometer: dict[str, float] = {}  # ISO date -> odometer at the end of the day
+        self.learned_distances: dict[str, float] = {}  # number key -> learned distance with enough days
         self.charging_loss_db: dict = {"segments": [], "backfilled": False}
         self.economy_db: dict = {"windows": []}
         self.analysis_db: dict = {"drives": [], "departures": [], "planned_days": {}, "price_hours": {}, "price_days": {}}
@@ -573,14 +574,18 @@ class CJPEngine(Planner, Control, ChargingHistory, Distance, Loss, Economy, Anal
 
     def get_entity_daily_distance(self, day_text=None, date=None, ignore_realistic_estimated_range=False):
         try:
+            key = "typical_daily_distance"
             if day_text is None and date is None:
-                distance = float(self.number_state("typical_daily_distance"))
+                distance = float(self.number_state(key))
             else:
                 day_text = day_text if day_text in WEEKDAYS else day_of_week_text(self.now() if date is None else date)
                 workday = self.switch_state(f"workday_{day_text}", error_state="off")
                 distance = float(self.number_state(f"workday_distance_needed_{day_text}", error_state=0.0))
                 if distance == 0.0 or workday == "off":
-                    distance = float(self.number_state("typical_daily_distance"))
+                    distance = float(self.number_state(key))
+                else:
+                    key = f"workday_distance_needed_{day_text}"
+            distance = self.with_learned_distance(key, distance)
             if self.is_ev_configured() and not ignore_realistic_estimated_range:
                 estimated_range_attr = self.own_attr("estimated_range", error_state={})
                 if "total" in estimated_range_attr and float(estimated_range_attr["total"]) > 0.0:
