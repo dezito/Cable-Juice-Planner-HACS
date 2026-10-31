@@ -764,6 +764,21 @@ def test_virtual_car_reports_the_drive_after_unplugging_from_completed() -> None
     assert not drive_notifications(higher)
 
 
+def test_plug_in_under_daily_level_notifies_once() -> None:
+    """The charger status and the car's charge port both report the plug-in: one notification."""
+    now = datetime.datetime.combine(DAY, datetime.time(16, 30))
+    snap = snapshot(now, level=20, **PLUGGED_IN)
+    engine = CJPEngine(const.build_config(OPTIONS), "cjp_test", TEXTS)
+    assert engine.run_job(snap, engine.startup, {}).error is None
+
+    def daily_level_notifications(result) -> list[dict]:
+        assert result.error is None, result.error
+        return [n for n in result.mobile_notifications if TEXTS["ui.notify_battery_under_daily_battery_level.title"] in n["title"]]
+
+    assert len(daily_level_notifications(engine.run_job(snap, engine.charger_connected, "awaiting_start"))) == 1
+    assert not daily_level_notifications(engine.run_job(snap, engine.ev_port_changed, "on", "off"))
+
+
 @pytest.mark.parametrize(
     ("status", "status_history", "cable", "cable_history", "home"),
     [
