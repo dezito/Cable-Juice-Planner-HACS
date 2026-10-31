@@ -29,7 +29,7 @@ custom_components/cable_juice_planner/  The HA integration (HACS payload)
 │   ├── engine.py / planning.py          Calculation orchestration
 │   ├── planner/                         Charge plan and price-level decisions
 │   │   └── future/                      Departure, scheduled, solar, and unscheduled plans
-│   ├── control/                         Current charger actions, schedule, and preheat
+│   ├── control/                         Current charger actions, schedule, triggers, preheat, and charging-loss measurement
 │   ├── energy/                          Prices, solar, forecasts, and power inputs
 │   ├── history/                         Charging sessions, consumption, cost, and efficiency
 │   ├── analysis/                        Economy/forecast analysis and published results
@@ -265,11 +265,13 @@ Inside it, run `python -m pytest` from the repository root; it is Linux, so no
 shims are needed. The dev HA runs on `http://localhost:8123`; after a code
 change run `bash ha-dev/devcontainer/restart.sh`, and
 `bash ha-dev/devcontainer/restart.sh reset` wipes the state and seeds again.
-Seeding creates four car profiles, each with its own prefix ("Bil med alt"
-with every car entity, "Bil uden EV" without car entities, "Bil uden varme
-entity" without the climate entity, "Bil uden Energi Data Service" with only
+Seeding creates four car profiles, each with its own prefix ("Car with
+everything"/`car_full` with every car entity, "Car without EV"/`car_no_ev`
+without car entities, "Car without climate entity"/`car_no_climate` without the
+climate entity, "Car without Energi Data Service"/`car_no_eds` with only
 Strømligning as price provider) plus the shared site entry. Use them to test
-missing-entity and single-provider cases.
+missing-entity and single-provider cases. The dev HA, the dev user's profile
+and the seeded entries are in English.
 
 The seed data and simulator entities are in `../ha-dev/devcontainer/seed.py`
 (`SIM_ENTITIES`/`SEEDS`), the simulator in

@@ -269,6 +269,24 @@ class ControlEvents:
         self.drive_efficiency(str(value))
         self.notify_battery_under_daily_battery_level()
 
+    def notify_set_battery_level(self) -> None:
+        if self.is_ev_configured() or self.battery_level() != 0.0:
+            return
+        data = {"actions": [{"action": "URI", "title": self.t("ui.notify_set_battery_level.action"), "uri": f"entityId:{self.own_entity_id('number', 'battery_level')}"}]}
+        self.my_notify(self.t("ui.notify_set_battery_level.message"), title=f"{self.title} {self.t('ui.notify_set_battery_level.title')}", data=data, always=True)
+
+    def notify_battery_under_daily_battery_level(self) -> None:
+        if not self.ready_to_charge():
+            return
+        if self.battery_level() < self.get_min_daily_battery_level() and self.battery_level() != 0.0:
+            data = {"actions": [{"action": "URI", "title": self.t("ui.notify_battery_under_daily_battery_level.action"), "uri": f"entityId:{self.own_entity_id('switch', 'forced_charging_daily_battery_level')}"}]}
+            # not always=True: the charger status and the car's port/cable both report the same plug-in
+            self.my_notify(
+                f"{self.t('ui.notify_battery_under_daily_battery_level.message')}\n{self.t('ui.notify_battery_under_daily_battery_level.no_charge_expensive_hours')}",
+                title=f"{self.title} {self.t('ui.notify_battery_under_daily_battery_level.title')}",
+                data=data,
+            )
+
     def charger_cable_changed(self, value, old_value) -> None:
         """state_trigger_charger_cable_connected (charger without a status entity)."""
         if not self.is_ev_configured() or old_value in ENTITY_UNAVAILABLE_STATES or value in ENTITY_UNAVAILABLE_STATES:
