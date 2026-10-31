@@ -67,6 +67,7 @@ class CJPCoordinator(CoordinatorLifecycle, CoordinatorEvents, CoordinatorData, C
         self.ev_configured = is_ev_configured(self.config)
         self.solar_configured = is_solar_configured(self.config)
         self.texts: dict[str, str] = {}
+        self.entity_names: dict[str, str] = {}  # '<platform>.<key>' -> name, loaded in async_setup
         self.engine: CJPEngine | None = None
         self.storage = CJPStorage(hass, entry.entry_id)
 

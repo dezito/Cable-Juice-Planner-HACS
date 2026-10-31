@@ -9,7 +9,7 @@
           "language": "Language"
         },
         "data_description": {
-          "language": "Language of the overview, the charging history, the charging rule and notifications."
+          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications."
         }
       },
       "charger": {
@@ -326,7 +326,7 @@
         "data_description": {
           "name": "Optional, e.g. Tesla or Family car. Used as the device name (entities show as e.g. Tesla Overview) and in the notifications.",
           "entity_prefix": "Optional. All entities start with cjp_, the prefix follows: tesla gives sensor.cjp_tesla_overview, empty gives sensor.cjp_overview. Use a different prefix for each car. Cannot be changed later.",
-          "language": "Language of the overview, the charging history, the charging rule and notifications."
+          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications."
         }
       },
       "site": {
@@ -409,7 +409,7 @@
           "language": "Language"
         },
         "data_description": {
-          "language": "Language of the overview, the charging history, the charging rule and notifications."
+          "language": "Language of the entity names, the overview, the charging history, the charging rule and notifications."
         }
       },
       "charger": {

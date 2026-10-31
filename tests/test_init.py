@@ -214,6 +214,23 @@ async def test_settings_and_databases_survive_reload(hass: HomeAssistant, loaded
     assert _state(hass, "time", "workday_departure_monday") == "06:15:00"
 
 
+async def test_entity_names_follow_the_language_of_the_entry(hass: HomeAssistant, loaded_entry) -> None:
+    """HA names translation_key entities in its UI language (en), CJP in the entry's (da, then en)."""
+    assert hass.config.language == "en"
+    entity_id = f"number.{OBJECT_PREFIX}_trip_range_needed"
+    # {distance} is filled in like HA does for its own translations
+    assert er.async_get(hass).async_get(entity_id).original_name == "Tur km forbrug"
+
+    old_coordinator = loaded_entry.runtime_data
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "language": "en"})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await hass.async_add_executor_job(old_coordinator._executor.shutdown, True)
+
+    assert loaded_entry.runtime_data is not old_coordinator
+    assert er.async_get(hass).async_get(entity_id).original_name == "Trip km needed"
+    assert hass.states.get(entity_id).attributes["friendly_name"].endswith("Trip km needed")
+
+
 async def test_charger_only_instance(hass: HomeAssistant) -> None:
     """Without a car integration CJP waits (max 30 min) for the battery level entered in number.cjp_<prefix>_battery_level."""
     set_source_states(hass, ev=False)

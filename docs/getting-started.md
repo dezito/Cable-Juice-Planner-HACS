@@ -42,6 +42,9 @@ The setup is split into pages. Every field has a help text – here are the ones
 - **Name** is used as the device name and in notifications.
 - **Prefix:** all entity ids start with `cjp_`. With the prefix `tesla` you get `sensor.cjp_tesla_overview`,
   without one `sensor.cjp_overview`. Use one prefix per car. It can't be changed later.
+- **Language** is used for the entity names, the dashboard, the charging rule and notifications. It can be
+  changed later under **Configure → General**; the entry reloads and the entity names follow (names you
+  renamed yourself are kept).
 
 ### Charger
 

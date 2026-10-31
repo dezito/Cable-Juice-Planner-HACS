@@ -9,7 +9,7 @@
           "language": "Sprache"
         },
         "data_description": {
-          "language": "Sprache der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
+          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
         }
       },
       "charger": {
@@ -326,7 +326,7 @@
         "data_description": {
           "name": "Optional, z. B. Tesla. Wird als Gerätename (z. B. Tesla Übersicht) und in Benachrichtigungen verwendet.",
           "entity_prefix": "Optional. Alle Entitäten beginnen mit cjp_, das Präfix folgt: tesla ergibt sensor.cjp_tesla_overview, leer ergibt sensor.cjp_overview. Für jedes Auto ein anderes Präfix verwenden.",
-          "language": "Sprache der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
+          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
         }
       },
       "site": {
@@ -409,7 +409,7 @@
           "language": "Sprache"
         },
         "data_description": {
-          "language": "Sprache der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
+          "language": "Sprache der Entitätsnamen, der Übersicht, der Ladehistorie, der Laderegel und der Benachrichtigungen."
         }
       },
       "charger": {
