@@ -5,6 +5,10 @@
 Without a fixed pattern – or on holiday – CJP keeps the car ready for a normal day and fills it up when the
 power is cheapest during the week.
 
+<p align="center">
+  <img src="../../images/settings-optimal-weekly-charging.png" alt="The Optimal weekly charging settings" width="380">
+</p>
+
 ## How it plans
 
 Two levels every day:

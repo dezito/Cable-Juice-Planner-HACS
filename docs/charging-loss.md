@@ -28,6 +28,10 @@ part, as it does with solar charging, but the charging phase count must remain t
 | *Use measured charging loss* (switch, off by default) | the plan uses the measured loss instead of the configured one – per hour at that hour's power when there is a model, else the measured loss at the max. power |
 | *Recalculate charging loss* (button) | forgets the measurements and reads the history again |
 
+<p align="center">
+  <img src="../images/settings-charging-loss.png" alt="The Charging loss switches" width="380">
+</p>
+
 **kWh from the charger per 1 %** is what the plan really needs, and it doesn't depend on the battery size:
 if the battery size is set too high or too low, only the loss percentage moves – the plan still fits.
 
@@ -35,6 +39,10 @@ if the battery size is set too high or too low, only the loss percentage moves �
 1-phase solar charging at 1.4 kW loses 0.3 ÷ 1.4 + 3 % ≈ 24 %.
 
 The [analysis](dashboard-analysis.md#charging-loss-per-power) shows the measurements and the model per power.
+
+<p align="center">
+  <img src="../images/charging-loss-per-power.png" alt="Measured charging loss per power group" width="760">
+</p>
 
 ## One-time measurement
 

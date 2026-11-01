@@ -75,9 +75,9 @@ For battery health, regular smaller top-ups can keep the battery in a narrower s
 > [action entities](docs/charger-control.md#the-action-entities), and you control the charger yourself with an
 > automation. A [blueprint](docs/charger-control.md#the-blueprint) with fail-safe is included for this.
 
-<a href="https://sloth.nu/tesla_solar_demo.gif" target="_blank"><img src="images/tesla_solar_demo_small.gif" width="49%"></a><a href="https://sloth.nu/virtual_ev_demo.gif" target="_blank"><img src="images/virtual_ev_demo_small.gif" width="49%"></a>
-
-![Charging period](images/charging_period.png)
+<p align="center">
+  <img src="images/overview-dashboard.png" alt="Cable Juice Planner dashboard with the battery and charging plan, electricity prices, charging history, status and trip" width="100%">
+</p>
 
 📖 **[Documentation](docs/README.md)** – [getting started](docs/getting-started.md), [how CJP plans](docs/how-it-works.md),
 every charging rule explained with examples, [charger control](docs/charger-control.md) and [FAQ](docs/faq-troubleshooting.md).
@@ -173,13 +173,13 @@ every charging rule explained with examples, [charger control](docs/charger-cont
 - **Does not run in Home Assistant's main thread:** all calculations run in the integration's own
   worker thread, so Home Assistant isn't blocked while the plan is calculated
 
-| Last drive | Battery level costs | Charging overview |
+| Battery level costs and charging overview | Departure plan | Charging history |
 | --- | --- | --- |
-| ![Last drive efficiency](images/last_drive_efficiency.png) | ![Battery level costs](images/battery_level_costs.png) | ![Charging overview](images/charging_overview.png) |
+| ![Battery level costs and charging overview](images/battery-level-costs-and-charging-overview.png) | ![Departure plan for the workdays](images/departure-plan.png) | ![Charging history](images/charging-history.png) |
 
-| Overview | History | Solar surplus |
-| --- | --- | --- |
-| ![Overview](images/overview.png) | ![History](images/history.png) | ![Solar surplus](images/solar_overproduction.png) |
+| Economy | Driving and temperature |
+| --- | --- |
+| ![Economy per month compared with daily charging](images/economy.png) | ![km/kWh against the outdoor temperature](images/driving-and-temperature.png) |
 
 ---
 

@@ -5,6 +5,10 @@
 
 When the power is cheap, it pays to charge more than the plan needs – the kWh will cost more later.
 
+<p align="center">
+  <img src="../../images/settings-cheap-power.png" alt="The Cheap power settings" width="380">
+</p>
+
 ## When is it cheap?
 
 CJP takes the **15 lowest prices** (the number of prices kept in the price database, setup → *Databases*) of the known hours of the week (the published prices, the forecast and the

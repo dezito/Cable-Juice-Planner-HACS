@@ -5,6 +5,10 @@
 
 For a longer drive outside the normal pattern.
 
+<p align="center">
+  <img src="../../images/settings-trip.png" alt="The Trip settings" width="380">
+</p>
+
 ## Planning a trip
 
 1. Set **EV trip departure** and **EV trip arrival** in the future.

@@ -5,6 +5,10 @@
 For a fixed weekly pattern: CJP makes sure the car has enough for every workday, and charges in the
 cheapest hours before each departure.
 
+<p align="center">
+  <img src="../../images/settings-work-plan.png" alt="The Work plan settings per weekday" width="380">
+</p>
+
 ## Settings
 
 | Setting | Meaning |

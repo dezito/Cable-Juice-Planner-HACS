@@ -107,6 +107,10 @@ Open the dashboard (`/cjp-<prefix>`) → **Settings**. All rules are off after t
 Then set the battery levels: **min. daily battery level** (e.g. 30 %) and **max. recommended charge limit**
 (e.g. 90 %). If all rules are off, CJP charges like a normal charger at max. current.
 
+<p align="center">
+  <img src="../images/settings-battery-levels.png" alt="The Battery levels settings" width="380">
+</p>
+
 ## 5. Control the charger
 
 CJP only publishes what should happen: `sensor.cjp_<prefix>_charger_action` (`charge` or `stop`) with the
