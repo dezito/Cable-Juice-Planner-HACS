@@ -36,7 +36,7 @@ Create **one automation per car**. Under *Cable Juice Planner* select the car's 
 current per phase is read from its attributes.
 
 Others may already have set it up for your charger or car: see
-[Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-HACS/discussions/categories/blueprint-setups).
+[Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-Integration/discussions/categories/blueprint-setups).
 Paste a setup under *Settings → Automations & scenes → Create automation → ⋮ → Edit in YAML* and change what
 is marked `TODO`. When yours works, share it there with **New discussion**, so the next one with the same
 charger or car can copy it.
