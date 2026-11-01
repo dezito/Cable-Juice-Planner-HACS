@@ -67,7 +67,7 @@ async def test_export_is_anonymised(hass: HomeAssistant, config_dir: Path, loade
     assert data["price_data"]["attributes"]
 
     item = hass.data["persistent_notification"][f"{OBJECT_PREFIX}_debug_export"]
-    assert "Cable-Juice-Planner-HACS/issues/new?template=bug_report.yml" in item["message"]
+    assert "Cable-Juice-Planner-Integration/issues/new?template=bug_report.yml" in item["message"]
 
 
 async def test_download_view(hass: HomeAssistant, config_dir: Path, loaded_entry, hass_client_no_auth) -> None:

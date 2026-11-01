@@ -66,5 +66,5 @@ With a home battery configured (level and power):
 
 CJP doesn't control the home battery. Create an automation that stops the home battery from discharging
 while the car charges, and only allows it while the switch is on and the battery is above the level.
-[BattMind's blueprint](https://github.com/dezito/BattMind-HACS/blob/main/docs/actions.md#ev-optional) has
+[BattMind's blueprint](https://github.com/dezito/BattMind-Integration/blob/main/docs/actions.md#ev-optional) has
 inputs for exactly these two entities.

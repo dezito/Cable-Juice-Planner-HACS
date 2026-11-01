@@ -3,8 +3,8 @@
 # 🚗Cable Juice Planner🔋🌞📅 for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
-[![GitHub Release](https://img.shields.io/github/v/release/dezito/Cable-Juice-Planner-HACS)](https://github.com/dezito/Cable-Juice-Planner-HACS/releases)
-[![License](https://img.shields.io/github/license/dezito/Cable-Juice-Planner-HACS)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/dezito/Cable-Juice-Planner-Integration)](https://github.com/dezito/Cable-Juice-Planner-Integration/releases)
+[![License](https://img.shields.io/github/license/dezito/Cable-Juice-Planner-Integration)](LICENSE)
 
 Plans EV charging based on a work plan or the cheapest times over a week.
 The plan uses electricity prices, solar surplus, home battery and the car's actual consumption.
@@ -216,9 +216,9 @@ stopped and have their amps set from Home Assistant.
 
 ### HACS (recommended)
 
-[![Open your Home Assistant and add the repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-HACS&category=integration)
+[![Open your Home Assistant and add the repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dezito&repository=Cable-Juice-Planner-Integration&category=integration)
 
-1. **HACS** → ⋮ → **Custom repositories**: add `https://github.com/dezito/Cable-Juice-Planner-HACS` as **Integration**.
+1. **HACS** → ⋮ → **Custom repositories**: add `https://github.com/dezito/Cable-Juice-Planner-Integration` as **Integration**.
 2. Search for **Cable Juice Planner**, install it, and restart Home Assistant.
 3. Add the integration:
 
@@ -279,7 +279,7 @@ the integration stops. See [Charger and car control](docs/charger-control.md) fo
 setups and examples.
 
 Find a ready-made setup for your charger and car, or share your own, under
-[Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-HACS/discussions/categories/blueprint-setups).
+[Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-Integration/discussions/categories/blueprint-setups).
 
 The blueprint file is never overwritten on its own. If a new version arrives with a HACS update (or you
 have edited the file yourself), a repair shows up after restart under *Settings → System → Repairs*.

@@ -180,7 +180,7 @@ These rules apply to code, tests, documentation, and the dashboard.
 Agents record lasting decisions and findings for this repository here (not in
 private agent memory). Update or remove a note when it stops being true.
 
-- Built like BattMind-HACS; keep the worker-thread design so calculations
+- Built like BattMind-Integration; keep the worker-thread design so calculations
   never block HA: single-thread executor, snapshot -> job result.
 - `input_boolean.dezito_show_debug_button` in the generated dashboard is the
   user's own toggle for the debug-info badge. It is intentional; do not flag it.

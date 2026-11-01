@@ -29,7 +29,7 @@ and `card-mod`.
 
 ## 2. Install
 
-1. **HACS** → ⋮ → **Custom repositories**: add `https://github.com/dezito/Cable-Juice-Planner-HACS` as **Integration**.
+1. **HACS** → ⋮ → **Custom repositories**: add `https://github.com/dezito/Cable-Juice-Planner-Integration` as **Integration**.
 2. Search for **Cable Juice Planner**, install it, and restart Home Assistant.
 3. **Settings → Devices & services → Add integration → Cable Juice Planner → Add EV / charger**.
 
