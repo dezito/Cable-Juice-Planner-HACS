@@ -23,6 +23,10 @@ It needs these HACS frontend cards: [Mushroom](https://github.com/piitaya/lovela
 | **Charging history** | each charge with time, reason, %, kWh, price and price/kWh, and per month km, kWh, share from solar and price |
 | **Overview** | the plan with a reason for each hour, the departure plan, the cost of the current battery level, the last drive's efficiency and the solar surplus forecast |
 
+| Battery and charging plan | Electricity prices |
+| --- | --- |
+| ![Battery level forecast with planned driving and planned charging](../images/battery-and-charging-plan.png) | ![Electricity prices with solar forecast and planned charging](../images/electricity-prices-per-hour.png) |
+
 At the top: **Force planning** recalculates the plan now. The overview also has the emoji explanation – see [Emojis](emojis.md).
 
 ## Settings
@@ -64,15 +68,36 @@ Older months (before the recorder's history) only show kWh per source, cost and 
 the work plan as it is set now. `sensor.cjp_<prefix>_economy` holds this month's saving, the months in the
 attributes.
 
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/economy.png" alt="Economy per month compared with daily charging" width="760"></p>
+
+</details>
+
 ### Driving and temperature
 
 km/kWh against the outdoor temperature, from the drives (unplugging to plugging in) and the outdoor
 temperature's statistics – and how much more energy per km the car uses at 0 °C than at 20 °C.
 
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/driving-and-temperature.png" alt="km/kWh against the outdoor temperature" width="760"></p>
+
+</details>
+
 ### Ready at departure
 
 Whether the car had the battery level it needed at each work plan departure, saved at every departure from
 the first start. `sensor.cjp_<prefix>_analysis` is the share of the last 30 departures that were ready.
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/ready-at-departure.png" alt="Battery level at each work plan departure" width="760"></p>
+
+</details>
 
 ### Learned driving distance
 
@@ -90,10 +115,24 @@ Above the table it says whether *Learn driving distance* is on, so the plan uses
 the learned distance (the entered numbers are not changed).
 The first distance comes the evening after the first start.
 
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/learned-driving-distance.png" alt="Entered against learned driving distance per weekday" width="760"></p>
+
+</details>
+
 ### Planned against actually charged
 
 The kWh planned the evening before against what was charged, and how much was charged outside the plan
 (manual, forced charging …). Saved every evening from the first start.
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/planned-against-actually-charged.png" alt="Planned against actually charged kWh per day" width="760"></p>
+
+</details>
 
 ### Price forecast
 
@@ -121,6 +160,13 @@ Only the buy price is measured, and only hours with a forecast from the price in
 from its own price database are not included. The measurements always use the forecast as the price
 integration published it, never the corrected one. The first numbers come at 13:00 the day after the first
 start, "3 days ahead" after 3 days.
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/price-forecast.png" alt="The price forecast against the real price per day ahead" width="760"></p>
+
+</details>
 
 ### Forecast accuracy
 
@@ -150,10 +196,24 @@ fallback prices alike, so the two tables can point at different types. Pick the 
 where it matters most to you: without solar, the house consumption is not used. The numbers are collected
 from the first start: the house consumption after the first whole day, km/kWh after the first drive.
 
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/forecast-accuracy.png" alt="Forecast accuracy for the house consumption and the car's km/kWh" width="760"></p>
+
+</details>
+
 ### Battery capacity
 
 kWh from the charger per 1 % per month and power group, from the [charging loss](charging-loss.md)
 measurements. Rising over the years = less capacity. Compare the same month year by year – winter is higher.
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/battery-capacity.png" alt="kWh from the charger per 1 % per month and power group" width="760"></p>
+
+</details>
 
 ### Charging loss per power
 
@@ -162,6 +222,13 @@ measurements. Rising over the years = less capacity. Compare the same month year
   use** per power – the fixed use is what makes a low power (solar on 1 phase) expensive.
 
 See [Charging loss](charging-loss.md).
+
+<details>
+<summary>Screenshot</summary>
+
+<p align="center"><img src="../images/charging-loss-per-power.png" alt="Measured charging loss per power group" width="760"></p>
+
+</details>
 
 ### History
 
