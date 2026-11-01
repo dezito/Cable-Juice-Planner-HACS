@@ -76,7 +76,7 @@ For battery health, regular smaller top-ups can keep the battery in a narrower s
 > automation. A [blueprint](docs/charger-control.md#the-blueprint) with fail-safe is included for this.
 
 <p align="center">
-  <a href="https://sloth.nu/cable-juice-planner.gif" target="_blank"><img src="images/dashboard-demo.gif" alt="The Cable Juice Planner dashboard in use: battery and charging plan, electricity prices, settings and analysis" width="100%"></a>
+  <a href="https://sloth.nu/cable-juice-planner.mp4" target="_blank"><img src="images/dashboard-demo.gif" alt="The Cable Juice Planner dashboard in use: battery and charging plan, electricity prices, settings and analysis" width="100%"></a>
 </p>
 
 📖 **[Documentation](docs/README.md)** – [getting started](docs/getting-started.md), [how CJP plans](docs/how-it-works.md),
