@@ -278,6 +278,9 @@ car, with a section for the charger and one for the car, and a fail-safe that ch
 the integration stops. See [Charger and car control](docs/charger-control.md) for every input, typical
 setups and examples.
 
+Find a ready-made setup for your charger and car, or share your own, under
+[Blueprint setups](https://github.com/dezito/Cable-Juice-Planner-HACS/discussions/categories/blueprint-setups).
+
 The blueprint file is never overwritten on its own. If a new version arrives with a HACS update (or you
 have edited the file yourself), a repair shows up after restart under *Settings → System → Repairs*.
 

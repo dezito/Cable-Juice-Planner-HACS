@@ -1,0 +1,72 @@
+title: "Setup: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share how you control your charger and car with the **Cable Juice Planner - charger control**
+        blueprint, so others with the same charger or car can copy it. Write the charger and car in the
+        title, e.g. *Setup: Easee Home + Tesla Model 3*.
+
+        **Copy the whole automation:** open your automation, choose **⋮ → Edit in YAML** and copy everything.
+        Others can then paste it under *Settings → Automations & scenes → Create automation → ⋮ → Edit in YAML*
+        and only change what you mark with `TODO`.
+  - type: input
+    id: charger
+    attributes:
+      label: Charger and integration
+      description: Brand, model and the integration with a link and version, e.g. Easee Home, https://github.com/nordicopen/easee_hass 0.9.70.
+    validations:
+      required: true
+  - type: input
+    id: car
+    attributes:
+      label: Car and integration
+      description: Only if the automation also controls the car, e.g. Tesla Model 3, Tesla Fleet (core).
+  - type: input
+    id: versions
+    attributes:
+      label: Cable Juice Planner and Home Assistant version
+      description: e.g. CJP 1.2.0, HA 2026.10.
+    validations:
+      required: true
+  - type: dropdown
+    id: tested
+    attributes:
+      label: Tested functions
+      description: The parts of the blueprint you have seen work.
+      multiple: true
+      options:
+        - Enable/disable charger
+        - Start/stop
+        - Charging current
+        - Circuit limit
+        - Car charge limit
+        - Charging state
+        - Restart when not charging
+        - Fail-safe
+    validations:
+      required: true
+  - type: textarea
+    id: automation
+    attributes:
+      label: Automation YAML
+      description: >-
+        The whole automation with `use_blueprint:`. Replace device ids, serial numbers, VINs, IP addresses
+        and tokens with `YOUR_DEVICE_ID` and similar, and mark what others must change with `# TODO`.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything others should know, e.g. needed delays between commands, phase switching, charger settings, known problems.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before posting
+      options:
+        - label: The YAML contains no personal data (device ids, serial numbers, VINs, IP addresses, tokens, names).
+          required: true
+        - label: I have used this setup with Cable Juice Planner on my own charger/car.
+          required: true
