@@ -1248,7 +1248,7 @@
         "step": {
           "confirm": {
             "title": "Blueprint {name} aktualisieren",
-            "description": "Cable Juice Planner bringt eine Version des Blueprints **{name}** mit, die sich von `{path}` unterscheidet.\n\nWähle **Absenden**, um die Datei durch die mitgelieferte Version zu ersetzen und die Automationen neu zu laden, die sie verwenden. Eigene Änderungen an der Datei werden überschrieben – kopiere sie vorher unter einem anderen Dateinamen, wenn du sie behalten möchtest.\n\nIgnoriere diese Reparatur, um deine eigene Datei zu behalten."
+            "description": "Cable Juice Planner bringt eine Version des Blueprints **{name}** mit, die sich von `{path}` unterscheidet.\n\nWähle **Absenden**, um die Datei durch die mitgelieferte Version zu ersetzen und die Automationen neu zu laden, die sie verwenden. Hat eine Automation eine einzelne Entität in einem Feld, das jetzt mehrere nimmt, wird sie in `automations.yaml` als Liste gespeichert, damit sie im Editor angezeigt wird. Eigene Änderungen an der Datei werden überschrieben – kopiere sie vorher unter einem anderen Dateinamen, wenn du sie behalten möchtest.\n\nIgnoriere diese Reparatur, um deine eigene Datei zu behalten."
           }
         }
       }

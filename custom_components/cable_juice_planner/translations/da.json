@@ -1248,7 +1248,7 @@
         "step": {
           "confirm": {
             "title": "Opdatér blueprinten {name}",
-            "description": "Cable Juice Planner kommer med en version af blueprinten **{name}**, der er forskellig fra `{path}`.\n\nVælg **Send** for at erstatte filen med den medfølgende version og genindlæse de automationer, der bruger den. Har du selv rettet i filen, bliver dine ændringer overskrevet – kopiér den til et andet filnavn først, hvis du vil beholde dem.\n\nIgnorér denne reparation for at beholde din egen fil."
+            "description": "Cable Juice Planner kommer med en version af blueprinten **{name}**, der er forskellig fra `{path}`.\n\nVælg **Send** for at erstatte filen med den medfølgende version og genindlæse de automationer, der bruger den. Har en automation én entitet i et felt, der nu tager flere, bliver den gemt som en liste i `automations.yaml`, så den vises i editoren. Har du selv rettet i filen, bliver dine ændringer overskrevet – kopiér den til et andet filnavn først, hvis du vil beholde dem.\n\nIgnorér denne reparation for at beholde din egen fil."
           }
         }
       }
