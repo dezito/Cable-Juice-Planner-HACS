@@ -8,6 +8,9 @@
     "sun",
     "weather"
   ],
+  "categories": [
+    "energy.ev_charging"
+  ],
   "codeowners": [
     "@dezito"
   ],
