@@ -44,14 +44,22 @@ and the charge limit in the car).
 | Section | Inputs |
 |---|---|
 | Charger | Start charging, Stop charging, Set charging current, Set circuit current (master only), Enable the charger, Disable the charger, Wait between charger commands |
-| Car | Start charging in the car, Wait before starting the car, Stop charging in the car, Set charging current in the car, Set charge limit in the car |
+| Car | Wait before starting the car, Wait for the charger to be ready, Start charging in the car, Stop charging in the car, Set charging current in the car, Set charge limit in the car, Wait between car commands |
 
 On start: charge limit in the car → enable the charger → circuit limit → current in the charger → current in
-the car → start the charger → start the car. On stop, both are stopped. If the car must wait until the charger
-is ready, set **Wait before starting the car** (seconds). If the charger or its cloud shouldn't get commands right
-after each other, set **Wait between charger commands** (seconds, e.g. 2–5 for Easee): it pauses between two
-charger commands in the same run (enable/disable, circuit current, charging current, start/stop) – not before the
-first one, and not for the car's commands. If one action fails (e.g. the charger's cloud doesn't answer), the
+the car → start the charger → start the car. On stop, both are stopped.
+
+The waits:
+
+| Input | Default | What it does |
+|---|---|---|
+| Wait between charger commands | 0 s | Pause between two charger commands in the same run (enable/disable, circuit current, charging current, start/stop) – not before the first one, and not for the car's commands. E.g. 2–5 s for Easee. |
+| Wait between car commands | 0 s | Pause between two commands to the car in the same run (charge limit, charging current, start) – not before the first one. |
+| Wait before starting the car | 0 s | Fixed time from the charger's commands to **Start charging in the car**. If the car got a command before, the longer of this and *Wait between car commands* is used. |
+| Wait for the charger to be ready | on | Before **Start charging in the car**, wait (at most 30 s) while every status entity under *Charging state* is one of **States that mean the charger is not ready** (default `awaiting_start`, `disconnected`, `off`), e.g. until the Easee cloud has applied the current. A car told to charge before the charger gives power may give up. Turn it off if the status entities are only the car's – they stay "not ready" until the car is started. |
+
+The automation carries out one decision at a time, so while a wait or check runs, a new decision (e.g. stop)
+waits for it – about a minute at most with the defaults. If one action fails (e.g. the charger's cloud doesn't answer), the
 error is logged and the remaining actions still run.
 
 The automation runs **once per change** of the decision (the `decision` attribute), however much changed:
@@ -108,15 +116,30 @@ fail-safe the circuit gets the fail-safe current, which the circuit's chargers s
 
 ### Charging state
 
-Tells the blueprint whether the car is charging, so start isn't sent again and again:
+Tells the blueprint whether it charges, so start isn't sent again and again. Status and power can each be
+several entities, e.g. both the charger's and the car's – **one of them is enough**:
 
 | Input | Meaning |
 |---|---|
-| Status or "charging" entity | the charger's or the car's status sensor, or a switch/binary sensor that is `on` while charging |
+| Status or "charging" entities | the charger's and/or the car's status sensor, or a switch/binary sensor that is `on` while charging |
 | States that mean charging / done | e.g. `charging` and `completed`, `finished` (OCPP: `Charging`, `Finishing`) |
-| Charging power + Charging above | a power sensor with a threshold (default 500 W) |
+| States that mean the charger is not ready | e.g. `awaiting_start`, `disconnected`, `off` (OCPP: `Preparing`) – the charger gives no power (yet or any more) |
+| Charging power + Charging above | power sensors for the charger and/or the car, with a threshold (default 500 W) |
+| Check that it charges or stops | on by default – see below |
 
 A new charging decision from CJP always sends start.
+
+**Check that it charges or stops:** 30 s after a start or stop the blueprint checks the entities above, and
+one of them is enough:
+
+| | Status entity | Power |
+|---|---|---|
+| Started | in *States that mean charging* or *States that mean done* | above *Charging above* |
+| Stopped | in *States that mean the charger is not ready* | below *Charging above* |
+
+If it hasn't started, the charging current and start are sent once more to the charger and the car; if it
+hasn't stopped, stop and the current are sent once more. Because one entity is enough, the charger's entities
+alone can check a car that can't be read.
 
 ### Restart when not charging
 

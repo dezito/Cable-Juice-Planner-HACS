@@ -232,3 +232,149 @@ async def test_master_sets_the_shared_circuit(hass: HomeAssistant, calls: list[s
     await hass.async_block_till_done()
     assert calls[:3] == ["enable", "circuit", "fail_amps"]
     assert [int(circuits[0][f"p{i}"]) for i in (1, 2, 3)] == [32, 16, 16]
+
+
+STATUS = "sensor.test_charger_status"
+
+
+async def test_car_start_waits_for_a_ready_charger(hass: HomeAssistant, calls: list[str]) -> None:
+    """The charger's cloud has not applied the current yet: the car is told to charge once it can."""
+    hass.states.async_set(STATUS, "awaiting_start")
+    _set_action(hass, "stop")
+    await _setup(hass, charger_status=STATUS)
+    calls.clear()
+
+    _set_action(hass, "charge")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "charger_start"]
+
+    hass.states.async_set(STATUS, "ready_to_charge")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
+
+    # it charges: start is not repeated
+    hass.states.async_set(STATUS, "charging")
+    await hass.async_block_till_done()
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
+
+
+def _short_checks(tmp_path: Path) -> None:
+    """The 30 s checks as 1 s: their timeouts run on the event loop's clock, which the tests cannot advance."""
+    blueprint = tmp_path / "blueprints" / "automation" / DOMAIN / "charger_control.yaml"
+    text = blueprint.read_text(encoding="utf-8")
+    assert "check_seconds: 30" in text
+    blueprint.write_text(text.replace("check_seconds: 30", "check_seconds: 1"), encoding="utf-8")
+
+
+async def test_start_is_repeated_when_not_charging(hass: HomeAssistant, calls: list[str], tmp_path: Path) -> None:
+    """The charger never reports ready: the car is started after the wait, and the start is sent once more."""
+    _short_checks(tmp_path)
+    hass.states.async_set(STATUS, "awaiting_start")
+    _set_action(hass, "stop")
+    await _setup(hass, charger_status=STATUS)
+    calls.clear()
+
+    _set_action(hass, "charge")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "charger_start"]
+
+    await asyncio.sleep(1.2)
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
+
+    await asyncio.sleep(1.2)
+    await hass.async_block_till_done()
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start", "fail_amps", "charger_start", "car_start"]
+
+
+async def test_stop_is_repeated_while_charging(hass: HomeAssistant, calls: list[str], tmp_path: Path) -> None:
+    _short_checks(tmp_path)
+    hass.states.async_set(STATUS, "charging")
+    _set_action(hass, "charge")
+    await _setup(hass, charger_status=STATUS)
+    calls.clear()
+
+    _set_action(hass, "stop")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_charger_stop", "car_stop", "fail_amps"]
+
+    await asyncio.sleep(1.2)
+    await hass.async_block_till_done()
+    assert calls == ["enable", "fail_charger_stop", "car_stop", "fail_amps", "fail_charger_stop", "car_stop", "fail_amps"]
+
+
+async def test_checks_can_be_turned_off(hass: HomeAssistant, calls: list[str]) -> None:
+    """Without the wait for the charger and the check, the car is started at once and nothing is repeated."""
+    hass.states.async_set(STATUS, "awaiting_start")
+    _set_action(hass, "stop")
+    await _setup(hass, charger_status=STATUS, wait_for_charger=False, check_charging=False)
+    calls.clear()
+
+    _set_action(hass, "charge")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
+    assert hass.states.get("automation.charger_control").attributes["current"] == 0
+
+
+async def test_car_commands_wait_for_each_other(hass: HomeAssistant, calls: list[str]) -> None:
+    """Wait between car commands: a pause between two car commands, none before the first one."""
+    hass.services.async_register("test", "car_amps", lambda call: calls.append(call.service))
+    _set_action(hass, "stop")
+    await _setup(hass, car_command_delay=5, car_limit_actions=_service("car_limit"), car_amps_actions=_service("car_amps"))
+    calls.clear()
+
+    _set_action(hass, "charge", limit=80)
+    await _run_loop(hass)
+    assert calls == ["enable", "car_limit", "fail_amps"]  # waiting before the next car command
+
+    # (firing the time also runs the later pauses' timers)
+    await async_advance(hass, 20)
+    assert calls == ["enable", "car_limit", "fail_amps", "car_amps", "charger_start", "car_start"]
+
+    # without a charge limit the current is the car's first command: the pause comes before the start
+    _set_action(hass, "stop")
+    await hass.async_block_till_done()
+    calls.clear()
+    _set_action(hass, "charge")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "car_amps", "charger_start"]
+
+    await async_advance(hass, 20)
+    assert calls == ["enable", "fail_amps", "car_amps", "charger_start", "car_start"]
+
+
+async def test_one_of_several_entities_is_enough(hass: HomeAssistant, calls: list[str], tmp_path: Path) -> None:
+    """The charger's and the car's status and power: one of them charging or stopped is enough."""
+    _short_checks(tmp_path)
+    car = "binary_sensor.test_car_charging"
+    power = ["sensor.test_charger_power", "sensor.test_car_power"]
+    hass.states.async_set(STATUS, "ready_to_charge")
+    hass.states.async_set(car, "off")
+    hass.states.async_set(power[0], "unavailable", {"unit_of_measurement": "W"})
+    hass.states.async_set(power[1], "0", {"unit_of_measurement": "kW"})
+    _set_action(hass, "stop")
+    await _setup(hass, charger_status=[STATUS, car], power_sensor=power)
+    calls.clear()
+
+    # the charger is ready although the car is not charging yet: no wait
+    _set_action(hass, "charge")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
+
+    # only the car's power (in kW) shows it charging
+    hass.states.async_set(power[1], "7.2", {"unit_of_measurement": "kW"})
+    await asyncio.sleep(1.2)
+    await hass.async_block_till_done()
+    assert calls == ["enable", "fail_amps", "charger_start", "car_start"]
+
+    # on stop, the car's switch going off is enough, while the charger still reports charging
+    hass.states.async_set(STATUS, "charging")
+    hass.states.async_set(car, "on")
+    calls.clear()
+    _set_action(hass, "stop")
+    await _run_loop(hass)
+    assert calls == ["enable", "fail_charger_stop", "car_stop", "fail_amps"]
+    hass.states.async_set(car, "off")
+    await asyncio.sleep(1.2)
+    await hass.async_block_till_done()
+    assert calls == ["enable", "fail_charger_stop", "car_stop", "fail_amps"]
