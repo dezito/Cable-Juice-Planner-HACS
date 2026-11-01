@@ -14,10 +14,13 @@ blueprint:
 
 
     **Order on start:** enable the charger → circuit limit → charging current in the charger →
-    charging current in the car → start the charger → (optional wait) → start the car, with an
-    optional pause between two charger commands (Wait between charger commands). On stop,
-    both the charger and the car are stopped. If one action fails (e.g. the charger's cloud does
-    not answer), the error is logged and the rest still run, so the car is still told to charge.
+    charging current in the car → start the charger → (wait for the charger, optional wait) →
+    start the car, with optional pauses between two charger commands (Wait between charger
+    commands) and between two car commands (Wait between car commands). With a charging state,
+    start or stop is sent once more if it does not charge or stop within 30 s (Check that it
+    charges or stops). On stop, both the charger and the car are stopped. If one action fails
+    (e.g. the charger's cloud does not answer), the error is logged and the rest still run, so
+    the car is still told to charge.
 
 
     **One run per change:** the automation runs once each time Cable Juice Planner changes its
@@ -40,11 +43,12 @@ blueprint:
     carried out as a normal action.
 
 
-    **Charging state (optional):** a status sensor, a "charging" switch/binary sensor or a
-    power sensor tells the blueprint whether it is charging. Start is then not repeated while
-    charging or when the charger/car reports done (e.g. `completed`/`finished` – the car is
-    full or has reached its charge limit), and the integrations can be restarted if it is not
-    charging.
+    **Charging state (optional):** status sensors, "charging" switches/binary sensors or power
+    sensors – the charger's and/or the car's, one of them is enough – tell the blueprint whether
+    it is charging. Start is then not repeated while charging or when the charger/car reports
+    done (e.g. `completed`/`finished` – the car is full or has reached its charge limit), a start
+    or stop that did not take is sent once more, and the integrations can be restarted if it is
+    not charging.
 
 
     **Restart (optional):** if the action has been `charge` for the selected number of
@@ -164,6 +168,33 @@ blueprint:
       icon: mdi:car-electric
       collapsed: true
       input:
+        wait_for_charger:
+          name: Wait for the charger to be ready
+          description: >
+            Before "Start charging in the car", wait (at most 30 s) while every status entity
+            (Charging state) is one of "States that mean the charger is not ready", e.g.
+            awaiting_start while the charger's cloud has not yet applied the charging current. A
+            car told to charge before the charger gives power may give up. Requires a status
+            entity; turn it off if the status entities are only the car's (they stay "not ready"
+            until the car is started).
+          default: true
+          selector:
+            boolean: {}
+        car_start_delay:
+          name: Wait before starting the car
+          description: >
+            Seconds between the charger's actions (enable, charging current, start) and
+            "Start charging in the car", so the charger is ready before the car is told to
+            charge. If the car got a command before, the longer of this and "Wait between car
+            commands" is used. 0 = no wait. Only used when the car is started.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 300
+              step: 5
+              unit_of_measurement: s
+              mode: box
         car_start_actions:
           name: Start charging in the car
           description: >
@@ -173,20 +204,6 @@ blueprint:
           default: []
           selector:
             action: {}
-        car_start_delay:
-          name: Wait before starting the car
-          description: >
-            Seconds between the charger's actions (enable, charging current, start) and
-            "Start charging in the car", so the charger is ready before the car is told to
-            charge. 0 = no wait. Only used when the car is started.
-          default: 0
-          selector:
-            number:
-              min: 0
-              max: 300
-              step: 5
-              unit_of_measurement: s
-              mode: box
         car_stop_actions:
           name: Stop charging in the car
           description: The opposite of start – the switch turned off or the stop service.
@@ -214,20 +231,37 @@ blueprint:
           default: []
           selector:
             action: {}
+        car_command_delay:
+          name: Wait between car commands
+          description: >
+            Seconds between two commands to the car in the same run (charge limit, charging
+            current, start), for a car or its cloud that should not get commands right after each
+            other. There is no wait before the first command to the car. 0 = no wait.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 60
+              step: 1
+              unit_of_measurement: s
+              mode: box
     state:
       name: Charging state
       icon: mdi:battery-charging
       collapsed: true
       input:
         charger_status:
-          name: Status or "charging" entity (optional)
+          name: Status or "charging" entities (optional)
           description: >
-            The charger's or the car's status sensor (e.g. charging/completed) or a switch /
-            binary sensor that is on while charging. Adjust the two lists below to the states
-            your entity has (see its history).
-          default: ""
+            The charger's and/or the car's status sensor (e.g. charging/completed) or a switch /
+            binary sensor that is on while charging. With several entities (e.g. both the
+            charger's and the car's), one of them is enough: it charges when one of them is in
+            "States that mean charging". Adjust the lists below to the states your entities have
+            (see their history).
+          default: []
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: [sensor, binary_sensor, switch]
         charging_states:
@@ -250,15 +284,28 @@ blueprint:
               multiple: true
               custom_value: true
               options: [completed, finished]
+        not_ready_states:
+          name: States that mean the charger is not ready
+          description: >
+            The charger does not give power (yet or any more), e.g. awaiting_start, disconnected
+            or off (OCPP: Preparing). With "Wait for the charger to be ready" (Car), "Start
+            charging in the car" waits while every status is one of these, at most 30 s. "Check
+            that it charges or stops" counts a stop as done when one status is one of these.
+          default: [awaiting_start, disconnected, "off"]
+          selector:
+            select:
+              multiple: true
+              custom_value: true
+              options: [awaiting_start, disconnected, "off"]
         power_sensor:
           name: Charging power (optional)
           description: >
-            If there is no status: a power sensor for the charger or the car. Above the
-            threshold below, it counts as charging. Used together with the status if both are
-            set.
-          default: ""
+            Power sensors for the charger and/or the car. It charges when one of them is above
+            the threshold below. Used together with the status if both are set.
+          default: []
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: sensor
                   device_class: power
@@ -277,6 +324,18 @@ blueprint:
               step: 50
               unit_of_measurement: W
               mode: box
+        check_charging:
+          name: Check that it charges or stops
+          description: >
+            30 s after a start: if none of the entities above charges ("States that mean
+            charging" or "States that mean done", or power above "Charging above"), the charging
+            current and start are sent once more to the charger and the car. 30 s after a stop:
+            if none of them has stopped ("States that mean the charger is not ready", or power
+            below "Charging above"), stop is sent once more. One entity is enough, so the
+            charger's entities alone can check a car that cannot be read.
+          default: true
+          selector:
+            boolean: {}
     restart:
       name: Restart when not charging
       icon: mdi:restart-alert
@@ -393,6 +452,12 @@ variables:
   fail_safe_minutes: !input fail_safe_minutes
   fail_safe_amps: !input fail_safe_amps
   car_start_delay: !input car_start_delay
+  car_command_delay: !input car_command_delay
+  wait_for_charger: !input wait_for_charger
+  check_charging: !input check_charging
+  # the longest wait for the charger to be ready, and for charging/stopped before the repeat
+  check_seconds: 30
+  not_ready_states: !input not_ready_states
   command_delay: !input command_delay
   fail_safe_phases: !input fail_safe_phases
   action: "{{ states(action_sensor) }}"
@@ -412,16 +477,23 @@ variables:
       {% set updated = as_timestamp(s.attributes.get('updated'), 0) %}
       {{ updated > 0 and (as_timestamp(now()) - updated) > fail_safe_minutes * 60 }}
     {% endif %}
+  # the status and power entities as lists (older automations hold one entity id, or "")
+  status_entities: "{{ ([charger_status] if charger_status is string else charger_status or []) | reject('eq', '') | list }}"
+  power_entities: "{{ ([power_sensor] if power_sensor is string else power_sensor or []) | reject('eq', '') | list }}"
+  # one of the entities is enough
   already_charging: >
-    {{ (charger_status != '' and states(charger_status) in charging_states)
-       or (power_sensor != '' and states(power_sensor) | float(0) * (1000 if state_attr(power_sensor, 'unit_of_measurement') == 'kW' else 1) > power_threshold) }}
-  has_charging_state: "{{ charger_status != '' or power_sensor != '' }}"
+    {% set ns = namespace(on=false) %}
+    {% for e in power_entities if states(e) | is_number %}
+      {% if states(e) | float * (1000 if state_attr(e, 'unit_of_measurement') == 'kW' else 1) > power_threshold %}{% set ns.on = true %}{% endif %}
+    {% endfor %}
+    {{ ns.on or status_entities | map('states') | select('in', charging_states) | list | count > 0 }}
+  has_charging_state: "{{ status_entities | count > 0 or power_entities | count > 0 }}"
   # minutes the action has been charge (last_changed only moves when the state changes)
   charge_minutes: >
     {% set s = states[action_sensor] %}
     {{ ((now() - s.last_changed).total_seconds() / 60) | int if s is not none and s.state == 'charge' else 0 }}
   restart_attempt: "{{ ((charge_minutes - restart_minutes) // restart_minutes) + 1 if charge_minutes >= restart_minutes else 0 }}"
-  charger_done: "{{ charger_status != '' and states(charger_status) in completed_states }}"
+  charger_done: "{{ status_entities | map('states') | select('in', completed_states) | list | count > 0 }}"
   phase_1: "{{ (fail_safe_amps if fail_safe else state_attr(action_sensor, 'phase_1_amps')) | int(0) }}"
   phase_2: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 2 else 0 if fail_safe else state_attr(action_sensor, 'phase_2_amps')) | int(0) }}"
   phase_3: "{{ (fail_safe_amps if fail_safe and fail_safe_phases >= 3 else 0 if fail_safe else state_attr(action_sensor, 'phase_3_amps')) | int(0) }}"
@@ -456,6 +528,12 @@ variables:
     {{ ns.items }}
   # a new action (or Home Assistant start / back from unavailable): the whole start or stop
   whole_decision: "{{ trigger.id in ['start', 'fail_safe'] or 'action' in changed }}"
+  # last, so the car's actions are rendered with every variable above (only counted)
+  car_limit_steps: !input car_limit_actions
+  car_amps_steps: !input car_amps_actions
+  car_start_steps: !input car_start_actions
+  # set when the car got a command in this run (Wait between car commands)
+  car_sent: false
 
 actions:
   - choose:
@@ -488,18 +566,75 @@ actions:
               - *pause
               - continue_on_error: true
                 sequence: !input amps_actions
-              - continue_on_error: true
-                sequence: !input car_amps_actions
+              # the car's charging current (never 0 A), reused below
+              - &car_amps
+                if:
+                  - condition: template
+                    value_template: "{{ max_phase > 0 }}"
+                then:
+                  # pause after another command to the car (Wait between car commands), reused below
+                  - &car_pause
+                    if:
+                      - condition: template
+                        value_template: "{{ car_command_delay > 0 and car_sent }}"
+                    then:
+                      - delay: "{{ car_command_delay }}"
+                  - continue_on_error: true
+                    sequence: !input car_amps_actions
+                  - variables:
+                      car_sent: "{{ car_sent or car_amps_steps | count > 0 }}"
               - *pause
               - continue_on_error: true
                 sequence: !input start_actions
-              - if:
-                  - condition: template
-                    value_template: "{{ car_start_delay > 0 }}"
-                then:
-                  - delay: "{{ car_start_delay }}"
-              - continue_on_error: true
-                sequence: !input car_start_actions
+              # start the car and check that it charges, reused below
+              - &start_car
+                sequence:
+                  # a charger whose cloud has not applied the current yet cannot give power
+                  - if:
+                      - condition: template
+                        value_template: >
+                          {{ wait_for_charger and car_start_steps | count > 0 and status_entities | count > 0
+                             and status_entities | map('states') | reject('in', not_ready_states) | list | count == 0 }}
+                    then:
+                      # until one of them is ready
+                      - wait_template: "{{ status_entities | map('states') | reject('in', not_ready_states) | list | count > 0 }}"
+                        timeout: "{{ check_seconds }}"
+                        continue_on_timeout: true
+                  # Wait before starting the car, or Wait between car commands when that is longer
+                  - if:
+                      - condition: template
+                        value_template: >
+                          {{ car_start_steps | count > 0
+                             and [car_start_delay, car_command_delay if car_sent else 0] | max > 0 }}
+                    then:
+                      - delay: "{{ [car_start_delay, car_command_delay if car_sent else 0] | max }}"
+                  - continue_on_error: true
+                    sequence: !input car_start_actions
+                  # a car told to charge before the charger gives power may give up: start once more
+                  - if:
+                      - condition: template
+                        value_template: "{{ check_charging and has_charging_state }}"
+                    then:
+                      # until one of them charges (or is done)
+                      - wait_template: >
+                          {% set ns = namespace(on=false) %}
+                          {% for e in power_entities if states(e) | is_number %}
+                            {% if states(e) | float * (1000 if state_attr(e, 'unit_of_measurement') == 'kW' else 1) > power_threshold %}{% set ns.on = true %}{% endif %}
+                          {% endfor %}
+                          {{ ns.on or status_entities | map('states') | select('in', charging_states + completed_states) | list | count > 0 }}
+                        timeout: "{{ check_seconds }}"
+                        continue_on_timeout: true
+                      - if:
+                          - condition: template
+                            value_template: "{{ not wait.completed and (fail_safe or states(action_sensor) == 'charge') }}"
+                        then:
+                          - continue_on_error: true
+                            sequence: !input amps_actions
+                          - *pause
+                          - continue_on_error: true
+                            sequence: !input start_actions
+                          - continue_on_error: true
+                            sequence: !input car_start_actions
               # notify when the fail-safe starts and at most once an hour while it lasts
               - if:
                   - condition: template
@@ -535,22 +670,11 @@ actions:
           - *pause
           - continue_on_error: true
             sequence: !input amps_actions
-          - if:
-              - condition: template
-                value_template: "{{ max_phase > 0 }}"
-            then:
-              - continue_on_error: true
-                sequence: !input car_amps_actions
+          - *car_amps
           - *pause
           - continue_on_error: true
             sequence: !input start_actions
-          - if:
-              - condition: template
-                value_template: "{{ car_start_delay > 0 }}"
-            then:
-              - delay: "{{ car_start_delay }}"
-          - continue_on_error: true
-            sequence: !input car_start_actions
+          - *start_car
       # ---- the integration reports an error (it already asks for max amps) ----
       - conditions:
           - condition: template
@@ -567,12 +691,7 @@ actions:
           - *pause
           - continue_on_error: true
             sequence: !input amps_actions
-          - if:
-              - condition: template
-                value_template: "{{ max_phase > 0 }}"
-            then:
-              - continue_on_error: true
-                sequence: !input car_amps_actions
+          - *car_amps
           - if:
               - condition: template
                 value_template: "{{ not charger_done }}"
@@ -580,13 +699,7 @@ actions:
               - *pause
               - continue_on_error: true
                 sequence: !input start_actions
-              - if:
-                  - condition: template
-                    value_template: "{{ car_start_delay > 0 }}"
-                then:
-                  - delay: "{{ car_start_delay }}"
-              - continue_on_error: true
-                sequence: !input car_start_actions
+              - *start_car
       # ---- normal operation: everything this change changed, in one run ----
       - conditions:
           - condition: template
@@ -637,17 +750,15 @@ actions:
                     then:
                       - continue_on_error: true
                         sequence: !input car_limit_actions
+                      - &car_limit_sent
+                        variables:
+                          car_sent: "{{ car_sent or car_limit_steps | count > 0 }}"
                   - continue_on_error: true
                     sequence: !input circuit_actions
                   - *pause
                   - continue_on_error: true
                     sequence: !input amps_actions
-                  - if:
-                      - condition: template
-                        value_template: "{{ max_phase > 0 }}"
-                    then:
-                      - continue_on_error: true
-                        sequence: !input car_amps_actions
+                  - *car_amps
                   # a new charge decision always starts; after a restart only when not charging/done
                   - if:
                       - condition: template
@@ -656,13 +767,7 @@ actions:
                       - *pause
                       - continue_on_error: true
                         sequence: !input start_actions
-                      - if:
-                          - condition: template
-                            value_template: "{{ car_start_delay > 0 }}"
-                        then:
-                          - delay: "{{ car_start_delay }}"
-                      - continue_on_error: true
-                        sequence: !input car_start_actions
+                      - *start_car
                 else:
                   - continue_on_error: true
                     sequence: !input stop_actions
@@ -674,6 +779,31 @@ actions:
                   - *pause
                   - continue_on_error: true
                     sequence: !input circuit_actions
+                  # still charging: stop once more
+                  - if:
+                      - condition: template
+                        value_template: "{{ check_charging and has_charging_state }}"
+                    then:
+                      # until one of them has stopped
+                      - wait_template: >
+                          {% set ns = namespace(off=false) %}
+                          {% for e in power_entities if states(e) | is_number %}
+                            {% if states(e) | float * (1000 if state_attr(e, 'unit_of_measurement') == 'kW' else 1) < power_threshold %}{% set ns.off = true %}{% endif %}
+                          {% endfor %}
+                          {{ ns.off or status_entities | map('states') | select('in', not_ready_states) | list | count > 0 }}
+                        timeout: "{{ check_seconds }}"
+                        continue_on_timeout: true
+                      - if:
+                          - condition: template
+                            value_template: "{{ not wait.completed and states(action_sensor) == 'stop' }}"
+                        then:
+                          - continue_on_error: true
+                            sequence: !input stop_actions
+                          - continue_on_error: true
+                            sequence: !input car_stop_actions
+                          - *pause
+                          - continue_on_error: true
+                            sequence: !input amps_actions
             # the same action: only what changed
             else:
               - if:
@@ -682,6 +812,7 @@ actions:
                 then:
                   - continue_on_error: true
                     sequence: !input car_limit_actions
+                  - *car_limit_sent
               - if:
                   - condition: template
                     value_template: "{{ 'circuit' in changed }}"
@@ -699,9 +830,4 @@ actions:
                 then:
                   - continue_on_error: true
                     sequence: !input amps_actions
-                  - if:
-                      - condition: template
-                        value_template: "{{ max_phase > 0 }}"
-                    then:
-                      - continue_on_error: true
-                        sequence: !input car_amps_actions
+                  - *car_amps

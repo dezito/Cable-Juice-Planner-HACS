@@ -58,10 +58,11 @@ async def _async_reload(hass: HomeAssistant) -> None:
 async def async_install_blueprints(hass: HomeAssistant) -> None:
     target = _target(hass)
 
-    def _install() -> tuple[list[str], dict[str, str]]:
+    def _install() -> tuple[list[str], list[str], dict[str, str]]:
+        sources = sorted(SOURCE.glob("*.yaml"))
         installed: list[str] = []
         outdated: dict[str, str] = {}
-        for source in sorted(SOURCE.glob("*.yaml")):
+        for source in sources:
             content = source.read_text(encoding="utf-8")
             destination = target / source.name
             if not destination.exists():
@@ -71,18 +72,19 @@ async def async_install_blueprints(hass: HomeAssistant) -> None:
                 _LOGGER.info("Installed blueprint %s", destination)
             elif _normalized(destination.read_text(encoding="utf-8")) != _normalized(content):
                 outdated[source.name] = yaml_util.parse_yaml(content)["blueprint"]["name"]
-        return installed, outdated
+        return [source.name for source in sources], installed, outdated
 
     # earlier versions kept the digests of the installed files here
     await Store(hass, 1, f"{DOMAIN}.blueprints").async_remove()
     try:
-        installed, outdated = await hass.async_add_executor_job(_install)
+        # the folder is listed in the executor too: scandir blocks the event loop
+        names, installed, outdated = await hass.async_add_executor_job(_install)
     except (OSError, HomeAssistantError) as err:
         _LOGGER.error("Could not install the Cable Juice Planner blueprints: %s", err)
         return
-    for source in SOURCE.glob("*.yaml"):
-        if source.name not in outdated:
-            ir.async_delete_issue(hass, DOMAIN, _issue_id(source.name))
+    for name in names:
+        if name not in outdated:
+            ir.async_delete_issue(hass, DOMAIN, _issue_id(name))
     for name, title in outdated.items():
         ir.async_create_issue(
             hass,
